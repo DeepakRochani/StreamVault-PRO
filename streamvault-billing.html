@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>StreamVault PRO - Billing & Subscription</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600&family=Hanken+Grotesk:wght@600;700;800&family=Inter:wght@400&display=swap" rel="stylesheet"/>
+    <!-- Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>`n    <script type="module" src="js/config.js"></script>
+    <script type="module" src="js/config.js"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+              "primary-container": "#ff5540",
+              "surface-container-highest": "#2d3449",
+              "surface-variant": "#2d3449",
+              "primary-fixed": "#ffdad4",
+              "surface-dim": "#0b1326",
+              "surface": "#0b1326",
+              "secondary": "#adc6ff",
+              "error": "#ffb4ab",
+              "background": "#0b1326",
+              "primary": "#ffb4a8",
+              "on-background": "#dae2fd",
+              "surface-container": "#171f33",
+              "on-surface": "#dae2fd"
+            },
+            "fontFamily": {
+              "title-md": ["Hanken Grotesk"],
+              "mono-sm": ["Geist"],
+              "display-lg": ["Hanken Grotesk"],
+              "label-md": ["Geist"],
+              "headline-lg-mobile": ["Hanken Grotesk"],
+              "headline-lg": ["Hanken Grotesk"],
+              "body-lg": ["Inter"],
+              "body-sm": ["Inter"]
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+        body { min-height: max(884px, 100dvh); }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .pro-glow { animation: subtleGlow 3s infinite alternate; }
+        @keyframes subtleGlow {
+            0% { box-shadow: 0 0 10px rgba(255, 85, 64, 0.2); }
+            50% { box-shadow: 0 0 20px rgba(255, 85, 64, 0.5); }
+            100% { box-shadow: 0 0 10px rgba(255, 85, 64, 0.2); }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen font-body-sm text-body-sm relative overflow-x-hidden">
+    <!-- Ambient Glow -->
+    <div class="fixed top-0 left-1/4 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] pointer-events-none z-0"></div>
+
+    <!-- TopAppBar -->
+    <header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-xl border-b border-white/10 shadow-sm flex items-center justify-between px-4 md:px-8 h-16">
+        <button class="nav-home text-on-surface hover:bg-white/5 transition-colors p-2 rounded-full">
+            <span class="material-symbols-outlined">speed</span>
+        </button>
+        <h1 class="font-headline-lg-mobile text-primary tracking-tighter">StreamVault PRO</h1>
+        <button class="nav-settings text-primary hover:bg-white/5 transition-colors p-2 rounded-full">
+            <span class="material-symbols-outlined">account_circle</span>
+        </button>
+    </header>
+
+    <main class="relative z-10 pt-24 pb-32 px-4 md:px-8 max-w-5xl mx-auto space-y-6">
+        
+        <!-- Page Header & Debug Toggles -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
+            <div>
+                <h2 class="text-3xl md:text-4xl font-headline-lg text-on-surface">Billing & Subscription</h2>
+                <p class="text-on-surface/70 mt-2">Manage your current plan and payment methods.</p>
+            </div>
+            
+            <!-- DEBUG TOGGLES (For demonstration purposes) -->
+            <div class="flex gap-2 bg-surface-container-highest/50 p-1.5 rounded-xl border border-white/10">
+                <button onclick="setView('free')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all" id="btn-free">Free View</button>
+                <button onclick="setView('paid')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all" id="btn-paid">Paid View</button>
+                <button onclick="setView('lifetime')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all" id="btn-lifetime">Lifetime View</button>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- VIEW: FREE USER -->
+        <!-- ============================================== -->
+        <div id="view-free" class="billing-view hidden space-y-6">
+            <div class="glass-panel p-6 md:p-8 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-6">
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center">
+                        <span class="material-symbols-outlined text-3xl text-on-surface">account_circle</span>
+                    </div>
+                    <div>
+                        <p class="text-on-surface/70 text-sm font-mono uppercase tracking-wider mb-1">Current Plan</p>
+                        <h3 class="text-3xl font-bold text-on-surface">Free Basic</h3>
+                    </div>
+                </div>
+                <button onclick="window.location.href='streamvault-upgrade.html'" class="w-full md:w-auto px-8 py-3 bg-primary hover:bg-primary-container text-on-primary rounded-full font-bold shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 active:scale-95">
+                    <span class="material-symbols-outlined text-[20px]">bolt</span> Upgrade to PRO
+                </button>
+            </div>
+
+            <div class="glass-panel p-6 md:p-8 rounded-2xl text-center">
+                <span class="material-symbols-outlined text-4xl text-on-surface/30 mb-2">receipt_long</span>
+                <h4 class="text-xl font-bold text-on-surface mb-1">No Billing History</h4>
+                <p class="text-on-surface/60 text-sm">You are currently on the free plan. Invoices will appear here once you upgrade.</p>
+            </div>
+        </div>
+
+
+        <!-- ============================================== -->
+        <!-- VIEW: PAID USER (PRO) -->
+        <!-- ============================================== -->
+        <div id="view-paid" class="billing-view hidden space-y-6">
+            <div class="glass-panel p-6 md:p-8 rounded-2xl relative overflow-hidden">
+                <div class="absolute -right-20 -top-20 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+                
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10 mb-8">
+                    <div class="flex items-center gap-4">
+                        <div class="w-16 h-16 rounded-full bg-surface-container border border-primary/30 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-3xl text-primary" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
+                        </div>
+                        <div>
+                            <p class="text-on-surface/70 text-sm font-mono uppercase tracking-wider mb-1">Current Plan</p>
+                            <div class="flex items-center gap-3">
+                                <h3 class="text-3xl font-bold text-on-surface">StreamVault PRO</h3>
+                                <span class="bg-primary-container/20 text-primary border border-primary/20 text-xs px-2 py-0.5 rounded-full font-bold uppercase pro-glow">Active</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="px-6 py-2.5 bg-surface-container-highest hover:bg-white/10 border border-white/10 text-on-surface rounded-lg font-bold transition-all">
+                        Manage Billing
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10 pt-6 border-t border-white/10">
+                    <div>
+                        <p class="text-sm text-on-surface/60 mb-1">Billing Cycle</p>
+                        <p class="font-bold text-on-surface">$12.99 / Month</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-on-surface/60 mb-1">Next Renewal Date</p>
+                        <p class="font-bold text-on-surface">Nov 24, 2026</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-on-surface/60 mb-1">Payment Method</p>
+                        <p class="font-bold text-on-surface flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px]">credit_card</span> •••• 4242
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-panel rounded-2xl overflow-hidden">
+                <div class="p-6 border-b border-white/10">
+                    <h4 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary">history</span> Payment History
+                    </h4>
+                </div>
+                <div class="divide-y divide-white/5">
+                    <div class="p-4 px-6 flex justify-between items-center hover:bg-white/5 transition-colors">
+                        <div>
+                            <p class="font-bold text-on-surface">StreamVault PRO Monthly</p>
+                            <p class="text-xs text-on-surface/60">Oct 24, 2026</p>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="font-mono text-on-surface">$12.99</span>
+                            <button class="text-primary hover:underline text-sm font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">download</span> Invoice</button>
+                        </div>
+                    </div>
+                    <div class="p-4 px-6 flex justify-between items-center hover:bg-white/5 transition-colors">
+                        <div>
+                            <p class="font-bold text-on-surface">StreamVault PRO Monthly</p>
+                            <p class="text-xs text-on-surface/60">Sep 24, 2026</p>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="font-mono text-on-surface">$12.99</span>
+                            <button class="text-primary hover:underline text-sm font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">download</span> Invoice</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Danger Zone -->
+            <div class="flex justify-end pt-4">
+                <button class="text-error/70 hover:text-error text-sm font-bold transition-colors flex items-center gap-1">
+                    Cancel Subscription
+                </button>
+            </div>
+        </div>
+
+
+        <!-- ============================================== -->
+        <!-- VIEW: LIFETIME USER -->
+        <!-- ============================================== -->
+        <div id="view-lifetime" class="billing-view hidden space-y-6">
+            <div class="glass-panel p-6 md:p-8 rounded-2xl relative overflow-hidden border-yellow-500/30">
+                <div class="absolute -right-20 -top-20 w-64 h-64 bg-yellow-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                
+                <div class="flex items-center gap-4 relative z-10 mb-8">
+                    <div class="w-16 h-16 rounded-full bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-3xl text-yellow-400" style="font-variation-settings: 'FILL' 1;">stars</span>
+                    </div>
+                    <div>
+                        <p class="text-on-surface/70 text-sm font-mono uppercase tracking-wider mb-1">Current Plan</p>
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-3xl font-bold text-on-surface">Lifetime Access</h3>
+                            <span class="bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 text-xs px-2 py-0.5 rounded-full font-bold uppercase shadow-[0_0_10px_rgba(234,179,8,0.2)]">Permanent</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10 pt-6 border-t border-white/10">
+                    <div>
+                        <p class="text-sm text-on-surface/60 mb-1">Purchase Date</p>
+                        <p class="font-bold text-on-surface">Jan 12, 2026</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-on-surface/60 mb-1">Initial Invoice</p>
+                        <button class="text-yellow-400 hover:text-yellow-300 font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">download</span> Download Receipt</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="glass-panel p-6 rounded-2xl flex items-start gap-4 border-l-4 border-l-yellow-500">
+                <span class="material-symbols-outlined text-yellow-500 text-2xl mt-0.5">verified_user</span>
+                <div>
+                    <h4 class="font-bold text-on-surface mb-1">Lifetime Status Active</h4>
+                    <p class="text-on-surface/70 text-sm">Your account will never expire and no further renewals will be charged. Enjoy unlimited, permanent access to all PRO features.</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- BottomNavBar -->
+    <nav class="fixed bottom-0 w-full z-50 rounded-t-xl bg-surface/90 backdrop-blur-2xl border-t border-white/5 shadow-[0_-4px_20px_rgba(0,0,0,0.4)] md:hidden">
+        <div class="flex justify-around items-center px-4 py-2 pb-6 w-full">
+            <a class="nav-home flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary transition-all active:scale-90 duration-200 cursor-pointer">
+                <span class="material-symbols-outlined mb-1 text-[24px]">home</span>
+                <span class="font-label-md">Home</span>
+            </a>
+            <a class="nav-settings flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-5 py-1.5 active:scale-90 duration-200 cursor-pointer">
+                <span class="material-symbols-outlined mb-1 text-[24px]" style="font-variation-settings: 'FILL' 1;">settings</span>
+                <span class="font-label-md">Settings</span>
+            </a>
+        </div>
+    </nav>
+
+    <script>
+        // Set the active view dynamically for debugging
+        function setView(viewId) {
+            // Hide all views
+            document.querySelectorAll('.billing-view').forEach(el => el.classList.add('hidden'));
+            // Reset button styles
+            document.querySelectorAll('[id^="btn-"]').forEach(el => {
+                el.classList.remove('bg-white', 'text-black');
+                el.classList.add('text-on-surface', 'hover:bg-white/10');
+            });
+            
+            // Show selected view
+            document.getElementById('view-' + viewId).classList.remove('hidden');
+            // Highlight active button
+            const btn = document.getElementById('btn-' + viewId);
+            btn.classList.add('bg-white', 'text-black');
+            btn.classList.remove('text-on-surface', 'hover:bg-white/10');
+        }
+
+        // Initialize default view to Paid
+        document.addEventListener('DOMContentLoaded', () => {
+            setView('paid');
+            
+            // Basic Nav
+            document.querySelectorAll('.nav-home').forEach(el => {
+                el.addEventListener('click', () => { window.location.href = 'index.html'; });
+            });
+            document.querySelectorAll('.nav-settings').forEach(el => {
+                el.addEventListener('click', () => { window.location.href = 'app-settings.html'; });
+            });
+        });
+    </script>
+</body>
+</html>

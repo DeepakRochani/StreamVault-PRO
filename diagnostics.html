@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamVault PRO - Diagnostics</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>`n    <script type="module" src="js/config.js"></script>
+    <script type="module" src="js/config.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="js/url-parser.js"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-5">
+    <div class="max-w-3xl mx-auto">
+        <h1 class="text-3xl font-bold mb-4 text-red-500">URL Detection Diagnostics</h1>
+        
+        <div class="bg-gray-800 p-4 rounded-lg shadow-lg mb-5">
+            <h2 class="text-xl font-semibold mb-4">Test URL Parsing</h2>
+            <div class="flex gap-4 mb-4">
+                <input type="text" id="diag-url-input" class="flex-1 bg-gray-700 text-white p-3 rounded border border-gray-600 focus:border-red-500 focus:outline-none" placeholder="Paste Instagram/Facebook/YouTube URL here...">
+                <button id="diag-btn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded font-medium transition-colors">Test Detection</button>
+            </div>
+        </div>
+
+        <div id="results-panel" class="hidden bg-gray-800 p-4 rounded-lg shadow-lg">
+            <h2 class="text-xl font-semibold mb-4 border-b border-gray-700 pb-2">Diagnostic Results</h2>
+            <div class="space-y-4 font-mono text-sm">
+                <div>
+                    <span class="text-gray-400">Original Input:</span>
+                    <div id="res-original" class="break-all mt-1 bg-gray-900 p-2 rounded border border-gray-700 text-yellow-300"></div>
+                </div>
+                <div>
+                    <span class="text-gray-400">Normalized URL (Sent to yt-dlp):</span>
+                    <div id="res-normalized" class="break-all mt-1 bg-gray-900 p-2 rounded border border-gray-700 text-green-400"></div>
+                </div>
+                <div class="flex items-center justify-between bg-gray-900 p-3 rounded border border-gray-700">
+                    <span class="text-gray-400">Detection Status:</span>
+                    <span id="res-status" class="font-bold"></span>
+                </div>
+                <div class="flex items-center justify-between bg-gray-900 p-3 rounded border border-gray-700">
+                    <span class="text-gray-400">Platform Detected:</span>
+                    <span id="res-platform" class="text-blue-400 font-bold uppercase"></span>
+                </div>
+                <div>
+                    <span class="text-gray-400">Extraction Readiness:</span>
+                    <div id="res-ready" class="mt-1 bg-gray-900 p-2 rounded border border-gray-700"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('diag-btn').addEventListener('click', () => {
+            const input = document.getElementById('diag-url-input').value.trim();
+            if(!input) return;
+
+            document.getElementById('results-panel').classList.remove('hidden');
+            document.getElementById('res-original').textContent = input;
+
+            const check = window.URLParser.detectPlatform(input);
+            
+            document.getElementById('res-normalized').textContent = check.normalizedUrl || 'N/A';
+            
+            const statusEl = document.getElementById('res-status');
+            if(check.valid) {
+                statusEl.textContent = 'PASSED';
+                statusEl.className = 'font-bold text-green-500';
+            } else {
+                statusEl.textContent = 'FAILED';
+                statusEl.className = 'font-bold text-red-500';
+            }
+
+            document.getElementById('res-platform').textContent = check.type;
+            
+            const readyEl = document.getElementById('res-ready');
+            if(check.valid) {
+                readyEl.innerHTML = `<span class="text-green-400">✓ Engine is ready to extract this stream.</span>`;
+                if(check.type === 'instagram' || check.type === 'facebook') {
+                    readyEl.innerHTML += `<br><span class="text-yellow-400">⚠ Note: Requires local Chrome cookies for authentication.</span>`;
+                }
+            } else {
+                readyEl.innerHTML = `<span class="text-red-400">✗ Blocked: ${check.reason}</span>`;
+            }
+        });
+    </script>
+</body>
+</html>

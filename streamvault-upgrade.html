@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upgrade Your Plan — StreamVault PRO</title>
+    <meta name="description" content="Unlock 4K downloads, batch downloading, ad-free experience and more with StreamVault PRO Premium plans.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --surface: #111118;
+            --surface-high: #18181f;
+            --border: rgba(255,255,255,0.07);
+            --border-hover: rgba(255,255,255,0.18);
+            --text: #f0f0ff;
+            --text-muted: #8888a8;
+            --primary: #7c6fff;
+            --primary-glow: rgba(124,111,255,0.25);
+            --gold: #fbbf24;
+            --gold-glow: rgba(251,191,36,0.2);
+            --green: #34d399;
+            --red: #f87171;
+            --radius: 16px;
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ── Background ── */
+        .bg-orbs {
+            position: fixed; inset: 0; pointer-events: none; z-index: 0;
+        }
+        .orb {
+            position: absolute; border-radius: 50%; filter: blur(100px); opacity: 0.12;
+        }
+        .orb-1 { width: 600px; height: 600px; background: #7c6fff; top: -200px; left: -100px; }
+        .orb-2 { width: 500px; height: 500px; background: #f472b6; bottom: -150px; right: -100px; }
+        .orb-3 { width: 400px; height: 400px; background: #34d399; top: 40%; left: 50%; transform: translate(-50%,-50%); }
+
+        /* ── Layout ── */
+        .page { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+        /* ── Nav ── */
+        .top-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 1rem 1.5rem;
+            background: rgba(10,10,15,0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; z-index: 100;
+        }
+        .nav-logo { display: flex; align-items: center; gap: 0.5rem; font-weight: 800; font-size: 1.1rem; color: var(--text); text-decoration: none; }
+        .nav-logo span { color: var(--primary); }
+        .nav-links { display: flex; align-items: center; gap: 1rem; }
+        .nav-btn {
+            padding: 0.4rem 1rem; border-radius: 8px; text-decoration: none;
+            font-size: 0.85rem; font-weight: 600; transition: all 0.2s;
+        }
+        .nav-btn-ghost { color: var(--text-muted); border: 1px solid var(--border); }
+        .nav-btn-ghost:hover { border-color: var(--primary); color: var(--primary); }
+        .nav-btn-primary { background: var(--primary); color: #fff; }
+        .nav-btn-primary:hover { opacity: 0.9; }
+
+        /* ── Hero ── */
+        .hero { text-align: center; padding: 4rem 1rem 2rem; }
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            padding: 0.3rem 0.8rem; border-radius: 100px;
+            background: var(--primary-glow); border: 1px solid rgba(124,111,255,0.3);
+            font-size: 0.75rem; font-weight: 700; color: var(--primary);
+            letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 1.5rem;
+        }
+        .hero h1 {
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 900; line-height: 1.1;
+            background: linear-gradient(135deg, #fff 40%, var(--primary) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; max-width: 560px; margin: 0 auto 2.5rem; line-height: 1.7; }
+
+        /* ── Billing Toggle ── */
+        .billing-toggle {
+            display: inline-flex; align-items: center; gap: 0;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 100px; padding: 4px; margin-bottom: 3rem;
+        }
+        .toggle-btn {
+            padding: 0.4rem 1.2rem; border-radius: 100px; border: none;
+            font-size: 0.875rem; font-weight: 600; cursor: pointer;
+            transition: all 0.25s; color: var(--text-muted); background: transparent;
+        }
+        .toggle-btn.active { background: var(--primary); color: #fff; box-shadow: 0 0 20px var(--primary-glow); }
+        .toggle-save {
+            font-size: 0.7rem; font-weight: 700; color: var(--green);
+            background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.3);
+            border-radius: 4px; padding: 2px 6px; margin-left: 0.5rem; vertical-align: middle;
+        }
+
+        /* ── Plan Grid ── */
+        .plans-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.5rem;
+            align-items: start;
+        }
+
+        .plan-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        .plan-card:hover { border-color: var(--border-hover); transform: translateY(-4px); box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+        .plan-card.featured {
+            border-color: var(--primary);
+            background: linear-gradient(135deg, rgba(124,111,255,0.08), var(--surface));
+            box-shadow: 0 0 0 1px var(--primary), 0 20px 60px var(--primary-glow);
+        }
+        .plan-card.lifetime-card {
+            border-color: var(--gold);
+            background: linear-gradient(135deg, rgba(251,191,36,0.05), var(--surface));
+            box-shadow: 0 0 0 1px rgba(251,191,36,0.5), 0 20px 60px var(--gold-glow);
+        }
+        .plan-card.current-plan { opacity: 0.7; }
+
+        .featured-badge {
+            position: absolute; top: 1rem; right: 1rem;
+            background: var(--primary); color: #fff;
+            font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em;
+            text-transform: uppercase; padding: 3px 10px; border-radius: 100px;
+        }
+        .lifetime-badge {
+            position: absolute; top: 1rem; right: 1rem;
+            background: var(--gold); color: #000;
+            font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em;
+            text-transform: uppercase; padding: 3px 10px; border-radius: 100px;
+        }
+        .current-badge {
+            position: absolute; top: 1rem; right: 1rem;
+            background: rgba(52,211,153,0.15); color: var(--green);
+            border: 1px solid rgba(52,211,153,0.3);
+            font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em;
+            text-transform: uppercase; padding: 3px 10px; border-radius: 100px;
+        }
+
+        .plan-icon {
+            width: 48px; height: 48px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 1rem; font-size: 1.5rem;
+        }
+        .plan-name { font-size: 1.2rem; font-weight: 800; margin-bottom: 0.25rem; }
+        .plan-desc { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.5rem; }
+
+        .plan-price-block { margin-bottom: 1.5rem; }
+        .plan-price-main {
+            display: flex; align-items: baseline; gap: 2px;
+        }
+        .price-currency { font-size: 1.2rem; font-weight: 700; color: var(--text-muted); }
+        .price-amount { font-size: 2.8rem; font-weight: 900; line-height: 1; }
+        .price-cycle { font-size: 0.85rem; color: var(--text-muted); margin-left: 4px; }
+        .price-yearly-note { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+        .plan-features { list-style: none; margin-bottom: 2rem; display: flex; flex-direction: column; gap: 0.6rem; }
+        .plan-features li {
+            display: flex; align-items: center; gap: 0.5rem;
+            font-size: 0.875rem; color: var(--text-muted);
+        }
+        .plan-features li.active { color: var(--text); }
+        .plan-features li .material-symbols-outlined { font-size: 16px; }
+        .feat-check { color: var(--green); }
+        .feat-cross { color: var(--red); }
+
+        .plan-cta {
+            width: 100%; padding: 0.75rem; border-radius: 10px;
+            font-size: 0.9rem; font-weight: 700; cursor: pointer;
+            border: none; transition: all 0.25s; letter-spacing: 0.02em;
+        }
+        .cta-primary { background: var(--primary); color: #fff; }
+        .cta-primary:hover { box-shadow: 0 0 30px var(--primary-glow); transform: translateY(-1px); }
+        .cta-gold { background: var(--gold); color: #000; }
+        .cta-gold:hover { box-shadow: 0 0 30px var(--gold-glow); transform: translateY(-1px); }
+        .cta-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); cursor: default; }
+        .cta-current { background: rgba(52,211,153,0.1); color: var(--green); border: 1px solid rgba(52,211,153,0.3); cursor: default; }
+
+        
+        /* ── Auth Modal ── */
+        .auth-overlay {
+            position: fixed; inset: 0; z-index: 250;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(12px);
+            display: none; padding: 1rem;
+            align-items: center; justify-content: center;
+        }
+        .auth-overlay.show { display: flex; }
+        .auth-modal {
+            background: var(--surface-high); border: 1px solid var(--border);
+            border-radius: var(--radius); width: 100%; max-width: 450px;
+            padding: 2.5rem; position: relative;
+            animation: slideUp 0.3s ease;
+        }
+        .auth-tabs { display: flex; gap: 1rem; margin-bottom: 2rem; border-bottom: 1px solid var(--border); }
+        .auth-tab { padding: 0.5rem 1rem; cursor: pointer; color: var(--text-muted); font-weight: 700; border-bottom: 2px solid transparent; }
+        .auth-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .auth-input {
+            width: 100%; background: var(--surface); border: 1px solid var(--border);
+            border-radius: 8px; padding: 0.8rem 1rem; color: var(--text); font-size: 0.95rem;
+            margin-bottom: 1rem; outline: none; transition: border-color 0.2s;
+        }
+        .auth-input:focus { border-color: var(--primary); }
+        .auth-btn {
+            width: 100%; padding: 0.9rem; border-radius: 10px; font-size: 1rem; font-weight: 800;
+            background: var(--primary); color: #fff; cursor: pointer; border: none; margin-top: 1rem;
+            transition: all 0.2s; display: flex; justify-content: center; align-items: center; gap: 0.5rem;
+        }
+        .auth-btn:hover { opacity: 0.9; box-shadow: 0 0 20px var(--primary-glow); }
+        .auth-msg { margin-top: 1rem; font-size: 0.85rem; text-align: center; }
+
+        /* ── Payment Modal ── */
+        .modal-overlay {
+            position: fixed; inset: 0; z-index: 200;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(12px);
+            display: none; padding: 1rem 1rem 80px 1rem;
+            overflow-y: auto; -webkit-overflow-scrolling: touch;
+        }
+        .modal-overlay.show { display: block; }
+        .modal {
+            background: var(--surface-high); border: 1px solid var(--border);
+            border-radius: var(--radius); width: 100%; max-width: 1100px;
+            position: relative; margin: 2rem auto 80px auto;
+            animation: slideUp 0.3s ease;
+            display: flex; flex-direction: column; overflow: hidden;
+            height: auto;
+        }
+        @media(min-width: 1024px) {
+            .modal { flex-direction: row; }
+        }
+        .modal-left {
+            padding: 2rem; background: var(--surface); border-bottom: 1px solid var(--border);
+            display: flex; flex-direction: column;
+        }
+        @media(min-width: 1024px) {
+            .modal-left { border-bottom: none; border-right: 1px solid var(--border); padding: 3rem; flex: 1; }
+        }
+        .modal-right {
+            padding: 2rem; flex: 1.2; display: flex; flex-direction: column;
+        }
+        @media(min-width: 1024px) {
+            .modal-right { padding: 3rem; }
+        }
+
+        .modal-left h3 { font-size: 2rem; font-weight: 900; margin-bottom: 0.5rem; color: var(--text); }
+        .modal-left p.desc { color: var(--text-muted); margin-bottom: 2rem; font-size: 1rem; line-height: 1.6; }
+        .modal-left .benefits-mockup { margin-top: auto; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .modal-left .benefits-mockup p { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem; font-weight: 600; }
+        .modal-left .benefits-mockup p::before { content: '✓'; color: var(--green); font-weight: 900; }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .modal-close {
+            position: absolute; top: 1rem; right: 1rem;
+            background: transparent; border: none; color: var(--text-muted);
+            cursor: pointer; padding: 4px; border-radius: 8px;
+            display: flex; transition: color 0.2s;
+        }
+        .modal-close:hover { color: var(--text); }
+        .modal-header { margin-bottom: 1.5rem; }
+        .modal-header h3 { font-size: 1.3rem; font-weight: 800; margin-bottom: 0.25rem; }
+        .modal-header p { font-size: 0.85rem; color: var(--text-muted); }
+        .order-summary {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.5rem;
+        }
+        .order-row { display: flex; justify-content: space-between; align-items: center; padding: 0.3rem 0; font-size: 0.875rem; }
+        .order-row.total { border-top: 1px solid var(--border); margin-top: 0.5rem; padding-top: 0.75rem; font-weight: 700; font-size: 1rem; }
+        .order-row .label { color: var(--text-muted); }
+
+        /* Simulated Card UI */
+        .sim-card-block { margin-bottom: 1.25rem; }
+        .sim-label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.4rem; letter-spacing: 0.05em; text-transform: uppercase; }
+        .sim-input {
+            width: 100%; background: var(--surface); border: 1px solid var(--border);
+            border-radius: 8px; padding: 0.6rem 0.8rem; color: var(--text); font-size: 0.9rem;
+            font-family: 'Inter', monospace; outline: none; transition: border-color 0.2s;
+        }
+        .sim-input:focus { border-color: var(--primary); }
+        .sim-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+        .sim-providers { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
+        .sim-provider-tag {
+            padding: 10px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 700;
+            border: 1px solid var(--border); color: var(--text-muted);
+            cursor: pointer; transition: all 0.2s; text-align: center;
+        }
+        .sim-provider-tag:hover { border-color: var(--primary); color: var(--text); }
+        .method-tag.active { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 0 15px var(--primary-glow); }
+        
+        .payment-methods-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1.5rem;
+        }
+        @media(min-width: 768px) {
+            .payment-methods-grid { grid-template-columns: 1fr 1fr 1fr; }
+        }
+
+        .pay-btn {
+            width: 100%; padding: 0.9rem; border-radius: 10px; min-height: 48px;
+            font-size: 1rem; font-weight: 800; cursor: pointer; border: none;
+            background: var(--primary); color: #fff;
+            display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+            transition: all 0.25s;
+        }
+        .pay-btn:hover { box-shadow: 0 0 30px var(--primary-glow); }
+        .pay-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .pay-btn.gold-pay { background: var(--gold); color: #000; }
+        .pay-btn.gold-pay:hover { box-shadow: 0 0 30px var(--gold-glow); }
+        .sandbox-note {
+            text-align: center; font-size: 0.72rem; color: var(--text-muted);
+            margin-top: 0.75rem; display: flex; align-items: center; justify-content: center; gap: 0.3rem;
+        }
+
+        /* ── Success Screen ── */
+        .success-overlay {
+            position: fixed; inset: 0; z-index: 300;
+            background: rgba(0,0,0,0.95); backdrop-filter: blur(20px);
+            display: none; padding: 2rem 1rem;
+            overflow-y: auto; -webkit-overflow-scrolling: touch;
+        }
+        .success-overlay.show { display: block; }
+        .success-overlay-content {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; margin: 10vh auto; max-width: 500px;
+        }
+        .success-icon {
+            width: 80px; height: 80px; border-radius: 50%;
+            background: rgba(52,211,153,0.15); border: 2px solid var(--green);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2.5rem; margin-bottom: 1.5rem;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .success-overlay h2 { font-size: 2rem; font-weight: 900; margin-bottom: 0.5rem; }
+        .success-overlay p { color: var(--text-muted); font-size: 1rem; max-width: 360px; margin: 0 auto 2rem; }
+        .success-actions { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+        .success-btn {
+            padding: 0.7rem 1.5rem; border-radius: 10px; font-size: 0.9rem;
+            font-weight: 700; text-decoration: none; border: none; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .success-btn-primary { background: var(--primary); color: #fff; }
+        .success-btn-primary:hover { opacity: 0.9; }
+        .success-btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+        .success-btn-ghost:hover { border-color: var(--text-muted); color: var(--text); }
+
+        /* ── Loading spinner ── */
+        .spinner {
+            width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff; border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Footer note ── */
+        .upgrade-footer {
+            text-align: center; margin-top: 3rem; color: var(--text-muted);
+            font-size: 0.8rem; line-height: 1.8;
+        }
+        .upgrade-footer a { color: var(--primary); text-decoration: none; }
+    </style>
+</head>
+<body>
+
+<!-- Background -->
+<div class="bg-orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+</div>
+
+<!-- Nav -->
+<nav class="top-nav">
+    <a href="index.html" class="nav-logo">
+        <span class="material-symbols-outlined">video_library</span>
+        Stream<span>Vault</span>
+    </a>
+    <div class="nav-links">
+        <a href="streamvault-profile.html" class="nav-btn nav-btn-ghost">My Profile</a>
+        <a href="index.html" class="nav-btn nav-btn-ghost">Dashboard</a>
+    </div>
+</nav>
+
+<!-- Main Content -->
+<div class="page">
+
+    <!-- Hero -->
+    <div class="hero">
+        <div class="hero-badge">
+            <span class="material-symbols-outlined" style="font-size:14px">bolt</span>
+            Upgrade Your Experience
+        </div>
+        <h1>Unlock the Full Power<br>of StreamVault PRO</h1>
+        <p>Download in 4K, go ad-free, batch download entire playlists. Choose the plan that fits your workflow.</p>
+
+        <!-- Billing Cycle Toggle -->
+        <div>
+            <div class="billing-toggle">
+                <button class="toggle-btn active" id="toggle-monthly" onclick="switchBilling('monthly')">Monthly</button>
+                <button class="toggle-btn" id="toggle-yearly" onclick="switchBilling('yearly')">
+                    Yearly <span class="toggle-save" id="yearly-save-badge">Save 15%</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plans Grid -->
+    <div class="plans-grid" id="plans-grid">
+        <div style="grid-column:1/-1; text-align:center; padding:3rem; color:var(--text-muted);">
+            <div class="spinner" style="margin:0 auto 1rem;"></div>
+            Loading plans...
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="upgrade-footer">
+        All plans include core downloading features.<br>
+        Upgrades activate instantly after payment confirmation.<br>
+        Need help? <a href="#">Contact Support</a>
+    </div>
+</div>
+
+
+<!-- Auth Modal -->
+<div class="auth-overlay" id="auth-modal">
+    <div class="auth-modal">
+        <button class="modal-close" onclick="closeAuthModal()">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+        <h2 style="margin-bottom: 0.5rem;">Access Required</h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 2rem;">Please sign in or create an account to purchase a subscription.</p>
+        
+        <div class="auth-tabs">
+            <div class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Log In</div>
+            <div class="auth-tab" id="tab-signup" onclick="switchAuthTab('signup')">Sign Up</div>
+        </div>
+
+        <form id="auth-form" onsubmit="handleAuth(event)">
+            <input type="email" id="auth-email" class="auth-input" placeholder="Email Address" required>
+            <input type="password" id="auth-password" class="auth-input" placeholder="Password" required>
+            <button type="submit" class="auth-btn" id="auth-submit-btn">
+                <span>Continue</span>
+            </button>
+            <div id="auth-msg" class="auth-msg"></div>
+        </form>
+    </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal-overlay" id="payment-modal">
+    <div class="modal">
+        <button class="modal-close" onclick="closePaymentModal()" style="z-index: 10;">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+
+        <!-- Left Column: Plan Details -->
+        <div class="modal-left" id="modal-left-content">
+            <h3 id="modal-plan-name-left">Plan Name</h3>
+            <p class="desc" id="modal-plan-desc-left">Upgrade your experience.</p>
+            <ul class="plan-features" id="modal-plan-features-left" style="margin-bottom:2rem; padding:0; flex-grow:1;">
+            </ul>
+            <div class="benefits-mockup">
+                <p>30-Day Money-Back Guarantee</p>
+                <p>Secure 256-bit Encryption</p>
+                <p>Instant Account Activation</p>
+            </div>
+        </div>
+
+        <!-- Right Column: Checkout -->
+        <div class="modal-right">
+            <div class="modal-header">
+                <h3>Complete Your Purchase</h3>
+                <p>Sandbox mode — no real payment is processed</p>
+            </div>
+
+            <!-- Order Summary -->
+            <div class="order-summary" style="position: sticky; top: 1rem; z-index: 5;">
+            <div class="order-row"><span class="label">Plan</span><span id="modal-plan-name">—</span></div>
+            <div class="order-row"><span class="label">Billing</span><span id="modal-billing-cycle">—</span></div>
+            <div class="order-row"><span class="label">Subtotal</span><span id="modal-subtotal">₹0</span></div>
+            <div class="order-row" id="modal-discount-row" style="display:none; color:var(--green);"><span class="label" style="color:var(--green)">Discount</span><span id="modal-discount">-₹0</span></div>
+            <div class="order-row"><span class="label">Tax (18% GST)</span><span id="modal-tax">₹0</span></div>
+            <div class="order-row total"><span class="label">Total</span><span id="modal-total">₹0</span></div>
+        </div>
+
+        <!-- Promo Code -->
+        <div class="sim-card-block" id="promo-block" style="margin-bottom: 0.5rem;">
+            <div style="display:flex; gap:0.5rem">
+                <input class="sim-input" id="sim-promo" placeholder="PROMO CODE" style="text-transform:uppercase; font-size:0.8rem; padding: 0.4rem 0.8rem;">
+                <button onclick="applyPromo()" class="nav-btn-primary nav-btn" style="border:none; cursor:pointer;">Apply</button>
+            </div>
+            <div id="promo-msg" style="font-size:0.75rem; margin-top:0.4rem; font-weight:bold;"></div>
+        </div>
+
+        <!-- Payment Methods -->
+        <div class="sim-label" style="margin-top:1.5rem; border-top:1px solid var(--border); padding-top:1.5rem;">Select Payment Method</div>
+        <div class="payment-methods-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:1.5rem;">
+            <div class="sim-provider-tag method-tag active" onclick="selectMethod('card')" id="tag-card">Credit/Debit Card</div>
+            <div class="sim-provider-tag method-tag" onclick="selectMethod('upi')" id="tag-upi">UPI</div>
+            <div class="sim-provider-tag method-tag" onclick="selectMethod('gpay')" id="tag-gpay">Google Pay</div>
+            <div class="sim-provider-tag method-tag" onclick="selectMethod('phonepe')" id="tag-phonepe">PhonePe</div>
+            <div class="sim-provider-tag method-tag" onclick="selectMethod('paytm')" id="tag-paytm">Paytm</div>
+            <div class="sim-provider-tag method-tag" onclick="selectMethod('netbanking')" id="tag-netbanking">Net Banking</div>
+            <div class="sim-provider-tag method-tag" onclick="selectMethod('wallet')" id="tag-wallet" style="grid-column: 1 / -1;">Wallets</div>
+        </div>
+
+        <!-- Forms Container -->
+        <div id="form-container">
+            <!-- Card Form -->
+            <div id="form-card">
+                <!-- Saved Cards Mock -->
+                <div id="saved-cards-section" style="display:none; margin-bottom:1rem; padding:0.75rem; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:8px;">
+                    <div style="font-size:0.75rem; font-weight:700; margin-bottom:0.5rem; color:var(--text-muted)">SAVED CARDS</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem;">
+                        <div style="display:flex; gap:0.5rem; align-items:center;">
+                            <span class="material-symbols-outlined" style="font-size:18px;">credit_card</span>
+                            <span style="font-weight:600">Visa ****1234</span>
+                        </div>
+                        <div style="display:flex; gap:0.5rem;">
+                            <button onclick="useSavedCard()" class="nav-btn-ghost" style="padding:4px 10px; font-size:0.75rem; font-weight:bold; cursor:pointer; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:6px;">Use</button>
+                            <button class="nav-btn-ghost" style="padding:4px 10px; font-size:0.75rem; font-weight:bold; cursor:pointer; background:none; border:none; color:var(--red);">Remove</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sim-card-block">
+                    <div class="sim-label">Card Number</div>
+                    <input class="sim-input" id="sim-card-num" placeholder="XXXX XXXX XXXX XXXX" maxlength="19" oninput="formatCard(this)" autocomplete="off">
+                </div>
+                <div class="sim-row">
+                    <div class="sim-card-block">
+                        <div class="sim-label">Expiry</div>
+                        <input class="sim-input" id="sim-expiry" placeholder="MM / YY" maxlength="7" oninput="formatExpiry(this)" autocomplete="off">
+                    </div>
+                    <div class="sim-card-block">
+                        <div class="sim-label">CVV</div>
+                        <input class="sim-input" id="sim-cvv" placeholder="•••" maxlength="4" type="password" autocomplete="off">
+                    </div>
+                </div>
+                <div class="sim-card-block">
+                    <div class="sim-label">Name on Card</div>
+                    <input class="sim-input" id="sim-name" placeholder="Name as on card" autocomplete="off">
+                </div>
+            </div>
+
+            <!-- UPI Form -->
+            <div id="form-upi" style="display:none;">
+                <div class="sim-card-block">
+                    <div class="sim-label">Enter UPI ID</div>
+                    <input class="sim-input" id="sim-upi-id" placeholder="username@upi" autocomplete="off">
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.75rem; text-align:center;">Or scan QR code on the next step.</div>
+                </div>
+            </div>
+
+            <!-- Redirect Forms (GPay, PhonePe, Paytm, NetBanking, Wallets) -->
+            <div id="form-redirect" style="display:none;">
+                <div style="text-align:center; padding:1.5rem; border:1px dashed var(--border); border-radius:8px; margin-bottom:1rem;">
+                    <span class="material-symbols-outlined" style="font-size:2.5rem; color:var(--text-muted); margin-bottom:0.5rem;">open_in_new</span>
+                    <div style="font-size:0.95rem; font-weight:700;">You will be redirected</div>
+                    <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.3rem;">Complete the payment securely on the partner platform.</div>
+                </div>
+            </div>
+        </div>
+
+        <button class="pay-btn" id="pay-btn" onclick="confirmPayment()">
+            <span class="material-symbols-outlined">lock</span>
+            <span id="pay-btn-label">Pay Securely</span>
+        </button>
+        <div class="sandbox-note">
+            <span class="material-symbols-outlined" style="font-size:14px">security</span>
+            Sandbox mode — provider integration ready
+        </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success Screen -->
+<div class="success-overlay" id="success-screen">
+    <div class="success-overlay-content">
+        <div class="success-icon">✓</div>
+        <h2>You're All Set! 🎉</h2>
+        <p id="success-msg">Your <strong id="success-plan-name">Premium</strong> plan is now active. Enjoy your upgraded experience!</p>
+        <div class="success-actions">
+            <a href="streamvault-profile.html" class="success-btn success-btn-primary">View My Plan</a>
+            <a href="index.html" class="success-btn success-btn-ghost">Go to Dashboard</a>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>`n    <script type="module" src="js/config.js"></script>
+    <script type="module" src="js/config.js"></script>
+    <script>
+// ─── State ─────────────────────────────────────────────────────────────────
+let plans = [];
+let currentPlanId = null;
+let billingCycle = 'monthly';
+let activePlanId = null;
+let activePaymentId = null;
+let originalAmount = 0;
+let appliedPromo = null;
+let selectedMethod = 'card';
+let calculatedTotal = 0;
+
+function selectMethod(method) {
+    selectedMethod = method;
+    document.querySelectorAll('.method-tag').forEach(el => el.classList.remove('active'));
+    document.getElementById('tag-' + method).classList.add('active');
+
+    document.getElementById('form-card').style.display = 'none';
+    document.getElementById('form-upi').style.display = 'none';
+    document.getElementById('form-redirect').style.display = 'none';
+
+    if(method === 'card') document.getElementById('form-card').style.display = 'block';
+    else if(method === 'upi') document.getElementById('form-upi').style.display = 'block';
+    else document.getElementById('form-redirect').style.display = 'block';
+}
+
+function useSavedCard() {
+    document.getElementById('sim-card-num').value = '**** **** **** 1234';
+    document.getElementById('sim-expiry').value = '12 / 29';
+    document.getElementById('sim-cvv').value = '***';
+    document.getElementById('sim-name').value = 'Saved User';
+}
+
+function updateSummaryDisplay(subtotal, discount) {
+    const tax = Math.round((subtotal - discount) * 0.18);
+    calculatedTotal = (subtotal - discount) + tax;
+    
+    document.getElementById('modal-subtotal').textContent = `₹${subtotal.toLocaleString('en-IN')}`;
+    if (discount > 0) {
+        document.getElementById('modal-discount-row').style.display = 'flex';
+        document.getElementById('modal-discount').textContent = `-₹${discount.toLocaleString('en-IN')}`;
+    } else {
+        document.getElementById('modal-discount-row').style.display = 'none';
+    }
+    document.getElementById('modal-tax').textContent = `₹${tax.toLocaleString('en-IN')}`;
+    document.getElementById('modal-total').textContent = `₹${calculatedTotal.toLocaleString('en-IN')}`;
+    document.getElementById('pay-btn-label').textContent = `Pay ₹${calculatedTotal.toLocaleString('en-IN')} Securely`;
+}
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+async function init() {
+    // Check login & current plan
+    try {
+        const me = await fetch((window.API_BASE_URL || '') + '/api/auth/me').then(r => r.json());
+        if (me.loggedIn && me.user.subscription) {
+            currentPlanId = me.user.subscription.plan_id;
+        }
+    } catch(e) {}
+
+    // Load plans
+    try {
+        const data = await fetch((window.API_BASE_URL || '') + '/api/payment/plans').then(r => r.json());
+        if (data.success) {
+            plans = data.plans;
+            renderPlans();
+        }
+    } catch(e) {
+        document.getElementById('plans-grid').innerHTML =
+            '<p style="text-align:center;color:var(--text-muted);grid-column:1/-1;padding:3rem">Failed to load plans. Please refresh.</p>';
+    }
+}
+
+// ─── Billing Toggle ───────────────────────────────────────────────────────────
+function switchBilling(cycle) {
+    billingCycle = cycle;
+    document.getElementById('toggle-monthly').classList.toggle('active', cycle === 'monthly');
+    document.getElementById('toggle-yearly').classList.toggle('active', cycle === 'yearly');
+    renderPlans();
+}
+
+// ─── Render Plans ─────────────────────────────────────────────────────────────
+function renderPlans() {
+    const grid = document.getElementById('plans-grid');
+    grid.innerHTML = '';
+
+    plans.forEach(plan => {
+        const isCurrent = plan.id === currentPlanId;
+        const isFeatured = plan.id === 'pro';
+        const isLifetime = plan.billing_type === 'lifetime' || plan.id === 'lifetime';
+        const isFree = plan.billing_type === 'free' || plan.id === 'free';
+
+        // Price calculation
+        let price = 0;
+        let cycleLabel = '';
+        let yearlyNote = '';
+
+        if (isFree) {
+            price = 0; cycleLabel = 'Free Forever';
+        } else if (isLifetime) {
+            price = plan.price_lifetime || 0; cycleLabel = 'One-Time';
+        } else if (billingCycle === 'yearly') {
+            price = plan.price_yearly || 0; cycleLabel = '/year';
+            if (plan.price_monthly > 0) {
+                const monthlyCost = plan.price_monthly * 12;
+                const saving = Math.round(((monthlyCost - price) / monthlyCost) * 100);
+                if (saving > 0) yearlyNote = `Save ₹${monthlyCost - price} vs monthly`;
+            }
+        } else {
+            price = plan.price_monthly || 0; cycleLabel = '/month';
+        }
+
+        // Features list
+        const features = buildFeatureList(plan, isFree);
+
+        // Badge
+        let badge = '';
+        if (isCurrent) badge = '<div class="current-badge">Current Plan</div>';
+        else if (isLifetime) badge = '<div class="lifetime-badge">⭐ Best Value</div>';
+        else if (isFeatured) badge = '<div class="featured-badge">Most Popular</div>';
+
+        // Card class
+        let cardClass = 'plan-card';
+        if (isCurrent) cardClass += ' current-plan';
+        if (isFeatured && !isCurrent) cardClass += ' featured';
+        if (isLifetime && !isCurrent) cardClass += ' lifetime-card';
+
+        // CTA
+        let cta = '';
+        if (isCurrent) {
+            cta = `<button class="plan-cta cta-current" disabled>✓ Current Plan</button>`;
+        } else if (isFree) {
+            cta = `<button class="plan-cta cta-ghost" disabled>Free — No Upgrade Needed</button>`;
+        } else if (isLifetime) {
+            cta = `<button class="plan-cta cta-gold" onclick="openPayment('${plan.id}', 'lifetime', ${price}, '${plan.name}')">Get Lifetime Access</button>`;
+        } else {
+            cta = `<button class="plan-cta cta-primary" onclick="openPayment('${plan.id}', '${billingCycle}', ${price}, '${plan.name}')">Upgrade Now</button>`;
+        }
+
+        // Plan icon & color
+        const icons = { free: '⚡', premium: '💎', pro: '🚀', lifetime: '♾️' };
+        const iconBgs = { free: '#1e1e2e', premium: 'rgba(124,111,255,0.15)', pro: 'rgba(59,130,246,0.15)', lifetime: 'rgba(251,191,36,0.15)' };
+
+        grid.innerHTML += `
+            <div class="${cardClass}">
+                ${badge}
+                <div class="plan-icon" style="background:${iconBgs[plan.id] || iconBgs.free}; font-size:1.4rem;">${icons[plan.id] || '📦'}</div>
+                <div class="plan-name">${plan.name}</div>
+                <div class="plan-desc">${plan.description || ''}</div>
+                <div class="plan-price-block">
+                    <div class="plan-price-main">
+                        ${!isFree ? '<span class="price-currency">₹</span>' : ''}
+                        <span class="price-amount">${isFree ? 0 : price.toLocaleString('en-IN')}</span>
+                        <span class="price-cycle">${cycleLabel}</span>
+                    </div>
+                    ${yearlyNote ? `<div class="price-yearly-note" style="color:var(--green)">${yearlyNote}</div>` : ''}
+                </div>
+                <ul class="plan-features">${features}</ul>
+                ${cta}
+            </div>
+        `;
+    });
+}
+
+function buildFeatureList(plan, isFree) {
+    const items = [];
+    const add = (check, label) => {
+        if (check) items.push(`<li class="active"><span class="material-symbols-outlined feat-check">check_circle</span>${label}</li>`);
+        else items.push(`<li><span class="material-symbols-outlined feat-cross">cancel</span>${label}</li>`);
+    };
+
+    add(plan.ad_free_experience, plan.ad_free_experience ? 'Ad-Free Experience' : 'Ads Shown');
+    add(plan.youtube_enabled, 'YouTube Downloader');
+    add(plan.instagram_enabled, 'Instagram Downloader');
+    add(plan.facebook_enabled, 'Facebook Downloader');
+    add(true, `Up to ${plan.max_resolution || '720p'} Quality`);
+    add(plan.daily_downloads === -1, plan.daily_downloads === -1 ? 'Unlimited Downloads' : `${plan.daily_downloads} Downloads/Day`);
+    add(plan.converter_access, 'File Converter');
+    add(plan.batch_download, 'Batch Downloads');
+    add(plan.playlist_download, 'Playlist Downloads');
+    if (plan.cloud_sync) add(true, 'Cloud Sync');
+    if (plan.priority_features) add(true, 'Priority Processing');
+
+    return items.join('');
+}
+
+
+// ─── Auth Logic ─────────────────────────────────────────────────────────────
+let authMode = 'login';
+window.pendingPayment = null;
+
+function switchAuthTab(mode) {
+    authMode = mode;
+    document.getElementById('tab-login').classList.toggle('active', mode === 'login');
+    document.getElementById('tab-signup').classList.toggle('active', mode === 'signup');
+    document.getElementById('auth-submit-btn').querySelector('span').innerText = mode === 'login' ? 'Log In' : 'Sign Up';
+    document.getElementById('auth-msg').innerText = '';
+}
+
+function closeAuthModal() {
+    document.getElementById('auth-modal').classList.remove('show');
+    window.pendingPayment = null;
+}
+
+async function handleAuth(e) {
+    e.preventDefault();
+    if (!window.supabaseClient) return alert('Supabase client not initialized');
+    
+    const email = document.getElementById('auth-email').value;
+    const password = document.getElementById('auth-password').value;
+    const btn = document.getElementById('auth-submit-btn');
+    const msg = document.getElementById('auth-msg');
+    
+    btn.disabled = true;
+    msg.innerText = 'Processing...';
+    msg.style.color = 'var(--text-muted)';
+    
+    try {
+        let result;
+        if (authMode === 'login') {
+            result = await window.supabaseClient.auth.signInWithPassword({ email, password });
+        } else {
+            result = await window.supabaseClient.auth.signUp({ email, password });
+        }
+        
+        if (result.error) throw result.error;
+        
+        // Sync with backend to get local SQLite token cookie
+        const syncRes = await fetch((window.API_BASE_URL || '') + '/api/auth/supabase-sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ access_token: result.data.session.access_token })
+        });
+        const syncData = await syncRes.json();
+        if (!syncData.success) throw new Error(syncData.error || 'Failed to sync with server');
+        
+        // Success
+        msg.innerText = 'Success!';
+        msg.style.color = 'var(--green)';
+        
+        setTimeout(() => {
+            closeAuthModal();
+            if (window.pendingPayment) {
+                // Trigger the payment modal now that we are authenticated
+                const p = window.pendingPayment;
+                openPaymentModal(p.planId, p.cycle, p.amount, p.planName);
+            }
+        }, 1000);
+        
+    } catch(err) {
+        msg.innerText = err.message;
+        msg.style.color = 'var(--red)';
+        btn.disabled = false;
+    }
+}
+
+// Intercept openPayment to check auth first
+const openPaymentModal = openPayment;
+window.openPayment = async function(planId, cycle, amount, planName) {
+    if (window.supabaseClient) {
+        const { data: { session } } = await window.supabaseClient.auth.getSession();
+        if (!session) {
+            window.pendingPayment = { planId, cycle, amount, planName };
+            document.getElementById('auth-modal').classList.add('show');
+            return;
+        }
+    }
+    openPaymentModal(planId, cycle, amount, planName);
+};
+
+// ─── Payment Flow ─────────────────────────────────────────────────────────────
+function openPayment(planId, cycle, amount, planName) {
+    activePlanId = planId;
+    activePaymentId = null;
+    originalAmount = amount;
+    appliedPromo = null;
+
+    document.getElementById('modal-plan-name').textContent = planName;
+    document.getElementById('modal-plan-name-left').textContent = planName;
+    document.getElementById('modal-billing-cycle').textContent = cycle === 'lifetime' ? 'Lifetime (One-Time)' : cycle.charAt(0).toUpperCase() + cycle.slice(1);
+    
+    const plan = plans.find(p => p.id === planId);
+    if(plan) {
+        document.getElementById('modal-plan-desc-left').textContent = plan.description || 'Unlock premium features today.';
+        document.getElementById('modal-plan-features-left').innerHTML = buildFeatureList(plan, planId === 'free');
+    }
+
+    updateSummaryDisplay(amount, 0);
+
+    const payBtn = document.getElementById('pay-btn');
+    payBtn.className = `pay-btn ${planId === 'lifetime' ? 'gold-pay' : ''}`;
+
+    document.getElementById('sim-promo').value = '';
+    document.getElementById('sim-promo').disabled = false;
+    document.getElementById('promo-msg').innerText = '';
+
+    // Reset forms securely (empty fields)
+    document.getElementById('sim-card-num').value = '';
+    document.getElementById('sim-expiry').value = '';
+    document.getElementById('sim-cvv').value = '';
+    document.getElementById('sim-name').value = '';
+    document.getElementById('sim-upi-id').value = '';
+
+    selectMethod('card'); // Default payment method
+
+    document.getElementById('payment-modal').classList.add('show');
+}
+
+function closePaymentModal() {
+    document.getElementById('payment-modal').classList.remove('show');
+}
+
+async function applyPromo() {
+    const code = document.getElementById('sim-promo').value.toUpperCase();
+    if(!code) return;
+    try {
+        const res = await fetch((window.API_BASE_URL || '') + '/api/payment/promo/validate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ code, plan_id: activePlanId })
+        });
+        const data = await res.json();
+        const msg = document.getElementById('promo-msg');
+        if(data.success) {
+            msg.innerText = "Promo code applied!";
+            msg.style.color = "var(--green)";
+            appliedPromo = data.promo.code;
+            document.getElementById('sim-promo').disabled = true;
+
+            let discountVal = 0;
+            if(data.promo.discount_type === 'percentage') {
+                discountVal = originalAmount * (data.promo.discount_value / 100);
+            } else {
+                discountVal = data.promo.discount_value;
+            }
+            if(discountVal > originalAmount) discountVal = originalAmount;
+            
+            updateSummaryDisplay(originalAmount, discountVal);
+        } else {
+            msg.innerText = data.error;
+            msg.style.color = "var(--red)";
+            appliedPromo = null;
+        }
+    } catch(e) {}
+}
+
+async function confirmPayment() {
+    // Front-end Validations
+    if (selectedMethod === 'card') {
+        const num = document.getElementById('sim-card-num').value.replace(/\s/g, '');
+        const exp = document.getElementById('sim-expiry').value;
+        const cvv = document.getElementById('sim-cvv').value;
+        const name = document.getElementById('sim-name').value;
+        if (!num || !exp || !cvv || !name) return alert('Please fill all card details securely.');
+        if (num.length < 15 && !num.includes('*')) return alert('Invalid card number length.');
+        if (cvv.length < 3 && !cvv.includes('*')) return alert('Invalid CVV.');
+    } else if (selectedMethod === 'upi') {
+        const upi = document.getElementById('sim-upi-id').value;
+        if (!upi) return alert('Please enter a UPI ID.');
+        if (!upi.includes('@')) return alert('Invalid UPI ID format (must contain @).');
+    }
+
+    const btn = document.getElementById('pay-btn');
+    const label = document.getElementById('pay-btn-label');
+    btn.disabled = true;
+    label.innerHTML = '';
+    const spinner = document.createElement('div');
+    spinner.className = 'spinner';
+    btn.appendChild(spinner);
+
+    try {
+        // Step 1: Initiate payment
+        const initRes = await fetch((window.API_BASE_URL || '') + '/api/payment/initiate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                plan_id: activePlanId, 
+                billing_cycle: billingCycle === 'yearly' || activePlanId === 'lifetime' ? (activePlanId === 'lifetime' ? 'lifetime' : 'yearly') : 'monthly',
+                promo_code: appliedPromo 
+            })
+        });
+        const initData = await initRes.json();
+        if (!initData.success) throw new Error(initData.error || 'Failed to initiate payment');
+
+        activePaymentId = initData.payment_id;
+
+        // Simulate network delay (realistic feel)
+        await new Promise(r => setTimeout(r, 1500));
+
+        // Step 2: Simulate payment success
+        const simRes = await fetch((window.API_BASE_URL || '') + '/api/payment/simulate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ payment_id: activePaymentId })
+        });
+        const simData = await simRes.json();
+        if (!simData.success) throw new Error(simData.error || 'Payment failed');
+
+        // Step 3: Show success screen
+        closePaymentModal();
+        const plan = plans.find(p => p.id === activePlanId);
+        document.getElementById('success-plan-name').textContent = plan ? plan.name : activePlanId;
+        document.getElementById('success-screen').classList.add('show');
+
+    } catch(e) {
+        alert('Payment failed: ' + e.message);
+        btn.disabled = false;
+        label.textContent = 'Pay Securely';
+        btn.removeChild(spinner);
+    }
+}
+
+// ─── Card Formatting ──────────────────────────────────────────────────────────
+function formatCard(el) {
+    let v = el.value.replace(/\D/g, '').substring(0, 16);
+    el.value = v.replace(/(.{4})/g, '$1 ').trim();
+}
+function formatExpiry(el) {
+    let v = el.value.replace(/\D/g, '').substring(0, 4);
+    if (v.length >= 3) v = v.substring(0,2) + ' / ' + v.substring(2);
+    el.value = v;
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamVault PRO - Dashboard</title>
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>`n    <script type="module" src="js/config.js"></script>
+    <script type="module" src="js/config.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="settings.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ff5540",
+                        "on-primary": "#ffffff",
+                        "primary-container": "#ff8a7a",
+                        "background": "#0f0f11",
+                        "on-background": "#e2e2e2",
+                        "surface": "#121214",
+                        "surface-container-high": "#222225",
+                        "on-surface": "#e2e2e2",
+                        "on-surface-variant": "#c4c6c9",
+                        "error": "#ffb4ab"
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Outfit', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .nav-item.active { background: rgba(255,85,64,0.1); color: #ff5540; border-right: 3px solid #ff5540; }
+        .view-section { display: none; }
+        .view-section.active { display: block; animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+
+    <!-- SEO & Beta Optimization -->
+    <meta name="description" content="StreamVault PRO - The ultimate high-speed 4K social video downloader and media converter. Download from YouTube, Instagram, Facebook, and more.">
+    <meta name="keywords" content="video downloader, 4K downloader, youtube to mp4, instagram downloader, audio converter, media management">
+    <meta property="og:title" content="StreamVault PRO">
+    <meta property="og:description" content="High-speed 4K social video downloader and media converter.">
+    <meta property="og:type" content="website">
+    <!-- End SEO -->
+
+</head>
+<body class="bg-background text-on-background min-h-screen flex">
+    
+    <!-- Sidebar -->
+    <aside class="w-56 bg-surface-container-high/50 border-r border-white/10 flex flex-col h-screen sticky top-0 backdrop-blur-xl shrink-0 hidden md:flex">
+        <div class="p-4 pb-2">
+            <h1 class="font-display font-extrabold text-2xl text-primary tracking-tighter cursor-pointer" onclick="window.location.href='index.html'">
+                StreamVault PRO
+            </h1>
+        </div>
+        
+        <div class="flex-grow py-2 flex flex-col gap-2">
+            <button onclick="switchView('dashboard')" id="nav-dashboard" class="nav-item active flex items-center gap-3 px-4 py-2 font-sans font-bold hover:bg-white/5 transition-colors text-left">
+                <span class="material-symbols-outlined text-[20px]">space_dashboard</span> Dashboard
+            </button>
+            <button onclick="switchView('downloads')" id="nav-downloads" class="nav-item flex items-center gap-3 px-4 py-2 font-sans font-medium text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-colors text-left">
+                <span class="material-symbols-outlined text-[20px]">download</span> My Downloads
+            </button>
+            <button onclick="switchView('conversions')" id="nav-conversions" class="nav-item flex items-center gap-3 px-4 py-2 font-sans font-medium text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-colors text-left">
+                <span class="material-symbols-outlined text-[20px]">movie_edit</span> My Conversions
+            </button>
+            <button onclick="switchView('settings')" id="nav-settings" class="nav-item flex items-center gap-3 px-4 py-2 font-sans font-medium text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-colors text-left">
+                <span class="material-symbols-outlined text-[20px]">settings</span> Settings
+            </button>
+        </div>
+        
+        <div class="p-4 border-t border-white/10 flex flex-col gap-2">
+            <button onclick="window.location.href='index.html'" class="flex items-center gap-3 px-2 py-2 font-sans font-medium text-sm text-on-surface-variant hover:text-primary transition-colors text-left">
+                <span class="material-symbols-outlined text-[18px]">arrow_back</span> Back to App
+            </button>
+            <button onclick="logout()" class="flex items-center gap-3 px-2 py-2 font-sans font-medium text-sm text-on-surface-variant hover:text-error transition-colors text-left">
+                <span class="material-symbols-outlined text-[18px]">logout</span> Logout
+            </button>
+        </div>
+    </aside>
+
+    <!-- Mobile Header -->
+    <header class="md:hidden bg-surface-container-high/80 backdrop-blur-xl fixed top-0 w-full z-50 shadow-sm border-b border-white/10 flex items-center justify-between px-4 h-16">
+        <h1 class="font-display font-extrabold text-xl text-primary tracking-tighter" onclick="window.location.href='index.html'">
+            StreamVault PRO
+        </h1>
+        <select id="mobile-nav" class="bg-surface border border-white/10 rounded-lg px-2 py-1 text-sm outline-none" onchange="switchView(this.value)">
+            <option value="dashboard">Dashboard</option>
+            <option value="downloads">My Downloads</option>
+            <option value="conversions">My Conversions</option>
+            <option value="settings">Settings</option>
+        </select>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow p-4 md:p-10 overflow-y-auto w-full pt-20 md:pt-10">
+        
+        <!-- DASHBOARD VIEW -->
+        <section id="view-dashboard" class="view-section active max-w-5xl mx-auto flex flex-col gap-5">
+            <h2 class="text-3xl font-display font-bold text-on-surface">Welcome, <span id="dash-name" class="text-primary">User</span></h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-surface-container-high/50 border border-white/10 p-4 rounded-2xl">
+                    <p class="text-on-surface-variant text-sm font-sans uppercase tracking-wider mb-2">Total Downloads</p>
+                    <p id="stat-total-dl" class="text-4xl font-display font-extrabold text-primary">0</p>
+                </div>
+                <div class="bg-surface-container-high/50 border border-white/10 p-4 rounded-2xl">
+                    <p class="text-on-surface-variant text-sm font-sans uppercase tracking-wider mb-2">Total Conversions</p>
+                    <p id="stat-total-cv" class="text-4xl font-display font-extrabold text-on-surface">0</p>
+                </div>
+                <div class="bg-surface-container-high/50 border border-white/10 p-4 rounded-2xl lg:col-span-2">
+                    <p class="text-on-surface-variant text-sm font-sans uppercase tracking-wider mb-2">Profile Details</p>
+                    <div class="flex flex-col gap-1 font-sans text-sm">
+                        <p><span class="text-on-surface-variant">Email:</span> <span id="dash-email" class="text-on-surface font-mono">--</span></p>
+                        <p><span class="text-on-surface-variant">Join Date:</span> <span id="dash-join" class="text-on-surface font-mono">--</span></p>
+                        <p><span class="text-on-surface-variant">Last Login:</span> <span id="dash-login" class="text-on-surface font-mono text-green-400">--</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <h3 class="text-xl font-display font-bold text-on-surface mt-4">Platform Breakdown</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-[#ff0000]/10 border border-[#ff0000]/20 p-4 rounded-xl flex items-center justify-between">
+                    <div class="flex items-center gap-2 text-[#ff0000]">
+                        <span class="material-symbols-outlined">play_circle</span>
+                        <span class="font-bold">YouTube</span>
+                    </div>
+                    <span id="stat-yt" class="text-2xl font-mono font-bold text-on-surface">0</span>
+                </div>
+                <div class="bg-[#E1306C]/10 border border-[#E1306C]/20 p-4 rounded-xl flex items-center justify-between">
+                    <div class="flex items-center gap-2 text-[#E1306C]">
+                        <span class="material-symbols-outlined">photo_camera</span>
+                        <span class="font-bold">Instagram</span>
+                    </div>
+                    <span id="stat-ig" class="text-2xl font-mono font-bold text-on-surface">0</span>
+                </div>
+                <div class="bg-[#1877F2]/10 border border-[#1877F2]/20 p-4 rounded-xl flex items-center justify-between">
+                    <div class="flex items-center gap-2 text-[#1877F2]">
+                        <span class="material-symbols-outlined">thumb_up</span>
+                        <span class="font-bold">Facebook</span>
+                    </div>
+                    <span id="stat-fb" class="text-2xl font-mono font-bold text-on-surface">0</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- DOWNLOADS VIEW -->
+        <section id="view-downloads" class="view-section max-w-5xl mx-auto flex flex-col gap-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <h2 class="text-3xl font-display font-bold text-on-surface">My Downloads</h2>
+                
+                <div class="flex gap-2 w-full md:w-auto">
+                    <input type="text" id="dl-search" placeholder="Search filename..." class="bg-surface border border-white/10 rounded-lg px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary flex-grow md:w-56" oninput="filterDownloads()">
+                    <select id="dl-filter" class="bg-surface border border-white/10 rounded-lg px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary" onchange="filterDownloads()">
+                        <option value="All">All Platforms</option>
+                        <option value="YouTube">YouTube</option>
+                        <option value="Instagram">Instagram</option>
+                        <option value="Facebook">Facebook</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="bg-surface-container-high/50 rounded-2xl border border-white/10 backdrop-blur-xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left font-sans text-sm min-w-[600px]">
+                        <thead class="text-on-surface-variant border-b border-white/10 bg-black/20">
+                            <tr>
+                                <th class="py-2 px-4 font-medium w-1/4">Platform</th>
+                                <th class="py-2 px-4 font-medium w-1/2">File Details</th>
+                                <th class="py-2 px-4 font-medium w-1/4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dl-table-body" class="divide-y divide-white/5">
+                            <tr><td colspan="3" class="py-2 text-center">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- CONVERSIONS VIEW -->
+        <section id="view-conversions" class="view-section max-w-5xl mx-auto flex flex-col gap-4">
+            <h2 class="text-3xl font-display font-bold text-on-surface">My Conversions</h2>
+
+            <div class="bg-surface-container-high/50 rounded-2xl border border-white/10 backdrop-blur-xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left font-sans text-sm min-w-[600px]">
+                        <thead class="text-on-surface-variant border-b border-white/10 bg-black/20">
+                            <tr>
+                                <th class="py-2 px-4 font-medium">Type</th>
+                                <th class="py-2 px-4 font-medium">File Name</th>
+                                <th class="py-2 px-4 font-medium">Date</th>
+                                <th class="py-2 px-4 font-medium text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cv-table-body" class="divide-y divide-white/5">
+                            <tr><td colspan="4" class="py-2 text-center">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- SETTINGS VIEW -->
+        <section id="view-settings" class="view-section max-w-3xl mx-auto flex flex-col gap-4">
+            <h2 class="text-3xl font-display font-bold text-on-surface mb-2">Settings</h2>
+            
+            <div class="bg-surface-container-high/50 rounded-2xl border border-white/10 backdrop-blur-xl p-4 flex flex-col gap-5">
+                
+                <!-- Appearance -->
+                <div class="flex flex-col gap-4">
+                    <h3 class="text-lg font-bold text-primary border-b border-white/10 pb-2">Appearance</h3>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="font-medium text-on-surface">Theme</p>
+                            <p class="text-xs text-on-surface-variant">Choose your application's color scheme</p>
+                        </div>
+                        <select id="set-theme" class="bg-surface border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary">
+                            <option value="dark">Dark</option>
+                            <option value="light">Light</option>
+                            <option value="system">System Default</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Downloader Defaults -->
+                <div class="flex flex-col gap-4">
+                    <h3 class="text-lg font-bold text-primary border-b border-white/10 pb-2">Downloader Configuration</h3>
+                    
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="font-medium text-on-surface">Default Video Quality</p>
+                            <p class="text-xs text-on-surface-variant">Automatically pre-select this resolution when analyzing links</p>
+                        </div>
+                        <select id="set-quality" class="bg-surface border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary">
+                            <option value="Best">Best Available</option>
+                            <option value="4K">4K Ultra HD</option>
+                            <option value="1080P">1080P FHD</option>
+                            <option value="720P">720P HD</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="font-medium text-on-surface">Auto Analyze</p>
+                            <p class="text-xs text-on-surface-variant">Automatically start extracting when you paste a valid link</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="set-auto-analyze" class="sr-only peer">
+                            <div class="w-11 h-6 bg-surface peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-surface-variant after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary peer-checked:after:bg-white border border-white/10"></div>
+                        </label>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="font-medium text-on-surface">Auto Clear After Download</p>
+                            <p class="text-xs text-on-surface-variant">Reset downloader UI state when a download completes successfully</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="set-auto-clear" class="sr-only peer">
+                            <div class="w-11 h-6 bg-surface peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-surface-variant after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary peer-checked:after:bg-white border border-white/10"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Storage -->
+                <div class="flex flex-col gap-4">
+                    <h3 class="text-lg font-bold text-primary border-b border-white/10 pb-2">Storage</h3>
+                    <div class="flex items-center justify-between gap-4">
+                        <div class="flex-grow">
+                            <p class="font-medium text-on-surface">Default Download Folder</p>
+                            <input type="text" id="set-folder" placeholder="Leave empty for System Downloads folder" class="w-full mt-2 bg-surface border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary font-mono">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            
+            <div class="flex justify-end mt-2">
+                <button onclick="saveSettings()" class="bg-primary hover:bg-primary-container text-on-primary font-bold px-4 py-2 rounded-xl transition-all hover:shadow-[0_0_15px_rgba(255,85,64,0.3)] active:scale-95 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[20px]">save</span> Save Changes
+                </button>
+            </div>
+            <p id="settings-msg" class="text-green-400 text-sm text-right mt-1 hidden">Settings saved successfully!</p>
+        </section>
+
+        <footer class="w-full mt-12 border-t border-white/10 py-8 text-center text-sm text-on-surface-variant flex flex-col md:flex-row justify-center items-center gap-4 md:gap-5 px-4">
+            <a href="streamvault-legal.html#about" class="hover:text-primary transition-colors">About Us</a>
+            <a href="streamvault-legal.html#contact" class="hover:text-primary transition-colors">Contact</a>
+            <a href="streamvault-legal.html#copyright" class="hover:text-primary transition-colors">Copyright Claims</a>
+            <a href="streamvault-legal.html#faq" class="hover:text-primary transition-colors">FAQ</a>
+            <a href="streamvault-legal.html#privacy" class="hover:text-primary transition-colors">Privacy Policy</a>
+            <a href="streamvault-legal.html#terms" class="hover:text-primary transition-colors">Terms of Use</a>
+        </footer>
+    </main>
+
+    <script>
+        // Global State
+        let allDownloads = [];
+        let allConversions = [];
+
+        function switchView(viewId) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('active', 'text-primary', 'font-bold');
+                el.classList.add('text-on-surface-variant', 'font-medium');
+                el.style.borderRight = 'none';
+            });
+            
+            document.getElementById('view-' + viewId).classList.add('active');
+            
+            const btn = document.getElementById('nav-' + viewId);
+            if (btn) {
+                btn.classList.add('active', 'font-bold');
+                btn.classList.remove('text-on-surface-variant', 'font-medium');
+                btn.style.borderRight = '3px solid #ff5540';
+            }
+            if(document.getElementById('mobile-nav')) document.getElementById('mobile-nav').value = viewId;
+        }
+
+        async function initDashboard() {
+            try {
+                const res = await fetch((window.API_BASE_URL || '') + '/api/auth/me');
+                const data = await res.json();
+                if (!data.loggedIn) {
+                    window.location.href = 'streamvault-login.html';
+                    return;
+                }
+                
+                // Populate Profile
+                document.getElementById('dash-name').innerText = data.user.name;
+                document.getElementById('dash-email').innerText = data.user.email;
+                document.getElementById('dash-join').innerText = new Date(data.user.join_date).toLocaleDateString();
+                
+                const loginDate = data.user.last_login ? new Date(data.user.last_login + 'Z') : new Date();
+                document.getElementById('dash-login').innerText = loginDate.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+
+                // Sync Settings UI
+                if(window.StreamVaultSettings) {
+                    document.getElementById('set-theme').value = window.StreamVaultSettings.theme;
+                    document.getElementById('set-quality').value = window.StreamVaultSettings.defaultQuality;
+                    document.getElementById('set-auto-analyze').checked = window.StreamVaultSettings.autoAnalyze;
+                    document.getElementById('set-auto-clear').checked = window.StreamVaultSettings.autoClear;
+                    document.getElementById('set-folder').value = window.StreamVaultSettings.defaultFolder;
+                }
+
+                // Load Stats & History
+                await Promise.all([
+                    loadStats(),
+                    loadHistory()
+                ]);
+
+            } catch (e) {
+                window.location.href = 'streamvault-login.html';
+            }
+        }
+
+        async function loadStats() {
+            const res = await fetch((window.API_BASE_URL || '') + '/api/auth/stats');
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('stat-total-dl').innerText = data.stats.dlCount;
+                document.getElementById('stat-total-cv').innerText = data.stats.cvCount;
+                document.getElementById('stat-yt').innerText = data.stats.ytCount;
+                document.getElementById('stat-ig').innerText = data.stats.igCount;
+                document.getElementById('stat-fb').innerText = data.stats.fbCount;
+            }
+        }
+
+        async function loadHistory() {
+            const dlRes = await fetch((window.API_BASE_URL || '') + '/api/auth/history/downloads');
+            const dlData = await dlRes.json();
+            if (dlData.success) {
+                allDownloads = dlData.history;
+                renderDownloads(allDownloads);
+            }
+
+            const cvRes = await fetch((window.API_BASE_URL || '') + '/api/auth/history/conversions');
+            const cvData = await cvRes.json();
+            if (cvData.success) {
+                allConversions = cvData.history;
+                renderConversions(allConversions);
+            }
+        }
+
+        function filterDownloads() {
+            const query = document.getElementById('dl-search').value.toLowerCase();
+            const platform = document.getElementById('dl-filter').value;
+            
+            const filtered = allDownloads.filter(d => {
+                const matchQ = d.file_name && d.file_name.toLowerCase().includes(query);
+                const matchP = platform === 'All' || d.platform === platform;
+                return matchQ && matchP;
+            });
+            renderDownloads(filtered);
+        }
+
+        function renderDownloads(list) {
+            const tbody = document.getElementById('dl-table-body');
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="py-10 text-center text-on-surface-variant font-mono">No downloads found.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = list.map(h => {
+                const dDate = new Date(h.download_date).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+                const size = h.file_size ? (h.file_size / 1024 / 1024).toFixed(1) + ' MB' : 'Unknown';
+                const safePath = (h.file_path || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                
+                let iconColor = 'text-primary';
+                if(h.platform==='Instagram') iconColor = 'text-[#E1306C]';
+                if(h.platform==='Facebook') iconColor = 'text-[#1877F2]';
+
+                return `
+                <tr class="hover:bg-white/5 transition-colors group">
+                    <td class="py-2 px-4 align-top">
+                        <span class="font-bold ${iconColor}">${h.platform || 'Direct'}</span>
+                    </td>
+                    <td class="py-2 px-4">
+                        <p class="font-medium text-on-surface break-words max-w-[200px] md:max-w-md line-clamp-2" title="${h.file_name}">${h.file_name}</p>
+                        <p class="text-xs text-on-surface-variant font-mono mt-1">${dDate} • ${size}</p>
+                    </td>
+                    <td class="py-2 px-4 align-top">
+                        <div class="flex justify-end gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="openPath('${safePath}', 'file')" class="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-on-surface" title="Play Media"><span class="material-symbols-outlined text-[18px]">play_arrow</span></button>
+                            <button onclick="openPath('${safePath}', 'folder')" class="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-on-surface" title="Show in Folder"><span class="material-symbols-outlined text-[18px]">folder_open</span></button>
+                            <button onclick="deleteDownload(${h.id})" class="p-2 bg-error/10 hover:bg-error/20 text-error rounded-lg transition-colors" title="Delete History"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function renderConversions(list) {
+            const tbody = document.getElementById('cv-table-body');
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="py-10 text-center text-on-surface-variant font-mono">No conversions found.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = list.map(h => {
+                const cDate = new Date(h.conversion_date).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+                const safePath = (h.file_path || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                
+                return `
+                <tr class="hover:bg-white/5 transition-colors group">
+                    <td class="py-2 px-4 align-top font-mono text-xs text-primary font-bold">
+                        ${h.conversion_type || 'CONVERT'}
+                    </td>
+                    <td class="py-2 px-4">
+                        <p class="font-medium text-on-surface break-words max-w-[200px] md:max-w-md line-clamp-2" title="${h.file_name}">${h.file_name}</p>
+                        <p class="text-xs text-on-surface-variant font-mono mt-1">${cDate}</p>
+                    </td>
+                    <td class="py-2 px-4 align-top text-right">
+                        <div class="flex justify-end gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="openPath('${safePath}', 'file')" class="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors" title="Play Media"><span class="material-symbols-outlined text-[18px]">play_arrow</span></button>
+                            <button onclick="openPath('${safePath}', 'folder')" class="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors" title="Show in Folder"><span class="material-symbols-outlined text-[18px]">folder_open</span></button>
+                            <button onclick="deleteConversion(${h.id})" class="p-2 bg-error/10 hover:bg-error/20 text-error rounded-lg transition-colors" title="Delete History"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function deleteDownload(id) {
+            if(!confirm('Remove this entry from your download history?')) return;
+            await fetch((window.API_BASE_URL || '') + `/api/auth/history/downloads/${id}`, { method: 'DELETE' });
+            allDownloads = allDownloads.filter(d => d.id !== id);
+            filterDownloads();
+            loadStats();
+        }
+
+        async function deleteConversion(id) {
+            if(!confirm('Remove this entry from your conversion history?')) return;
+            await fetch((window.API_BASE_URL || '') + `/api/auth/history/conversions/${id}`, { method: 'DELETE' });
+            allConversions = allConversions.filter(c => c.id !== id);
+            renderConversions(allConversions);
+            loadStats();
+        }
+
+        async function openPath(pathStr, type) {
+            if (!pathStr) return;
+            const endpoint = type === 'file' ? '/api/open-file' : '/api/open-folder';
+            await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: pathStr })
+            });
+        }
+
+        async function saveSettings() {
+            if(!window.StreamVaultSettings) return;
+            
+            window.StreamVaultSettings.theme = document.getElementById('set-theme').value;
+            window.StreamVaultSettings.defaultQuality = document.getElementById('set-quality').value;
+            window.StreamVaultSettings.autoAnalyze = document.getElementById('set-auto-analyze').checked;
+            window.StreamVaultSettings.autoClear = document.getElementById('set-auto-clear').checked;
+            window.StreamVaultSettings.defaultFolder = document.getElementById('set-folder').value;
+            
+            await window.StreamVaultSettings.save();
+            
+            const msg = document.getElementById('settings-msg');
+            msg.classList.remove('hidden');
+            setTimeout(() => msg.classList.add('hidden'), 3000);
+        }
+
+        async function logout() {
+            await fetch((window.API_BASE_URL || '') + '/api/auth/logout', { method: 'POST' });
+            window.location.href = 'streamvault-login.html';
+        }
+
+        // Init App
+        initDashboard();
+    </script>
+
+    <!-- BETA WIDGET -->
+    <div id="beta-widget" class="fixed bottom-4 right-4 z-[100] flex flex-col items-end gap-2 group pointer-events-none">
+        <div class="bg-surface-container-high/90 backdrop-blur-xl border border-white/10 p-2 rounded-xl shadow-2xl flex flex-col gap-2 translate-y-4 opacity-0 pointer-events-none group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-300">
+            <a href="streamvault-legal.html#contact" class="px-4 py-2 bg-primary/20 hover:bg-primary/40 text-primary text-sm font-bold rounded-lg transition-colors flex items-center gap-2">
+                <span class="material-symbols-outlined text-[16px]">bug_report</span> Report Bug
+            </a>
+            <a href="streamvault-legal.html#contact" class="px-4 py-2 bg-white/5 hover:bg-white/10 text-on-surface-variant text-sm rounded-lg transition-colors flex items-center gap-2">
+                <span class="material-symbols-outlined text-[16px]">feedback</span> Feedback
+            </a>
+        </div>
+        <button class="bg-gradient-to-r from-primary to-orange-500 text-on-primary px-4 py-2 rounded-full shadow-[0_4px_20px_rgba(255,85,64,0.4)] font-bold text-sm tracking-widest uppercase flex items-center gap-2 pointer-events-auto cursor-help">
+            <span class="material-symbols-outlined text-[18px]">science</span> Beta Mode
+        </button>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamVault PRO - Welcome</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>`n    <script type="module" src="js/config.js"></script>
+    <script type="module" src="js/config.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ffb4a8",
+                        "primary-container": "#ff5540",
+                        "background": "#0b1326",
+                        "surface": "#131b2e",
+                        "surface-container-high": "#222a3d",
+                        "on-background": "#dae2fd",
+                        "on-surface": "#dae2fd",
+                        "on-surface-variant": "#ebbbb4"
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Hanken Grotesk', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- SEO & Beta Optimization -->
+    <meta name="description" content="StreamVault PRO - The ultimate high-speed 4K social video downloader and media converter. Download from YouTube, Instagram, Facebook, and more.">
+    <meta name="keywords" content="video downloader, 4K downloader, youtube to mp4, instagram downloader, audio converter, media management">
+    <meta property="og:title" content="StreamVault PRO">
+    <meta property="og:description" content="High-speed 4K social video downloader and media converter.">
+    <meta property="og:type" content="website">
+    <!-- End SEO -->
+
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col justify-center items-center p-4 relative overflow-hidden font-sans">
+    
+    <!-- Background Decor (Immersive Glassmorphism) -->
+    <div class="absolute -z-10 top-1/3 left-1/4 w-[500px] h-[500px] bg-primary/10 blur-[120px] rounded-full pointer-events-none animate-pulse"></div>
+    <div class="absolute -z-10 bottom-1/4 right-1/4 w-[400px] h-[400px] bg-blue-500/10 blur-[100px] rounded-full pointer-events-none"></div>
+
+    <div class="w-full max-w-lg bg-surface/50 p-10 rounded-[32px] border border-white/5 backdrop-blur-2xl shadow-2xl relative z-10 flex flex-col items-center text-center">
+        
+        <!-- Logo -->
+        <div class="w-20 h-20 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(255,180,168,0.15)]">
+            <span class="material-symbols-outlined text-primary text-[40px]">cloud_sync</span>
+        </div>
+
+        <h1 class="font-display font-extrabold text-4xl text-on-surface tracking-tight mb-3">
+            StreamVault <span class="text-primary">PRO</span>
+        </h1>
+        
+        <p class="text-on-surface-variant text-base mb-10 max-w-sm">
+            Download, Convert & Manage Media Effortlessly.
+        </p>
+
+        <!-- Loading State for Auto-Login -->
+        <div id="loading-state" class="w-full flex flex-col items-center gap-3 py-2 hidden">
+            <span class="material-symbols-outlined animate-spin text-primary text-[32px]">progress_activity</span>
+            <p class="text-sm text-on-surface-variant">Restoring session...</p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div id="action-buttons" class="w-full flex flex-col gap-4">
+            <a href="index.html" class="w-full bg-white/5 hover:bg-white/10 text-on-surface font-bold py-2 px-4 rounded-2xl border border-white/10 flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 group">
+                <span class="material-symbols-outlined text-[20px] text-on-surface-variant group-hover:text-on-surface transition-colors">explore</span>
+                Continue as Guest
+            </a>
+
+            <div class="flex items-center gap-4 my-2" id="welcome-promo-container">
+                <div class="flex-grow border-t border-white/5"></div>
+                <span class="text-[10px] text-on-surface-variant font-mono uppercase tracking-widest">Unlock PRO Features</span>
+                <div class="flex-grow border-t border-white/5"></div>
+            </div>
+
+            <a href="streamvault-login.html?mode=login" class="w-full bg-primary hover:bg-primary-container text-[#5c0000] font-bold py-2 px-4 rounded-2xl transition-all hover:shadow-[0_0_20px_rgba(255,180,168,0.2)] hover:scale-[1.02] active:scale-95">
+                Login
+            </a>
+
+            <a href="streamvault-login.html?mode=register" class="w-full bg-transparent text-primary hover:text-primary-container font-bold py-2 px-4 rounded-2xl transition-colors">
+                Create Account
+            </a>
+        </div>
+
+    </div>
+
+    <!-- Features Mini-preview -->
+    <div class="mt-12 flex items-center gap-5 text-on-surface-variant opacity-60 text-sm font-medium">
+        <div class="flex items-center gap-2"><span class="material-symbols-outlined text-[18px]">4k</span> 4K Quality</div>
+        <div class="flex items-center gap-2"><span class="material-symbols-outlined text-[18px]">movie_edit</span> Fast Converter</div>
+        <div class="flex items-center gap-2"><span class="material-symbols-outlined text-[18px]">cloud</span> Cloud Sync</div>
+    </div>
+
+    <script>
+        // Auto Login Logic
+        document.addEventListener('DOMContentLoaded', async () => {
+            const btnContainer = document.getElementById('action-buttons');
+            const loader = document.getElementById('loading-state');
+            
+            try {
+                // Wait briefly to prevent flash if response is extremely fast
+                setTimeout(() => { if(!loader.classList.contains('hidden')) { btnContainer.classList.add('hidden'); loader.classList.remove('hidden'); } }, 100);
+                
+                const res = await fetch((window.API_BASE_URL || '') + '/api/auth/me');
+                const data = await res.json();
+                
+                if (data.loggedIn) {
+                    window.location.href = 'index.html';
+                } else {
+                    loader.classList.add('hidden');
+                    btnContainer.classList.remove('hidden');
+                }
+                
+                // Fetch settings to hide PRO promo
+                fetch((window.API_BASE_URL || '') + '/api/public-settings').then(r=>r.json()).then(settings => {
+                    if (settings.success && settings.settings.subscription_enabled === 'false') {
+                        const promo = document.getElementById('welcome-promo-container');
+                        if (promo) promo.style.display = 'none';
+                    }
+                }).catch(e=>{});
+            } catch (err) {
+                // If API fails or is unreachable, default to showing the buttons
+                loader.classList.add('hidden');
+                btnContainer.classList.remove('hidden');
+            }
+        });
+    </script>
+    <footer class="w-full mt-12 border-t border-white/10 py-8 text-center text-sm text-on-surface-variant z-10 flex flex-col md:flex-row justify-center items-center gap-4 md:gap-5 px-4 backdrop-blur-sm bg-background/50 shrink-0">
+        <a href="streamvault-legal.html#about" class="hover:text-primary transition-colors">About Us</a>
+        <a href="streamvault-legal.html#contact" class="hover:text-primary transition-colors">Contact</a>
+        <a href="streamvault-legal.html#copyright" class="hover:text-primary transition-colors">Copyright Claims</a>
+        <a href="streamvault-legal.html#faq" class="hover:text-primary transition-colors">FAQ</a>
+        <a href="streamvault-legal.html#privacy" class="hover:text-primary transition-colors">Privacy Policy</a>
+        <a href="streamvault-legal.html#terms" class="hover:text-primary transition-colors">Terms of Use</a>
+    </footer>
+
+    <!-- BETA WIDGET -->
+    <div id="beta-widget" class="fixed bottom-4 right-4 z-[100] flex flex-col items-end gap-2 group pointer-events-none">
+        <div class="bg-surface-container-high/90 backdrop-blur-xl border border-white/10 p-2 rounded-xl shadow-2xl flex flex-col gap-2 translate-y-4 opacity-0 pointer-events-none group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-300">
+            <a href="streamvault-legal.html#contact" class="px-4 py-2 bg-primary/20 hover:bg-primary/40 text-primary text-sm font-bold rounded-lg transition-colors flex items-center gap-2">
+                <span class="material-symbols-outlined text-[16px]">bug_report</span> Report Bug
+            </a>
+            <a href="streamvault-legal.html#contact" class="px-4 py-2 bg-white/5 hover:bg-white/10 text-on-surface-variant text-sm rounded-lg transition-colors flex items-center gap-2">
+                <span class="material-symbols-outlined text-[16px]">feedback</span> Feedback
+            </a>
+        </div>
+        <button class="bg-gradient-to-r from-primary to-orange-500 text-on-primary px-4 py-2 rounded-full shadow-[0_4px_20px_rgba(255,85,64,0.4)] font-bold text-sm tracking-widest uppercase flex items-center gap-2 pointer-events-auto cursor-help">
+            <span class="material-symbols-outlined text-[18px]">science</span> Beta Mode
+        </button>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Downloads Manager - StreamVault PRO</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>`n    <script type="module" src="js/config.js"></script>
+    <script type="module" src="js/config.js"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&amp;family=Inter:wght@400&amp;family=Geist:wght@500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "outline-variant": "#603e39",
+                        "primary-container": "#ff5540",
+                        "surface-container-lowest": "#060e20",
+                        "on-secondary-fixed": "#001a41",
+                        "surface-container-highest": "#2d3449",
+                        "on-secondary": "#002e69",
+                        "on-tertiary-fixed": "#3d0025",
+                        "on-secondary-fixed-variant": "#004493",
+                        "on-tertiary-fixed-variant": "#8b005a",
+                        "surface-variant": "#2d3449",
+                        "surface-container-high": "#222a3d",
+                        "secondary-fixed": "#d8e2ff",
+                        "on-primary-fixed": "#410000",
+                        "primary-fixed": "#ffdad4",
+                        "on-error": "#690005",
+                        "tertiary": "#ffafd2",
+                        "surface-dim": "#0b1326",
+                        "inverse-on-surface": "#283044",
+                        "error": "#ffb4ab",
+                        "secondary-container": "#0070eb",
+                        "surface-bright": "#31394d",
+                        "on-primary-fixed-variant": "#930100",
+                        "surface": "#0b1326",
+                        "secondary": "#adc6ff",
+                        "error-container": "#93000a",
+                        "inverse-primary": "#c00100",
+                        "outline": "#b18780",
+                        "on-surface-variant": "#ebbbb4",
+                        "inverse-surface": "#dae2fd",
+                        "tertiary-fixed-dim": "#ffafd2",
+                        "on-secondary-container": "#fefcff",
+                        "primary-fixed-dim": "#ffb4a8",
+                        "tertiary-fixed": "#ffd8e6",
+                        "surface-tint": "#ffb4a8",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "background": "#0b1326",
+                        "on-tertiary-container": "#570036",
+                        "on-primary-container": "#5c0000",
+                        "tertiary-container": "#ed5aa8",
+                        "surface-container-low": "#131b2e",
+                        "on-tertiary": "#63003f",
+                        "primary": "#ffb4a8",
+                        "on-background": "#dae2fd",
+                        "surface-container": "#171f33",
+                        "on-surface": "#dae2fd",
+                        "on-error-container": "#ffdad6",
+                        "on-primary": "#690100"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "16px",
+                        "margin-mobile": "16px",
+                        "container-max": "1200px",
+                        "base": "4px",
+                        "margin-desktop": "32px"
+                    },
+                    "fontFamily": {
+                        "title-md": ["Hanken Grotesk"],
+                        "mono-sm": ["Geist"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "label-md": ["Geist"],
+                        "headline-lg-mobile": ["Hanken Grotesk"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "body-lg": ["Inter"],
+                        "body-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "title-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "mono-sm": ["13px", { "lineHeight": "18px", "fontWeight": "500" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #0b1326; /* surface */
+            color: #dae2fd; /* on-surface */
+        }
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .progress-gradient {
+            background: linear-gradient(90deg, #0070eb, #ed5aa8);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="antialiased min-h-screen flex flex-col pt-16 pb-24 md:pb-0">
+<!-- Toast Notification Container -->
+<div id="toast-container" class="fixed top-20 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-surface/80 backdrop-blur-xl border-b border-white/10 shadow-sm flex items-center justify-between px-margin-mobile h-16 w-full">
+<button class="nav-settings text-primary dark:text-primary-fixed hover:bg-white/5 transition-colors active:scale-95 transition-transform p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">speed</span>
+</button>
+<div class="nav-home font-headline-lg-mobile text-headline-lg-mobile font-extrabold text-primary dark:text-primary-container tracking-tighter cursor-pointer">
+            StreamVault PRO
+        </div>
+<button class="nav-settings text-on-surface-variant hover:bg-white/5 transition-colors active:scale-95 transition-transform p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</header>
+<!-- Main Canvas -->
+<main class="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-8 flex flex-col gap-4">
+<!-- Header & Actions -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface mb-2">Downloads</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Manage your high-fidelity media streams.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 px-4 py-2 rounded-lg glass-panel font-label-md text-label-md text-on-surface hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined text-[18px]">checklist</span>
+                    Select Multiple
+                </button>
+</div>
+</div>
+<!-- Tabs -->
+<div class="flex gap-1 border-b border-white/10 mb-2">
+<button class="px-4 py-2 border-b-2 border-primary text-primary font-title-md text-title-md">
+                In Progress <span class="ml-2 px-2 py-0.5 rounded-full bg-primary/20 text-primary font-mono-sm text-mono-sm">3</span>
+</button>
+<button class="px-4 py-2 border-b-2 border-transparent text-on-surface-variant hover:text-on-surface transition-colors font-title-md text-title-md">
+                Completed
+            </button>
+</div>
+<!-- Download Queue -->
+<div id="download-container" class="flex flex-col gap-4">
+    <!-- Dynamically loaded cards -->
+</div>
+</main>
+<!-- Floating Action Button (FAB) for Desktop (bottom right) and Mobile (above nav) -->
+<button class="btn-add-link fixed bottom-24 md:bottom-8 right-4 md:right-8 w-14 h-14 bg-primary text-on-primary rounded-2xl shadow-[0_8px_32px_rgba(255,85,64,0.4)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-40">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">add</span>
+</button>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 w-full z-50 rounded-t-xl bg-surface/90 dark:bg-surface/90 backdrop-blur-2xl border-t border-white/5 shadow-[0_-4px_20px_rgba(0,0,0,0.4)] flex justify-around items-center px-4 py-2 pb-6 w-full max-w-7xl mx-auto">
+<a class="nav-home flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary transition-all active:scale-90 duration-200 cursor-pointer">
+<span class="material-symbols-outlined mb-1 text-[24px]">home</span>
+<span class="font-label-md text-label-md">Home</span>
+</a>
+<a class="nav-downloads flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-5 py-1.5 active:scale-90 duration-200 cursor-pointer">
+<span class="material-symbols-outlined mb-1 text-[24px]" style="font-variation-settings: 'FILL' 1;">download_for_offline</span>
+<span class="font-label-md text-label-md">Downloads</span>
+</a>
+<a class="nav-settings flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary transition-all active:scale-90 duration-200 cursor-pointer">
+<span class="material-symbols-outlined mb-1 text-[24px]">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</nav>
+
+<script>
+const defaultQueue = [
+  {
+    id: 'dl-default-1',
+    title: 'Cinematic Landscape Masterclass - Part 4',
+    size: '4.2 GB',
+    speed: '84 MB/s',
+    progress: 50,
+    status: 'downloading',
+    thumbnail: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDyvPGpq4NH3Reup0QKCe-1FR2RF6cPW8zDDTH1fwbS8BZ-NzxN5h71LBZl_Lj5L8ybuwt6uR5XDlk2wCgHMDF1HAiRgwxgSFQYnOcJm7vwjVVvYXCtu806v-2SEB2lTRbmInfYXbyyBDoHOJSo-OKuqIbrMh3NhbPLrzqzwUWdg9aE_IkfT1OWnBvg7OdaWiz8we3Ou4F9bTarZTtPI3U6y7hQg22P0nLACoCVVHNUlg8CC8cr3wP_wjZYOSNaZnzsJjykzAe53_L7',
+    quality: '4K',
+    duration: '12:45'
+  },
+  {
+    id: 'dl-default-2',
+    title: 'Live Coding Session: Building a WebGL Shader',
+    size: '1.8 GB',
+    speed: '12 MB/s',
+    progress: 25,
+    status: 'downloading',
+    thumbnail: '',
+    quality: '1080P',
+    duration: '45:10'
+  }
+];
+
+function parseSizeToMB(sizeStr) {
+    const num = parseFloat(sizeStr);
+    if (sizeStr.toUpperCase().includes('GB')) {
+        return num * 1024;
+    }
+    return num;
+}
+
+function formatSize(mbValue, originalUnit) {
+    if (originalUnit.toUpperCase().includes('GB')) {
+        return (mbValue / 1024).toFixed(1) + ' GB';
+    }
+    return mbValue.toFixed(0) + ' MB';
+}
+
+function formatTime(seconds) {
+    if (seconds <= 0) return '00:00';
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m < 10 ? '0' + m : m}:${s < 10 ? '0' + s : s}`;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Navigation routing
+    document.querySelectorAll('.nav-home').forEach(el => {
+        el.addEventListener('click', () => { window.location.href = 'index.html'; });
+    });
+    document.querySelectorAll('.nav-downloads').forEach(el => {
+        el.addEventListener('click', () => { window.location.href = 'download-queue.html'; });
+    });
+    document.querySelectorAll('.nav-settings').forEach(el => {
+        el.addEventListener('click', () => { window.location.href = 'app-settings.html'; });
+    });
+    document.querySelectorAll('.btn-add-link').forEach(el => {
+        el.addEventListener('click', () => { window.location.href = 'index.html'; });
+    });
+
+    // Load queue from localStorage or load default
+    let queue = JSON.parse(localStorage.getItem('download_queue') || '[]');
+    if (queue.length === 0) {
+        queue = [...defaultQueue];
+        localStorage.setItem('download_queue', JSON.stringify(queue));
+    }
+
+    const container = document.getElementById('download-container');
+
+    function renderQueue() {
+        container.innerHTML = '';
+        if (queue.length === 0) {
+            container.innerHTML = `
+                <div class="glass-panel rounded-xl p-5 text-center flex flex-col items-center justify-center gap-4">
+                    <span class="material-symbols-outlined text-[48px] text-on-surface-variant/50">download_done</span>
+                    <div class="text-on-surface-variant font-medium">No active downloads</div>
+                    <button class="btn-add-link px-4 py-2 rounded-lg bg-primary text-on-primary text-xs font-semibold hover:bg-primary-container transition-colors">Add New Link</button>
+                </div>
+            `;
+            container.querySelector('.btn-add-link').addEventListener('click', () => { window.location.href = 'index.html'; });
+            return;
+        }
+
+        queue.forEach(item => {
+            const card = document.createElement('div');
+            card.className = "glass-panel rounded-xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center relative group overflow-hidden transition-all duration-300";
+            card.id = `card-${item.id}`;
+
+            const isDone = item.status === 'completed';
+            const isPaused = item.status === 'paused';
+            const isFailed = item.status === 'failed';
+            const isSaving = item.status === 'saving' || item.status === 'processing';
+            
+            const totalMB = parseSizeToMB(item.size);
+            const dlMB = (item.progress / 100) * totalMB;
+            const speedVal = parseFloat(item.speed);
+            
+            let remainingText = '';
+            let statusColor = 'text-on-surface-variant';
+            let statusIcon = 'timer';
+            
+            if (isDone) {
+                remainingText = 'Completed';
+                statusColor = 'text-green-400';
+                statusIcon = 'check_circle';
+            } else if (isPaused) {
+                remainingText = 'Paused';
+                statusColor = 'text-on-surface-variant/70';
+                statusIcon = 'pause_circle';
+            } else if (isFailed) {
+                remainingText = `Failed: ${item.error || 'CORS / Access Blocked'}`;
+                statusColor = 'text-error';
+                statusIcon = 'error';
+            } else if (isSaving) {
+                remainingText = 'Processing & Saving...';
+                statusColor = 'text-yellow-400';
+                statusIcon = 'sync';
+            } else {
+                const remSecs = (totalMB - dlMB) / (speedVal || 1);
+                remainingText = 'Downloading (' + formatTime(remSecs) + ' remaining)';
+                statusColor = 'text-secondary';
+                statusIcon = 'downloading';
+            }
+
+            const thumbnailHTML = item.thumbnail 
+                ? `<img src="${item.thumbnail}" class="w-full h-full object-cover opacity-80" />`
+                : `<div class="w-full h-full bg-surface-container flex items-center justify-center border border-white/5 rounded">
+                     <span class="material-symbols-outlined text-surface-bright text-[40px]">video_library</span>
+                   </div>`;
+
+            // Action Buttons layout in card
+            let controlButtons = '';
+            if (isFailed) {
+                controlButtons = `
+                    <button class="btn-retry p-2 rounded-full hover:bg-white/10 text-primary hover:text-white transition-colors" title="Retry Download">
+                        <span class="material-symbols-outlined text-[20px]">replay</span>
+                    </button>
+                `;
+            } else if (isDone) {
+                controlButtons = `
+                    <button class="btn-save-device px-3 py-1.5 rounded-lg bg-primary/20 border border-primary/30 hover:bg-primary/30 text-xs text-primary transition-colors flex items-center gap-1 mr-1" title="Save to Device">
+                        <span class="material-symbols-outlined text-[16px]">save_alt</span>
+                        Save to Device
+                    </button>
+                `;
+            } else {
+                controlButtons = `
+                    <button class="btn-pause p-2 rounded-full hover:bg-white/10 text-on-surface-variant hover:text-white transition-colors" title="${isPaused ? 'Resume' : 'Pause'}">
+                        <span class="material-symbols-outlined text-[20px]">${isPaused ? 'play_arrow' : 'pause'}</span>
+                    </button>
+                `;
+            }
+
+            card.innerHTML = `
+                <!-- Thumbnail -->
+                <div class="relative w-full md:w-48 h-28 flex-shrink-0 rounded-lg overflow-hidden bg-surface-container-high border border-white/5">
+                    ${thumbnailHTML}
+                    <div class="absolute top-2 left-2 flex gap-1">
+                        <span class="px-1.5 py-0.5 rounded bg-black/80 backdrop-blur text-primary-fixed font-mono-sm text-mono-sm border border-primary/30 shadow-sm flex items-center justify-center font-bold tracking-widest text-[10px]">${item.quality}</span>
+                    </div>
+                    <div class="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur text-white font-mono-sm text-[10px]">
+                        ${item.duration}
+                    </div>
+                </div>
+                <!-- Content -->
+                <div class="flex-grow flex flex-col gap-3 w-full">
+                    <div class="flex justify-between items-start gap-4">
+                        <div>
+                            <h3 class="font-title-md text-title-md text-on-surface line-clamp-1 mb-1">${item.title}</h3>
+                            <p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1">
+                                ${isDone ? 'Completed' : isFailed ? 'Failed' : isSaving ? 'Saving' : 'Downloading'} • ${item.size}
+                            </p>
+                        </div>
+                        <div class="flex gap-2 items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            ${controlButtons}
+                            <button class="btn-cancel p-2 rounded-full hover:bg-error/20 text-on-surface-variant hover:text-error transition-colors">
+                                <span class="material-symbols-outlined text-[20px]">close</span>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Progress Area -->
+                    <div class="flex flex-col gap-2 w-full mt-auto">
+                        <div class="flex justify-between items-end">
+                            <span class="font-mono-sm text-mono-sm ${isFailed ? 'text-error' : 'text-secondary-container'}">
+                                ${isDone ? '0 MB/s' : isPaused ? '0 MB/s' : isFailed ? '0 MB/s' : item.speed}
+                            </span>
+                            <div class="flex gap-3 text-right">
+                                <span class="font-mono-sm text-mono-sm text-on-surface-variant">
+                                    ${formatSize(dlMB, item.size)} / ${item.size}
+                                </span>
+                                <span class="font-mono-sm text-mono-sm ${isFailed ? 'text-error' : 'text-on-surface'}">
+                                    ${Math.round(item.progress)}%
+                                </span>
+                            </div>
+                        </div>
+                        <!-- Progress Track -->
+                        <div class="w-full h-2 rounded-full bg-surface-container-highest shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)] overflow-hidden">
+                            <div class="h-full rounded-full ${isFailed ? 'bg-error shadow-[0_0_10px_rgba(255,180,168,0.5)]' : 'progress-gradient'} relative transition-all duration-300" style="width: ${item.progress}%">
+                                ${!isDone && !isPaused && !isFailed ? '<div class="absolute inset-0 bg-white/20 animate-pulse"></div>' : ''}
+                            </div>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="font-mono-sm text-[11px] ${statusColor} flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[14px]">${statusIcon}</span>
+                                ${remainingText}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Pause / Resume Event
+            const pauseBtn = card.querySelector('.btn-pause');
+            if (pauseBtn) {
+                pauseBtn.addEventListener('click', async () => {
+                    const wasPaused = item.status === 'paused';
+                    item.status = wasPaused ? 'downloading' : 'paused';
+                    localStorage.setItem('download_queue', JSON.stringify(queue));
+                    renderQueue();
+                    
+                    if (wasPaused) {
+                        item.downloadTriggered = false;
+                        startRealDownload(item);
+                    } else {
+                        try {
+                            await fetch((window.API_BASE_URL || '') + '/api/download-pause', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: item.id })
+                            });
+                        } catch (e) {
+                            console.error("Pause request error:", e);
+                        }
+                    }
+                });
+            }
+
+            // Retry Event
+            const retryBtn = card.querySelector('.btn-retry');
+            if (retryBtn) {
+                retryBtn.addEventListener('click', () => {
+                    item.status = 'downloading';
+                    item.progress = 0;
+                    item.error = null;
+                    item.downloadTriggered = false;
+                    localStorage.setItem('download_queue', JSON.stringify(queue));
+                    renderQueue();
+                    startRealDownload(item);
+                });
+            }
+
+            // Save Device Event
+            const saveBtn = card.querySelector('.btn-save-device');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', () => {
+                    if (item.id.includes('default')) {
+                        showToast("Demo file cannot be downloaded.", "error");
+                        return;
+                    }
+                    showToast("Starting download...", "success");
+                    // Trigger browser download by hitting the new delivery endpoint
+                    window.location.href = '/api/fetch-file?id=' + item.id;
+                });
+            }
+
+            // Cancel Event
+            const cancelBtn = card.querySelector('.btn-cancel');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', async () => {
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.95)';
+                    try {
+                        await fetch((window.API_BASE_URL || '') + '/api/download-cancel', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: item.id })
+                        });
+                    } catch (e) {
+                        console.error("Cancel request error:", e);
+                    }
+                    setTimeout(() => {
+                        queue = queue.filter(q => q.id !== item.id);
+                        localStorage.setItem('download_queue', JSON.stringify(queue));
+                        renderQueue();
+                    }, 300);
+                });
+            }
+
+            container.appendChild(card);
+        });
+    }
+
+    function showToast(message, type = 'success') {
+        const toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) return;
+        
+        const toast = document.createElement('div');
+        toast.className = `p-4 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] border backdrop-blur-xl flex items-center gap-3 transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto max-w-sm ${
+            type === 'error' 
+                ? 'bg-error-container/85 border-error text-on-error-container' 
+                : type === 'warning'
+                ? 'bg-surface-container-high/90 border-outline text-yellow-400'
+                : 'bg-surface-container-high/90 border-primary/20 text-primary'
+        }`;
+        
+        const icon = type === 'error' ? 'error' : type === 'warning' ? 'warning' : 'check_circle';
+        
+        toast.innerHTML = `
+            <span class="material-symbols-outlined text-[20px]">${icon}</span>
+            <div class="text-xs font-medium">${message}</div>
+        `;
+        
+        toastContainer.appendChild(toast);
+        
+        // Animate in
+        setTimeout(() => {
+            toast.classList.remove('translate-y-2', 'opacity-0');
+        }, 50);
+        
+        // Remove after 5 seconds
+        setTimeout(() => {
+            toast.classList.add('translate-y-2', 'opacity-0');
+            setTimeout(() => {
+                toast.remove();
+            }, 300);
+        }, 5000);
+    }
+
+    function updateItemProgress(id, pct, downloadedText) {
+        const item = queue.find(q => q.id === id);
+        if (item) {
+            item.progress = Math.min(100, pct);
+            localStorage.setItem('download_queue', JSON.stringify(queue));
+            
+            // Update DOM directly to avoid rendering glitch
+            const card = document.getElementById(`card-${item.id}`);
+            if (card) {
+                const pctSpan = card.querySelector('.font-mono-sm.text-on-surface');
+                const sizeSpan = card.querySelector('.font-mono-sm.text-on-surface-variant');
+                const progressBar = card.querySelector('.progress-gradient');
+                
+                if (pctSpan) pctSpan.textContent = `${Math.round(item.progress)}%`;
+                if (sizeSpan) sizeSpan.textContent = `${downloadedText} / ${item.size}`;
+                if (progressBar) progressBar.style.width = `${item.progress}%`;
+            }
+        }
+    }
+
+    function updateItemStatus(id, status, filename = null, errorMsg = null) {
+        const item = queue.find(q => q.id === id);
+        if (item) {
+            item.status = status;
+            if (errorMsg) item.error = errorMsg;
+            localStorage.setItem('download_queue', JSON.stringify(queue));
+            renderQueue();
+        }
+    }
+
+    // Helper: wait for a delay (ms) — used for retry backoff
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function startRealDownload(item) {
+        // Always use the item's stored URL when available.
+        // Only fall back to the W3Schools sample for pure mock/demo items that have no URL at all.
+        const sourceUrl = (item.url && item.url.trim()) ? item.url.trim() : 'https://www.w3schools.com/html/mov_bbb.mp4';
+        let filename = item.title;
+        if (!filename.toLowerCase().endsWith('.mp4') && !filename.toLowerCase().endsWith('.mp3') && !filename.toLowerCase().endsWith('.webm')) {
+            filename += item.isAudioOnly ? '.mp3' : '.mp4';
+        }
+
+        const platformLabel = item.directDownload ? 'Direct Stream' : (item.url ? 'Platform URL (server-proxied)' : 'Demo Video');
+
+        console.log(`[StreamVault Log] Download Initiated:\n  - Source URL: ${sourceUrl}\n  - Target Filename: ${filename}\n  - Type: ${platformLabel}`);
+
+        showToast(`Starting download: ${filename}`, 'info');
+
+        // ── Retry configuration ────────────────────────────────────
+        const MAX_RETRIES = 3;
+        const BASE_BACKOFF_MS = 2000; // 2s → 4s → 8s
+        let lastError = null;
+
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            if (attempt > 1) {
+                const waitMs = BASE_BACKOFF_MS * Math.pow(2, attempt - 2); // 2000, 4000, 8000
+                console.warn(`[StreamVault] Retry attempt ${attempt}/${MAX_RETRIES} in ${waitMs / 1000}s for: ${sourceUrl}`);
+                showToast(`Retrying download (attempt ${attempt}/${MAX_RETRIES})…`, 'warning');
+                await sleep(waitMs);
+            }
+
+            try {
+                // ── Step 1: Daemon health check ────────────────────
+                let healthData;
+                try {
+                    const healthResponse = await fetch((window.API_BASE_URL || '') + '/api/health');
+                    if (healthResponse.status === 404) throw new Error('Invalid Download Endpoint');
+                    if (!healthResponse.ok) {
+                        try {
+                            const diag = await healthResponse.json();
+                            if (diag && diag.error) throw new Error(`${diag.error}: ${diag.message}`);
+                        } catch (_) {}
+                        throw new Error('Port Configuration Error');
+                    }
+                    healthData = await healthResponse.json();
+                } catch (healthErr) {
+                    if (healthErr.message.includes('Endpoint') || healthErr.message.includes('Port') ||
+                        healthErr.message.includes('Permission') || healthErr.message.includes('filesystem')) {
+                        throw healthErr; // non-retryable — re-throw immediately
+                    }
+                    throw new Error('Local Download Engine Not Running / Download Service Offline');
+                }
+
+                if (!healthData || healthData.status !== 'running') {
+                    throw new Error('Local Download Engine Not Running / Download Service Offline');
+                }
+
+                // ── Step 2: Request download from daemon ───────────
+                // For non-direct URLs (YouTube, Instagram, Facebook, generic web pages),
+                // send the original page URL to the server which will attempt server-side
+                // resolution and proxy the stream. For direct media URLs, send as-is.
+                const downloadUrl = sourceUrl;
+
+                console.log(`[StreamVault] Attempt ${attempt}: POST /api/download\n  URL: ${downloadUrl}\n  Filename: ${filename}\n  ID: ${item.id}`);
+
+                const startResponse = await fetch((window.API_BASE_URL || '') + '/api/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        url: downloadUrl,
+                        filename: filename,
+                        id: item.id,
+                        format: item.isAudioOnly ? 'audio' : 'video'
+                    })
+                });
+
+                if (!startResponse.ok) {
+                    let errMsg = `Failed to initialize download via local daemon (Status ${startResponse.status})`;
+                    try {
+                        const errorJson = await startResponse.json();
+                        if (errorJson && errorJson.error) {
+                            errMsg = `${errorJson.error}${errorJson.message ? ' — ' + errorJson.message : ''}`;
+                        }
+                        // Log detailed diagnostics
+                        console.error(`[StreamVault] Daemon /api/download error (attempt ${attempt}):\n  Requested URL: ${downloadUrl}\n  Response status: ${startResponse.status}\n  Error: ${JSON.stringify(errorJson)}`);
+                    } catch (_) {}
+                    throw new Error(errMsg);
+                }
+
+                const startData = await startResponse.json();
+                if (startData.filename) filename = startData.filename;
+
+                // ── Step 3: Poll for download progress ─────────────
+                // Returns a promise that resolves on complete or rejects on failure
+                await new Promise((resolve, reject) => {
+                    const pollInterval = setInterval(async () => {
+                        try {
+                            const statusRes = await fetch((window.API_BASE_URL || '') + `/api/download-status?id=${item.id}`);
+                            if (!statusRes.ok) throw new Error('Failed to fetch status');
+                            const statusData = await statusRes.json();
+
+                            // User cancelled/paused — stop polling
+                            const checkItem = queue.find(q => q.id === item.id);
+                            if (!checkItem || checkItem.status === 'paused' || checkItem.status === 'cancelled') {
+                                clearInterval(pollInterval);
+                                resolve(); // don't retry — intentional user action
+                                return;
+                            }
+
+                            if (statusData.status === 'downloading' || statusData.status === 'saving' || statusData.status === 'processing') {
+                                item.progress = statusData.progress;
+                                item.speed = statusData.speed;
+                                item.status = statusData.status;
+                                item.path = statusData.path;
+                                localStorage.setItem('download_queue', JSON.stringify(queue));
+
+                                const card = document.getElementById(`card-${item.id}`);
+                                if (card) {
+                                    const pctSpan = card.querySelector('.font-mono-sm.text-on-surface');
+                                    const sizeSpan = card.querySelector('.font-mono-sm.text-on-surface-variant');
+                                    const progressBar = card.querySelector('.progress-gradient');
+                                    const speedSpan = card.querySelector('.font-mono-sm.text-secondary-container');
+                                    const remSpan = card.querySelector('.font-mono-sm.text-\\[11px\\]');
+                                    const statusLabel = card.querySelector('.font-body-sm.text-on-surface-variant');
+
+                                    if (pctSpan) pctSpan.textContent = `${Math.round(item.progress)}%`;
+                                    if (progressBar) progressBar.style.width = `${item.progress}%`;
+
+                                    const totalMB = parseSizeToMB(item.size);
+                                    const currentMB = ((item.progress / 100) * totalMB).toFixed(1);
+                                    if (sizeSpan) sizeSpan.textContent = `${currentMB} MB / ${item.size}`;
+
+                                    const displaySpeed = item.speed === '0 MB/s' && item.progress < 99 ? '1.5 MB/s' : item.speed;
+                                    if (speedSpan) speedSpan.textContent = displaySpeed;
+
+                                    if (statusLabel) statusLabel.textContent = `${item.status === 'saving' ? 'Saving' : 'Downloading'} • ${item.size}`;
+
+                                    if (remSpan) {
+                                        if (item.status === 'saving') {
+                                            remSpan.innerHTML = `<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Saving & writing file...`;
+                                        } else {
+                                            const speedVal = parseFloat(displaySpeed) || 1;
+                                            const remSecs = (totalMB - parseFloat(currentMB)) / speedVal;
+                                            remSpan.innerHTML = `<span class="material-symbols-outlined text-[14px]">downloading</span> Downloading (${formatTime(remSecs)} remaining)`;
+                                        }
+                                    }
+                                }
+
+                            } else if (statusData.status === 'completed') {
+                                clearInterval(pollInterval);
+
+                                // ── Final Media Validation Probe ────────────────
+                                try {
+                                    const probeRes = await fetch((window.API_BASE_URL || '') + '/api/probe-file', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ path: statusData.path })
+                                    });
+                                    if (probeRes.ok) {
+                                        const probeData = await probeRes.json();
+                                        
+                                        if (probeData.isValidMedia === false) {
+                                            // The backend downloaded something but it's not a video (e.g. HTML/JSON)
+                                            throw new Error(probeData.error || 'Downloaded file is not a valid video/audio format.');
+                                        }
+
+                                        // Update UI with true validated metadata
+                                        item.validatedFormat = (probeData.containerFormat || probeData.detectedFormat || 'mp4').toUpperCase();
+                                        item.validatedSizeMB = probeData.sizeMB;
+                                        item.validatedSizeStr = formatSize(probeData.sizeMB, 'MB');
+                                        item.size = item.validatedSizeStr; // overwrite original estimate with true size
+                                    }
+                                } catch (probeErr) {
+                                    // If probe explicitly fails media check, reject the download
+                                    console.error(`[StreamVault] Post-download probe failed: ${probeErr.message}`);
+                                    reject(new Error(`Validation failed: ${probeErr.message}`));
+                                    return;
+                                }
+
+                                item.progress = 100;
+                                item.speed = '0 MB/s';
+                                item.status = 'completed';
+                                item.path = statusData.path;
+                                localStorage.setItem('download_queue', JSON.stringify(queue));
+
+                                console.log(`[StreamVault Log Summary] Download COMPLETED (attempt ${attempt}):\n  Source URL: ${sourceUrl}\n  Download URL sent: ${downloadUrl}\n  Save location: ${statusData.path}\n  Validation: ${item.validatedFormat} (${item.validatedSizeMB} MB)`);
+
+                                renderQueue();
+                                showToast(`✓ Ready! Downloading ${filename} to your device...`, 'success');
+                                
+                                // Automatically trigger the browser download stream
+                                const a = document.createElement('a');
+                                a.href = '/api/fetch-file?id=' + item.id;
+                                a.style.display = 'none';
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                
+                                resolve();
+
+                            } else if (statusData.status === 'failed') {
+                                clearInterval(pollInterval);
+
+                                const failReason = statusData.error || 'Unknown error during stream';
+                                console.error(`[StreamVault Log Summary] Download FAILED (attempt ${attempt}/${MAX_RETRIES}):\n  Source URL: ${sourceUrl}\n  Download URL sent: ${downloadUrl}\n  Save location: ${statusData.path || filename}\n  Error: ${failReason}\n  Daemon log: ${JSON.stringify(statusData.log || [])}`);
+
+                                reject(new Error(failReason));
+                            }
+                        } catch (pollErr) {
+                            // Polling network error — don't reject, just log and retry next tick
+                            console.warn(`[StreamVault] Status poll error (attempt ${attempt}):`, pollErr.message);
+                        }
+                    }, 500);
+                });
+
+                // If we reach here, download completed successfully — exit retry loop
+                return;
+
+            } catch (attemptErr) {
+                lastError = attemptErr;
+
+                console.error(`[StreamVault] Attempt ${attempt}/${MAX_RETRIES} failed:\n  Source URL: ${sourceUrl}\n  Error: ${attemptErr.message}`);
+
+                // Non-retryable errors — fail immediately
+                const nonRetryable = [
+                    'Endpoint', 'Port Configuration', 'Not Running', 'Offline',
+                    'paused', 'cancelled', 'filesystem', 'Permission'
+                ];
+                if (nonRetryable.some(kw => attemptErr.message.includes(kw))) {
+                    break;
+                }
+
+                // If this was the last attempt, fall through to final failure handler
+            }
+        }
+
+        // ── All retries exhausted ──────────────────────────────────
+        console.error(`[StreamVault] All ${MAX_RETRIES} download attempts failed.\n  Source URL: ${sourceUrl}\n  Last error: ${lastError ? lastError.message : 'Unknown'}`);
+
+        let displayError = lastError ? lastError.message : 'Download failed after all retries';
+        if (displayError.includes('Failed to fetch') || displayError.includes('Offline') || displayError.includes('Not Running')) {
+            displayError = 'Local Download Engine Not Running / Download Service Offline';
+            showToast('Local Download Engine Not Running', 'error');
+        } else if (displayError.includes('Endpoint')) {
+            displayError = 'Invalid Download Endpoint';
+            showToast('Invalid Download Endpoint', 'error');
+        } else if (displayError.includes('Port')) {
+            displayError = 'Port Configuration Error';
+            showToast('Port Configuration Error', 'error');
+        } else {
+            showToast(`Download failed after ${MAX_RETRIES} attempts: ${displayError}`, 'error');
+        }
+
+        updateItemStatus(item.id, 'failed', null, displayError);
+    }
+
+    // Interval to simulate download progression for default simulated mock items
+    setInterval(() => {
+        let changed = false;
+        queue.forEach(item => {
+            // Only progress simulated mock items (without urls) via timer
+            if (!item.url && item.status === 'downloading' && item.progress < 100) {
+                const totalMB = parseSizeToMB(item.size);
+                const speedMB = parseFloat(item.speed);
+                const addPct = ((speedMB * 0.5) / totalMB) * 100;
+                item.progress = Math.min(100, item.progress + addPct);
+                
+                if (item.progress >= 100) {
+                    item.status = 'completed';
+                }
+                changed = true;
+            }
+        });
+
+        if (changed) {
+            localStorage.setItem('download_queue', JSON.stringify(queue));
+            queue.forEach(item => {
+                // Only update DOM for simulated items
+                if (!item.url) {
+                    const card = document.getElementById(`card-${item.id}`);
+                    if (card) {
+                        const isDone = item.status === 'completed';
+                        const totalMB = parseSizeToMB(item.size);
+                        const dlMB = (item.progress / 100) * totalMB;
+                        
+                        const pctSpan = card.querySelector('.font-mono-sm.text-on-surface');
+                        const sizeSpan = card.querySelector('.font-mono-sm.text-on-surface-variant');
+                        const progressBar = card.querySelector('.progress-gradient');
+                        const remSpan = card.querySelector('.font-mono-sm.text-\\[11px\\]');
+                        const statusLabel = card.querySelector('.font-body-sm.text-on-surface-variant');
+                        const speedSpan = card.querySelector('.text-secondary-container');
+
+                        if (pctSpan) pctSpan.textContent = `${Math.round(item.progress)}%`;
+                        if (sizeSpan) sizeSpan.textContent = `${formatSize(dlMB, item.size)} / ${item.size}`;
+                        if (progressBar) progressBar.style.width = `${item.progress}%`;
+                        
+                        if (isDone) {
+                            if (statusLabel) statusLabel.textContent = `Finished • ${item.size}`;
+                            if (speedSpan) speedSpan.textContent = '0 MB/s';
+                            if (remSpan) {
+                                remSpan.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> Complete';
+                            }
+                            const pauseBtn = card.querySelector('.btn-pause');
+                            if (pauseBtn) pauseBtn.remove();
+                        } else {
+                            if (remSpan) {
+                                const remSecs = (totalMB - dlMB) / parseFloat(item.speed);
+                                remSpan.innerHTML = `<span class="material-symbols-outlined text-[14px]">timer</span> ${formatTime(remSecs)} remaining`;
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }, 500);
+
+    // Initial page load downloads checker
+    queue.forEach(item => {
+        if (item.url && item.status === 'downloading' && !item.downloadTriggered) {
+            item.downloadTriggered = true;
+            startRealDownload(item);
+        }
+    });
+
+    renderQueue();
+});
+</script>
+</body></html>

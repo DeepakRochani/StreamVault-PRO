@@ -1,0 +1,2188 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>StreamVault PRO - Home</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>`n    <script type="module" src="js/config.js"></script>
+    <script type="module" src="js/config.js"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="ads.js"></script>
+<script src="js/url-parser.js"></script>
+<script src="settings.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&amp;family=Geist:wght@500;600&amp;family=Inter:wght@400&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "outline-variant": "#603e39",
+                      "primary-container": "#ff5540",
+                      "surface-container-lowest": "#060e20",
+                      "on-secondary-fixed": "#001a41",
+                      "surface-container-highest": "#2d3449",
+                      "on-secondary": "#002e69",
+                      "on-tertiary-fixed": "#3d0025",
+                      "on-secondary-fixed-variant": "#004493",
+                      "on-tertiary-fixed-variant": "#8b005a",
+                      "surface-variant": "#2d3449",
+                      "surface-container-high": "#222a3d",
+                      "secondary-fixed": "#d8e2ff",
+                      "on-primary-fixed": "#410000",
+                      "primary-fixed": "#ffdad4",
+                      "on-error": "#690005",
+                      "tertiary": "#ffafd2",
+                      "surface-dim": "#0b1326",
+                      "inverse-on-surface": "#283044",
+                      "error": "#ffb4ab",
+                      "secondary-container": "#0070eb",
+                      "surface-bright": "#31394d",
+                      "on-primary-fixed-variant": "#930100",
+                      "surface": "#0b1326",
+                      "secondary": "#adc6ff",
+                      "error-container": "#93000a",
+                      "inverse-primary": "#c00100",
+                      "outline": "#b18780",
+                      "on-surface-variant": "#ebbbb4",
+                      "inverse-surface": "#dae2fd",
+                      "tertiary-fixed-dim": "#ffafd2",
+                      "on-secondary-container": "#fefcff",
+                      "primary-fixed-dim": "#ffb4a8",
+                      "tertiary-fixed": "#ffd8e6",
+                      "surface-tint": "#ffb4a8",
+                      "secondary-fixed-dim": "#adc6ff",
+                      "background": "#0b1326",
+                      "on-tertiary-container": "#570036",
+                      "on-primary-container": "#5c0000",
+                      "tertiary-container": "#ed5aa8",
+                      "surface-container-low": "#131b2e",
+                      "on-tertiary": "#63003f",
+                      "primary": "#ffb4a8",
+                      "on-background": "#dae2fd",
+                      "surface-container": "#171f33",
+                      "on-surface": "#dae2fd",
+                      "on-error-container": "#ffdad6",
+                      "on-primary": "#690100"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "16px",
+                      "margin-mobile": "16px",
+                      "container-max": "1200px",
+                      "base": "4px",
+                      "margin-desktop": "32px"
+              },
+              "fontFamily": {
+                      "title-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "mono-sm": [
+                              "Geist"
+                      ],
+                      "display-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "label-md": [
+                              "Geist"
+                      ],
+                      "headline-lg-mobile": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "title-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "mono-sm": [
+                              "13px",
+                              {
+                                      "lineHeight": "18px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "800"
+                              }
+                      ],
+                      "label-md": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+    <style>
+        .glass-panel {
+            background: rgba(18, 18, 20, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .format-radio:checked + .format-card {
+            border-color: theme('colors.primary');
+            background: rgba(255, 180, 168, 0.1);
+        }
+        .format-radio:checked + .format-card .check-icon {
+            opacity: 1;
+        }
+        .format-radio:checked + .format-card .icon-color {
+            color: theme('colors.primary');
+        }
+
+        .quality-radio:checked + .quality-card {
+            border-color: theme('colors.primary');
+            background: rgba(255, 180, 168, 0.1);
+        }
+        .quality-radio:checked + .quality-card .check-icon {
+            opacity: 1;
+        }
+        .quality-radio:checked + .quality-card .radio-border {
+            border-color: theme('colors.primary');
+        }
+        .quality-radio:checked + .quality-card .radio-inner {
+            background-color: theme('colors.primary');
+            transform: scale(1);
+        }
+</style>
+    <script src="ads.js"></script>
+    <script src="global-status.js"></script>
+    <script src="updater.js"></script>
+
+    <!-- SEO & Beta Optimization -->
+    <meta name="description" content="StreamVault PRO - The ultimate high-speed 4K social video downloader and media converter. Download from YouTube, Instagram, Facebook, and more.">
+    <meta name="keywords" content="video downloader, 4K downloader, youtube to mp4, instagram downloader, audio converter, media management">
+    <meta property="og:title" content="StreamVault PRO">
+    <meta property="og:description" content="High-speed 4K social video downloader and media converter.">
+    <meta property="og:type" content="website">
+    <!-- End SEO -->
+
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col pt-16 pb-24 md:pb-0 overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="bg-surface/80 dark:bg-surface/80 backdrop-blur-xl fixed top-0 w-full z-50 shadow-sm border-b border-white/10 flex items-center justify-between px-margin-mobile h-16 w-full">
+<button class="nav-settings hover:bg-white/5 transition-colors active:scale-95 transition-transform p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-primary dark:text-primary-fixed" data-icon="speed">speed</span>
+</button>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg font-extrabold text-primary dark:text-primary-container tracking-tighter">
+            StreamVault PRO
+        </h1>
+<div class="flex items-center gap-3">
+    <!-- Notification Bell -->
+    <div class="relative hidden" id="notif-container">
+        <button id="notif-btn" onclick="toggleNotifs(event)" class="relative p-2 rounded-full hover:bg-white/5 transition-colors text-on-surface-variant hover:text-on-surface flex items-center justify-center">
+            <span class="material-symbols-outlined">notifications</span>
+            <span id="notif-badge" class="absolute top-1 right-1 w-2.5 h-2.5 bg-primary rounded-full hidden"></span>
+        </button>
+        <!-- Notif Dropdown -->
+        <div id="notif-dropdown" class="absolute right-0 mt-2 w-80 bg-surface-container-high border border-white/10 rounded-2xl shadow-xl overflow-hidden hidden flex-col z-50 max-h-96">
+            <div class="p-4 border-b border-white/10 flex justify-between items-center bg-surface-container-highest shrink-0">
+                <h3 class="font-bold text-on-surface">Notifications</h3>
+            </div>
+            <div id="notif-list" class="flex-col overflow-y-auto">
+                <div class="p-4 text-center text-on-surface-variant text-sm">No new notifications</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="relative" id="user-menu-container">
+        <button id="auth-btn" onclick="window.location.href='streamvault-login.html?mode=login'" class="bg-primary/10 hover:bg-primary/20 text-primary font-bold px-4 py-2 rounded-xl transition-all border border-primary/20 flex items-center gap-2" title="Sign In">
+            <span class="material-symbols-outlined text-[18px]">login</span>
+            <span class="hidden sm:inline text-sm">Sign In</span>
+        </button>
+    <!-- Dropdown (Hidden by default) -->
+    <div id="user-dropdown" class="absolute right-0 mt-2 w-56 bg-surface-container-high border border-white/10 rounded-2xl shadow-xl overflow-hidden hidden flex flex-col z-50">
+        <div class="p-4 border-b border-white/10 bg-surface-container-highest">
+            <p id="ud-name" class="font-bold text-on-surface truncate">User</p>
+            <p id="ud-email" class="text-xs text-on-surface-variant truncate">user@example.com</p>
+        </div>
+        <div class="p-2 flex flex-col gap-1">
+            <a href="streamvault-profile.html" class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 text-sm text-on-surface transition-colors">
+                <span class="material-symbols-outlined text-[18px] text-primary">person</span> My Profile
+            </a>
+            <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 text-sm text-on-surface transition-colors">
+                <span class="material-symbols-outlined text-[18px] text-secondary">download</span> My Downloads
+            </a>
+            <a href="streamvault-converter.html" class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 text-sm text-on-surface transition-colors">
+                <span class="material-symbols-outlined text-[18px] text-green-400">movie_edit</span> My Conversions
+            </a>
+            <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 text-sm text-on-surface transition-colors">
+                <span class="material-symbols-outlined text-[18px] text-on-surface-variant">settings</span> Settings
+            </a>
+        </div>
+        <div class="p-2 border-t border-white/10">
+            <button onclick="logout()" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-error/10 text-sm text-error transition-colors">
+                <span class="material-symbols-outlined text-[18px]">logout</span> Logout
+            </button>
+        </div>
+    </div>
+    </div>
+</div>
+</div>
+<script>
+    let isMenuOpen = false;
+    const authBtn = document.getElementById('auth-btn');
+    const dropdown = document.getElementById('user-dropdown');
+    
+    function toggleMenu(e) {
+        if(e) e.stopPropagation();
+        isMenuOpen = !isMenuOpen;
+        dropdown.classList.toggle('hidden', !isMenuOpen);
+    }
+    
+    let isNotifOpen = false;
+    const notifBtn = document.getElementById('notif-btn');
+    const notifDropdown = document.getElementById('notif-dropdown');
+
+    function toggleNotifs(e) {
+        if(e) e.stopPropagation();
+        isNotifOpen = !isNotifOpen;
+        notifDropdown.classList.toggle('hidden', !isNotifOpen);
+        if(isNotifOpen) {
+            isMenuOpen = false;
+            dropdown.classList.add('hidden');
+        }
+    }
+
+    async function markRead(id, el) {
+        try {
+            const res = await fetch((window.API_BASE_URL || '') + `/api/notifications/${id}/read`, { method: 'POST' });
+            if ((await res.json()).success) {
+                el.classList.remove('bg-primary/5');
+                el.classList.add('opacity-50');
+                const badge = document.getElementById('notif-badge');
+                let count = parseInt(badge.innerText) || 1;
+                count--;
+                if(count <= 0) badge.classList.add('hidden');
+                else badge.innerText = count;
+            }
+        } catch(e) {}
+    }
+
+    document.addEventListener('click', (e) => {
+        if(isMenuOpen && !dropdown.contains(e.target) && !authBtn.contains(e.target)) {
+            isMenuOpen = false;
+            dropdown.classList.add('hidden');
+        }
+        if(isNotifOpen && !notifDropdown.contains(e.target) && !notifBtn.contains(e.target)) {
+            isNotifOpen = false;
+            notifDropdown.classList.add('hidden');
+        }
+    });
+
+    async function logout() {
+        await fetch((window.API_BASE_URL || '') + '/api/auth/logout', { method: 'POST' });
+        window.location.href = 'streamvault-welcome.html';
+    }
+
+    window.isLoggedIn = false;
+    fetch((window.API_BASE_URL || '') + '/api/auth/me').then(r => r.json()).then(data => {
+        window.isLoggedIn = data.loggedIn;
+        if(data.loggedIn) {
+            authBtn.onclick = toggleMenu;
+            authBtn.className = "w-10 h-10 rounded-xl bg-primary-container/20 flex items-center justify-center border border-primary/20 text-primary font-bold hover:bg-primary-container/30 transition-colors";
+            authBtn.innerHTML = (data.user.name || data.user.email).substring(0, 2).toUpperCase();
+            
+            document.getElementById('ud-name').innerText = data.user.name || 'User';
+            document.getElementById('ud-email').innerText = data.user.email;
+
+            // Load Notifications
+            document.getElementById('notif-container').classList.remove('hidden');
+            const notifs = data.user.notifications || [];
+            if(notifs.length > 0) {
+                const badge = document.getElementById('notif-badge');
+                badge.classList.remove('hidden');
+                badge.innerText = notifs.length;
+                badge.className = "absolute top-1 right-1 w-4 h-4 text-[9px] font-bold bg-primary text-on-primary rounded-full flex items-center justify-center";
+                
+                const list = document.getElementById('notif-list');
+                list.innerHTML = '';
+                notifs.forEach(n => {
+                    const icon = n.priority === 'high' ? 'warning' : 'info';
+                    const col = n.priority === 'high' ? 'text-red-400' : 'text-primary';
+                    list.innerHTML += `
+                        <div class="p-4 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer bg-primary/5" onclick="markRead('${n.id}', this)">
+                            <div class="flex gap-3">
+                                <span class="material-symbols-outlined mt-0.5 ${col} text-[20px]">${icon}</span>
+                                <div>
+                                    <p class="font-bold text-sm text-on-surface">${n.title}</p>
+                                    <p class="text-xs text-on-surface-variant mt-1 leading-relaxed">${n.message}</p>
+                                    <p class="text-[10px] text-on-surface-variant mt-2">${new Date(n.created_at).toLocaleDateString()}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            // Show upgrade banner for free users
+            const checkAndShowBanner = () => {
+                if ((!data.user.subscription || data.user.subscription.plan_id === 'free') && window.subscriptionEnabled !== false) {
+                    const banner = document.getElementById('upgrade-banner');
+                    if (banner) {
+                        banner.classList.remove('hidden');
+                        banner.classList.add('flex');
+                    }
+                }
+            };
+            if (typeof window.subscriptionEnabled !== 'undefined') checkAndShowBanner();
+            else window.onSettingsLoaded = checkAndShowBanner;
+
+            // Auto-Resume Workflow
+            if (sessionStorage.getItem('resumeState')) {
+                try {
+                    const state = JSON.parse(sessionStorage.getItem('resumeState'));
+                    sessionStorage.removeItem('resumeState');
+                    if (state.url) {
+                        document.getElementById('url-input').value = state.url;
+                        if (state.tab === 'social') document.getElementById('tab-social').click();
+                        setTimeout(() => {
+                            if(typeof window.handlePasteOrAnalyze === 'function') window.handlePasteOrAnalyze();
+                        }, 300);
+                    }
+                } catch(e) {}
+            }
+        } else {
+            // Guest Mode
+            const histSection = document.getElementById('history-section');
+            if(histSection) {
+                histSection.innerHTML = `
+                <div class="w-full bg-surface-container/50 border border-white/5 rounded-2xl p-5 flex flex-col items-center justify-center text-center relative overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-b from-transparent to-surface-container pointer-events-none"></div>
+                    <span class="material-symbols-outlined text-[48px] text-on-surface-variant mb-4 relative z-10">lock</span>
+                    <h3 class="font-title-md text-xl text-on-surface font-bold relative z-10 mb-2">History & Sync Locked</h3>
+                    <p class="text-sm text-on-surface-variant max-w-sm relative z-10 mb-4" id="guest-promo-text">Create an account to sync your downloads across devices and access Premium features.</p>
+                    <a href="streamvault-login.html?mode=register" class="bg-primary hover:bg-primary-container text-[#5c0000] font-bold px-4 py-2 rounded-xl transition-all relative z-10">Create Free Account</a>
+                </div>`;
+                
+                const checkAndHidePromo = () => {
+                    if (window.subscriptionEnabled === false) {
+                        const promoText = document.getElementById('guest-promo-text');
+                        if (promoText) promoText.innerText = "Create an account to sync your downloads across devices.";
+                    }
+                };
+                if (typeof window.subscriptionEnabled !== 'undefined') checkAndHidePromo();
+                else {
+                    const oldOnLoad = window.onSettingsLoaded;
+                    window.onSettingsLoaded = () => { if(oldOnLoad) oldOnLoad(); checkAndHidePromo(); };
+                }
+            }
+        }
+    }).catch(e=>{});
+</script>
+</header>
+
+<!-- Upgrade Banner (Hidden by default, shown for free users) -->
+<div id="upgrade-banner" class="hidden bg-primary/10 border-b border-primary/20 text-center py-2 px-4 flex-col sm:flex-row justify-center items-center gap-3 w-full z-40 mt-16 sm:mt-0">
+    <span class="text-sm font-medium">Unlock 4K downloads, batch processing, and an ad-free experience.</span>
+    <a href="streamvault-upgrade.html" class="bg-primary text-on-primary font-bold px-4 py-1.5 rounded-lg text-xs hover:bg-primary-container transition-colors whitespace-nowrap">Upgrade to PRO</a>
+</div>
+<!-- Rewarded Ad Modal -->
+<div id="rewarded-ad-modal" class="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md hidden flex-col items-center justify-center p-4">
+    <div class="bg-surface-container-high border border-white/10 rounded-2xl p-4 w-full max-w-lg flex flex-col items-center gap-4 shadow-2xl relative text-center">
+        <h3 class="text-2xl font-display font-bold text-on-surface">Supporting Free Downloads</h3>
+        <p class="text-on-surface-variant text-sm">Please watch this short sponsor message to begin your download.</p>
+        
+        <div class="w-full h-[250px] bg-black border border-white/5 flex items-center justify-center relative overflow-hidden rounded-xl">
+            <streamvault-ad location="rewarded_video" type="rectangle" class="w-full h-full flex items-center justify-center"></streamvault-ad>
+            <div id="rewarded-ad-sim-content" class="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none opacity-50">
+                <span class="material-symbols-outlined text-[48px] text-white mb-2">movie</span>
+                <span class="font-mono text-sm tracking-widest text-white">ADVERTISEMENT SLOT</span>
+            </div>
+        </div>
+        
+        <div class="flex flex-col items-center w-full mt-2">
+            <p id="rewarded-ad-timer" class="text-primary font-bold font-mono text-xl mb-4">05</p>
+            <button id="btn-skip-rewarded" class="w-full bg-surface-container hover:bg-white/5 text-on-surface-variant font-bold py-2 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-white/5" disabled>
+                Skip Ad & Download
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content -->
+<main class="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop flex flex-col gap-4 mt-4">
+<!-- Global App Navigation -->
+<div class="flex items-center justify-center w-full mt-2 mb-2">
+    <div class="bg-surface-container-high/50 backdrop-blur-xl border border-white/10 p-1 rounded-full flex gap-1">
+        <a href="index.html" class="px-4 py-2 rounded-full bg-primary text-on-primary font-title-md text-title-md flex items-center gap-2 shadow-[0_0_15px_rgba(255,85,64,0.3)] transition-all">
+            <span class="material-symbols-outlined text-[20px]">download</span>
+            Downloader
+        </a>
+        <a href="streamvault-converter.html" class="px-4 py-2 rounded-full text-on-surface hover:bg-white/5 font-title-md text-title-md flex items-center gap-2 transition-all">
+            <span class="material-symbols-outlined text-[20px]">movie_edit</span>
+            Converter
+        </a>
+    </div>
+</div>
+
+<!-- Hero Input Section -->
+<section class="flex flex-col items-center text-center w-full max-w-2xl mx-auto mt-2 gap-4 relative">
+<div class="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-primary/20 blur-[100px] rounded-full pointer-events-none"></div>
+
+
+<!-- AD SLOT: Header (Above URL Input) -->
+<streamvault-ad location="home_header" type="banner" class="w-full max-w-3xl mx-auto mt-2"></streamvault-ad>
+
+<!-- NEW PLATFORM SELECTOR TABS -->
+<div class="flex border-b border-white/10 w-full max-w-sm mx-auto mt-4 mb-2 relative">
+    <!-- Active Indicator Line -->
+    <div id="tab-indicator" class="absolute bottom-[-1px] left-0 h-[3px] bg-primary transition-all duration-300 ease-out" style="width: 50%;"></div>
+    
+    <button id="tab-youtube" class="flex-1 pb-2 sm:pb-3 text-center transition-colors text-sm sm:text-base md:text-lg text-primary font-bold tab-btn" data-tab="youtube">
+        YouTube
+    </button>
+    <button id="tab-social" class="flex-1 pb-2 sm:pb-3 text-center transition-colors text-sm sm:text-base md:text-lg text-on-surface-variant font-normal tab-btn leading-tight" data-tab="social">
+        Instagram / Facebook
+    </button>
+</div>
+
+<div class="w-full mt-4 flex flex-col sm:flex-row gap-4 bg-surface-container-high/50 p-2 rounded-xl border border-white/10 backdrop-blur-xl shadow-lg relative overflow-hidden group">
+<div class="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none"></div>
+<input id="url-input" class="relative z-10 flex-grow bg-transparent border-none outline-none text-on-background font-body-lg text-body-lg px-4 py-2 placeholder:text-on-surface-variant focus:ring-0" placeholder="Paste media URL here (e.g., YouTube, Vimeo)..." type="text">
+<button id="analyze-btn" type="button" onclick="handlePasteOrAnalyze()" class="relative z-10 shrink-0 bg-primary hover:bg-primary-container text-on-primary font-title-md text-title-md w-full sm:w-40 h-12 rounded-lg flex items-center justify-center gap-2 transition-all active:scale-95 shadow-[0_0_20px_rgba(255,85,64,0.3)] cursor-pointer">
+<span id="analyze-btn-icon" class="material-symbols-outlined pointer-events-none">content_paste</span>
+<span id="analyze-btn-text" class="pointer-events-none">Paste Link</span>
+</button>
+</div>
+<!-- Error Message Container -->
+<div id="error-container" class="w-full text-left px-4 mt-2 hidden">
+    <p class="text-error font-body-sm text-body-sm flex items-center gap-2 bg-error-container/20 border border-error-container/30 px-3 py-2 rounded-lg">
+        <span class="material-symbols-outlined text-[18px] text-error">error</span>
+        <span id="error-message" class="text-error">Invalid URL. Please enter a valid video link.</span>
+    </p>
+</div>
+<!-- Quick Platforms Removed -->
+</section>
+
+<!-- Unified Download Workflow Section -->
+<section id="download-workflow-section" class="hidden w-full max-w-5xl mx-auto flex-col md:flex-row gap-5 mt-5 mb-12">
+    <!-- Left Column: Preview & Metadata -->
+    <div class="w-full md:w-5/12 flex flex-col gap-4">
+        <!-- Video Preview Card -->
+        <div class="glass-panel rounded-2xl overflow-hidden shadow-2xl relative group border border-white/10 bg-surface-container-high/50">
+            <div class="relative w-full pb-[56.25%] bg-surface-container-highest">
+                <img loading="lazy" id="video-thumbnail" class="absolute inset-0 w-full h-full object-cover opacity-80 transition-opacity duration-500" src="" />
+                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                <!-- Quality Chip -->
+                <div class="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-primary text-[16px]" style="font-variation-settings: 'FILL' 1;">movie</span>
+                    <span id="video-platform-badge" class="font-mono-sm text-mono-sm text-white">Platform</span>
+                </div>
+            </div>
+            <!-- Video Metadata -->
+            <div class="p-5 bg-surface-container-low/50">
+                <h2 id="video-title" class="font-title-md text-title-md text-on-surface line-clamp-2 mb-2">Analyzing...</h2>
+                <div class="flex items-center gap-4 text-on-surface-variant font-body-sm text-body-sm">
+                    <div class="flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[16px]">schedule</span>
+                        <span id="video-duration">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="restricted-warning" class="glass-panel rounded-xl p-4 flex gap-3 items-start border-l-4 border-l-red-500 hidden bg-red-500/10">
+            <span class="material-symbols-outlined text-red-500">warning</span>
+            <div>
+                <h4 class="font-label-md text-label-md text-on-surface mb-1">Restricted Content Warning</h4>
+                <p class="font-body-sm text-body-sm text-on-surface-variant">This stream may be private or age-restricted.</p>
+            </div>
+        </div>
+        <div id="direct-stream-info" class="glass-panel rounded-xl p-4 flex gap-3 items-start border-l-4 border-l-primary hidden bg-primary/10">
+            <span class="material-symbols-outlined text-primary">download</span>
+            <div>
+                <h4 class="font-label-md text-label-md text-on-surface mb-1">Direct Media File</h4>
+                <p class="font-body-sm text-body-sm text-on-surface-variant">Direct file ready for download.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Selection Form -->
+    <div class="w-full md:w-7/12 flex flex-col relative">
+        <!-- AD SLOT: Between Video Info and Quality Selection -->
+        <streamvault-ad location="home_content" type="rectangle" class="mb-4 w-full flex justify-center"></streamvault-ad>
+        
+        <div id="selection-steps-container" class="flex flex-col">
+            <div id="format-section-wrapper" class="block">
+            <!-- STEP 1: Format Selection -->
+            <h3 class="font-title-md text-title-md text-on-surface mb-4 flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">category</span>
+                <span id="step-1-label">1. Select Format</span>
+            </h3>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <!-- Format: MP4 -->
+                <label class="relative cursor-pointer group">
+                    <input type="radio" name="media_format" value="mp4" class="sr-only format-radio">
+                    <div class="glass-panel rounded-xl p-4 flex flex-col items-center text-center transition-all duration-200 border-2 border-transparent group-hover:border-white/20 h-full relative overflow-hidden format-card bg-surface-container-high/50">
+                        <div class="absolute top-2 right-2 opacity-0 check-icon transition-opacity">
+                            <span class="material-symbols-outlined text-primary">check_circle</span>
+                        </div>
+                        <span class="material-symbols-outlined text-4xl mb-2 text-on-surface-variant icon-color transition-colors">movie</span>
+                        <span class="font-title-md text-title-md text-on-surface mb-1">MP4 Video</span>
+                        <span class="font-body-sm text-body-sm text-on-surface-variant">Download video with audio</span>
+                    </div>
+                </label>
+
+                <!-- Format: MP3 -->
+                <label class="relative cursor-pointer group">
+                    <input type="radio" name="media_format" value="mp3" class="sr-only format-radio">
+                    <div class="glass-panel rounded-xl p-4 flex flex-col items-center text-center transition-all duration-200 border-2 border-transparent group-hover:border-white/20 h-full relative overflow-hidden format-card bg-surface-container-high/50">
+                        <div class="absolute top-2 right-2 opacity-0 check-icon transition-opacity">
+                            <span class="material-symbols-outlined text-primary">check_circle</span>
+                        </div>
+                        <span class="material-symbols-outlined text-4xl mb-2 text-on-surface-variant icon-color transition-colors">headphones</span>
+                        <span class="font-title-md text-title-md text-on-surface mb-1">MP3 Audio</span>
+                        <span class="font-body-sm text-body-sm text-on-surface-variant">Extract audio only</span>
+                    </div>
+                </label>
+            </div>
+            </div>
+
+            <!-- STEP 2: Quality Selection -->
+            <div id="quality-section" class="hidden opacity-0 transition-opacity duration-500 flex-col mb-auto">
+                <h3 class="font-title-md text-title-md text-on-surface mb-4 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">tune</span>
+                    2. Select Quality
+                </h3>
+                <!-- MP4 Video Quality Options -->
+                <div id="mp4-options" class="hidden flex-col gap-3"></div>
+                <!-- MP3 Audio Quality Options -->
+                <div id="mp3-options" class="hidden flex-col gap-3"></div>
+            </div>
+
+
+
+            <!-- Download Button -->
+            <button id="btn-start-download" class="mt-4 w-full h-14 rounded-xl bg-primary text-on-primary font-title-md text-title-md flex items-center justify-center gap-2 hover:bg-primary-container transition-colors shadow-[0_0_20px_rgba(255,85,64,0.2)] disabled:opacity-50 disabled:cursor-not-allowed">
+                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">download</span>
+                Download
+            </button>
+        </div>
+
+        <!-- Inline Downloading Progress Area (Hidden Initially) -->
+        <div id="inline-progress-section" class="hidden flex-col gap-4 mt-4 w-full h-full justify-center">
+            <h3 class="font-title-md text-title-md text-on-surface flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary animate-pulse">cloud_download</span>
+                Downloading...
+            </h3>
+            <div class="glass-panel rounded-xl p-4 border-2 border-primary/30 bg-primary/5 flex flex-col gap-4">
+                <div class="flex justify-between items-end">
+                    <span id="dl-speed" class="font-mono-sm text-mono-sm text-secondary-container">0 MB/s</span>
+                    <div class="flex gap-3 text-right">
+                        <span id="dl-size-info" class="font-mono-sm text-mono-sm text-on-surface-variant">0 MB / --</span>
+                        <span id="dl-percentage" class="font-mono-sm text-mono-sm text-on-surface">0%</span>
+                    </div>
+                </div>
+                <!-- Progress Track -->
+                <div class="w-full h-2 rounded-full bg-surface-container-highest overflow-hidden">
+                    <div id="dl-progress-bar" class="h-full rounded-full bg-gradient-to-r from-primary to-secondary-container relative transition-all duration-300" style="width: 0%">
+                        <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span id="dl-status-text" class="font-mono-sm text-[12px] text-primary flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[14px]">hourglass_empty</span>
+                        Starting...
+                    </span>
+                    <button id="btn-open-folder" class="hidden px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-sm flex items-center gap-2 font-title-sm">
+                        <span class="material-symbols-outlined text-[16px]">folder_open</span> Open Folder
+                    </button>
+                </div>
+                
+                <div id="dl-manual-save-container" class="hidden flex-col gap-2 mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+                    <span class="text-sm text-error font-sans font-bold flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[16px]">warning</span> Dialog Failed to Open. Enter path manually:
+                    </span>
+                    <div class="flex gap-2 w-full">
+                        <input type="text" id="dl-manual-save-path" class="w-full bg-surface border border-white/10 rounded-xl px-4 py-2 text-sm text-on-surface font-mono" placeholder="E.g. C:\Users\Name\Desktop\Video.mp4">
+                        <button onclick="manualSaveDownloader()" class="bg-primary px-4 py-2 rounded-xl text-on-primary font-bold text-sm transition hover:bg-primary-container shrink-0">Save</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="dl-complete-ad-wrapper" class="hidden mt-4 w-full flex justify-center">
+                <streamvault-ad location="home_download_complete" type="banner" class="w-full"></streamvault-ad>
+            </div>
+            
+            <button id="btn-download-another" class="hidden mt-4 w-full h-12 rounded-xl border border-white/20 text-on-surface font-title-md flex items-center justify-center gap-2 hover:bg-white/10 transition-colors">
+                <span class="material-symbols-outlined">add</span>
+                Download Another
+            </button>
+        </div>
+    </div>
+</section>
+
+<!-- Bento Grid: How It Works -->
+<section class="mt-5">
+<h3 class="font-title-md text-title-md text-on-surface-variant mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="info">info</span>
+                How It Works
+            </h3>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<!-- Step 1 -->
+<div class="bg-white/4 border border-white/10 backdrop-blur-xl rounded-2xl p-4 relative overflow-hidden group">
+<div class="absolute -right-8 -top-8 text-primary/10 font-display-lg text-[120px] font-bold z-0 pointer-events-none group-hover:scale-110 transition-transform">1</div>
+<div class="relative z-10 flex flex-col gap-4">
+<div class="w-12 h-12 rounded-xl bg-surface-container flex items-center justify-center border border-white/5">
+<span class="material-symbols-outlined text-primary" data-icon="link">link</span>
+</div>
+<h4 class="font-title-md text-title-md text-on-surface">Grab the Link</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Copy the URL of the video you want to download from any supported platform.</p>
+</div>
+</div>
+<!-- Step 2 -->
+<div class="bg-white/4 border border-white/10 backdrop-blur-xl rounded-2xl p-4 relative overflow-hidden group">
+<div class="absolute -right-8 -top-8 text-primary/10 font-display-lg text-[120px] font-bold z-0 pointer-events-none group-hover:scale-110 transition-transform">2</div>
+<div class="relative z-10 flex flex-col gap-4">
+<div class="w-12 h-12 rounded-xl bg-surface-container flex items-center justify-center border border-white/5">
+<span class="material-symbols-outlined text-primary" data-icon="tune">tune</span>
+</div>
+<h4 class="font-title-md text-title-md text-on-surface">Select Quality</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Our engine parses the link instantly. Choose up to 4K resolution and desired format.</p>
+</div>
+</div>
+<!-- Step 3 -->
+<div class="bg-white/4 border border-white/10 backdrop-blur-xl rounded-2xl p-4 relative overflow-hidden group">
+<div class="absolute -right-8 -top-8 text-primary/10 font-display-lg text-[120px] font-bold z-0 pointer-events-none group-hover:scale-110 transition-transform">3</div>
+<div class="relative z-10 flex flex-col gap-4">
+<div class="w-12 h-12 rounded-xl bg-surface-container flex items-center justify-center border border-white/5">
+<span class="material-symbols-outlined text-primary" data-icon="download">download</span>
+</div>
+<h4 class="font-title-md text-title-md text-on-surface">High-Speed Save</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Multi-thread downloading ensures your file is ready in seconds, directly to your vault.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Recent Downloads Strip -->
+<section class="mt-5">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-title-md text-title-md text-on-surface-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-xl">local_fire_department</span>
+                Trending Now
+            </h3>
+</div>
+<div class="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory hide-scrollbar">
+<!-- Trending Card 1 -->
+<div class="snap-start shrink-0 w-72 bg-white/4 border border-white/10 rounded-2xl overflow-hidden flex flex-col group cursor-pointer hover:bg-white/5 transition-colors">
+<div class="h-32 w-full relative overflow-hidden bg-surface-container">
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10"></div>
+<img loading="lazy" alt="AI Tech" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&amp;fit=crop&amp;q=80&amp;w=800">
+<div class="absolute top-2 right-2 z-20 flex gap-1">
+<span class="bg-primary/90 text-on-primary font-mono-sm text-[10px] px-2 py-0.5 rounded-full font-bold backdrop-blur-md">4K</span>
+<span class="bg-red-600 text-white font-mono-sm text-[10px] px-2 py-0.5 rounded-full backdrop-blur-md border border-white/20">YouTube</span>
+</div>
+</div>
+<div class="p-4">
+<h5 class="font-title-md text-[16px] text-on-surface truncate">Top 10 AI Tech 2024</h5>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Trending in Technology</p>
+</div>
+</div>
+<!-- Trending Card 2 -->
+<div class="snap-start shrink-0 w-72 bg-white/4 border border-white/10 rounded-2xl overflow-hidden flex flex-col group cursor-pointer hover:bg-white/5 transition-colors">
+<div class="h-32 w-full relative overflow-hidden bg-surface-container">
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10"></div>
+<img loading="lazy" alt="Japan Travel" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&amp;fit=crop&amp;q=80&amp;w=800">
+<div class="absolute top-2 right-2 z-20 flex gap-1">
+<span class="bg-primary/90 text-on-primary font-mono-sm text-[10px] px-2 py-0.5 rounded-full font-bold backdrop-blur-md">4K</span>
+<span class="bg-pink-500 text-white font-mono-sm text-[10px] px-2 py-0.5 rounded-full backdrop-blur-md border border-white/20">Instagram</span>
+</div>
+</div>
+<div class="p-4">
+<h5 class="font-title-md text-[16px] text-on-surface truncate">Cinematic Travel: Japan</h5>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Trending in Travel</p>
+</div>
+</div>
+<!-- Trending Card 3 -->
+<div class="snap-start shrink-0 w-72 bg-white/4 border border-white/10 rounded-2xl overflow-hidden flex flex-col group cursor-pointer hover:bg-white/5 transition-colors">
+<div class="h-32 w-full relative overflow-hidden bg-surface-container">
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10"></div>
+<img loading="lazy" alt="Cyberpunk City" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&amp;fit=crop&amp;q=80&amp;w=800">
+<div class="absolute top-2 right-2 z-20 flex gap-1">
+<span class="bg-primary/90 text-on-primary font-mono-sm text-[10px] px-2 py-0.5 rounded-full font-bold backdrop-blur-md">4K</span>
+<span class="bg-red-600 text-white font-mono-sm text-[10px] px-2 py-0.5 rounded-full backdrop-blur-md border border-white/20">YouTube</span>
+</div>
+</div>
+<div class="p-4">
+<h5 class="font-title-md text-[16px] text-on-surface truncate">Future Cities: 2077</h5>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Trending in Gaming</p>
+</div>
+</div>
+</div>
+</section><section id="history-section" class="mt-4 mb-5">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-title-md text-title-md text-on-surface-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="history">history</span>
+                    Recent Downloads
+                </h3>
+<button class="font-mono-sm text-mono-sm text-primary hover:text-primary-container transition-colors uppercase tracking-widest flex items-center gap-1">
+                    View All <span class="material-symbols-outlined text-[16px]" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+<div class="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory hide-scrollbar">
+<!-- Card 1 -->
+<div class="snap-start shrink-0 w-72 bg-white/4 border border-white/10 rounded-2xl overflow-hidden flex flex-col group cursor-pointer hover:bg-white/5 transition-colors">
+<div class="h-32 w-full relative overflow-hidden bg-surface-container">
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10"></div>
+<img loading="lazy" alt="Camera preview" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A close-up shot of a high-end digital cinema camera lens, bathed in moody cinematic lighting. The scene is dark, modern, and technical, with subtle crimson and blue highlights reflecting off the glass elements. The aesthetic emphasizes high-performance media production in a premium, minimalist environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuClQXs_b8bpRpKLMZbnxOceC9_sfPSSKDCXmlO4ndCtZN4yJhyEnLZa3X9bW2iqxijNWtpWNwKHofh67JlEnoEe68faR1U9tzWue7oTszV-5oyVY3zpGoBG-Xqu1Vv8qVYhWQkgaU3p3iobcc99l8HOT8QSIyv7vqADoeYlK8R8m4sNsb0ppoHPEHpwtkWJsos5_sYGpmACEGatSEyNm3ZSAf0GVOAWED4ZJtx4HCZ8X_XoHDCgv1cSk-Wn9yUT6VdqjsnjUTQZZV8e">
+<div class="absolute top-2 right-2 z-20 flex gap-1">
+<span class="bg-primary/90 text-on-primary font-mono-sm text-[10px] px-2 py-0.5 rounded-full font-bold backdrop-blur-md">4K</span>
+<span class="bg-black/50 text-white font-mono-sm text-[10px] px-2 py-0.5 rounded-full backdrop-blur-md border border-white/20">MP4</span>
+</div>
+<div class="absolute bottom-2 left-3 z-20 flex items-center gap-1">
+<span class="material-symbols-outlined text-white text-sm" data-icon="check_circle">check_circle</span>
+<span class="font-mono-sm text-mono-sm text-white">Complete</span>
+</div>
+</div>
+<div class="p-4">
+<h5 class="font-title-md text-[16px] text-on-surface truncate">Cinematic Drone Footage 2024</h5>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">1.2 GB • Downloaded today</p>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="snap-start shrink-0 w-72 bg-white/4 border border-white/10 rounded-2xl overflow-hidden flex flex-col group cursor-pointer hover:bg-white/5 transition-colors">
+<div class="h-32 w-full relative overflow-hidden bg-surface-container">
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10"></div>
+<img loading="lazy" alt="Tech review preview" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A sleek, modern desk setup featuring dual high-resolution curved monitors displaying editing software. The room is dimly lit with sophisticated ambient RGB lighting, primarily deep slate blues with subtle magenta accents. The mood is focused, professional, and indicative of high-end digital workflows." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBFHTMK4Aau6b6yLkdXeTGIs4GzIXegX_33plba5KBx9JcYdlqz0Ath_PN5H9ZHolLrN1eQeDo4HCE9BccvBjeUq6zwHkgc997gP7F2m2Wsr-ssqnrtUbdd09MWjMSJMRJVpLg7kt1QHCU5qagetmI_XVyPEvOSvCHP8iOn20W2Bg42enenxVhHDKdjWkpQs-gwWvx7Ge_L44dZpsFvEq2dHm4qz2RJvSjqveqi6RT6B7w85grZvyDWJMZDFqCo96BTEFOV2bfbEaRy">
+<div class="absolute top-2 right-2 z-20 flex gap-1">
+<span class="bg-surface-variant/90 text-on-surface font-mono-sm text-[10px] px-2 py-0.5 rounded-full border border-white/10 backdrop-blur-md">1080p</span>
+<span class="bg-black/50 text-white font-mono-sm text-[10px] px-2 py-0.5 rounded-full backdrop-blur-md border border-white/20">MP3</span>
+</div>
+<div class="absolute bottom-2 left-3 z-20 flex items-center gap-1">
+<span class="material-symbols-outlined text-white text-sm" data-icon="check_circle">check_circle</span>
+<span class="font-mono-sm text-mono-sm text-white">Complete</span>
+</div>
+</div>
+<div class="p-4">
+<h5 class="font-title-md text-[16px] text-on-surface truncate">Tech Review Audio Track</h5>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">45 MB • Downloaded yesterday</p>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="snap-start shrink-0 w-72 bg-white/4 border border-white/10 rounded-2xl overflow-hidden flex flex-col group cursor-pointer hover:bg-white/5 transition-colors">
+<div class="h-32 w-full relative overflow-hidden bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-surface-variant text-4xl" data-icon="ondemand_video">ondemand_video</span>
+</div>
+<div class="p-4">
+<h5 class="font-title-md text-[16px] text-on-surface-variant truncate italic">No more history</h5>
+<p class="font-body-sm text-body-sm text-on-surface-variant/50 mt-1">Ready for next download</p>
+</div>
+</div>
+</div>
+</section>
+<!-- AD SLOT: Footer -->
+<div class="mt-auto pt-12 pb-6">
+    <streamvault-ad location="home_footer" type="banner" class="w-full max-w-3xl mx-auto"></streamvault-ad>
+</div>
+
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden bg-surface/90 dark:bg-surface/90 backdrop-blur-2xl fixed bottom-0 w-full z-50 rounded-t-xl border-t border-white/5 shadow-[0_-4px_20px_rgba(0,0,0,0.4)] flex justify-around items-center px-4 py-2 pb-6 max-w-7xl mx-auto">
+<!-- Home (Active) -->
+<button class="nav-home flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-5 py-1.5 active:scale-90 duration-200">
+<span class="material-symbols-outlined text-[24px]" data-icon="home" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-md text-label-md mt-1">Home</span>
+</button>
+<!-- Downloads -->
+<button class="nav-downloads flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary transition-all active:scale-90 duration-200">
+<span class="material-symbols-outlined text-[24px]" data-icon="download_for_offline">download_for_offline</span>
+<span class="font-label-md text-label-md mt-1">Downloads</span>
+</button>
+<!-- Settings -->
+<button onclick="window.location.href='app-settings.html'" class="nav-settings flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary transition-all active:scale-90 duration-200">
+<span class="material-symbols-outlined text-[24px]" data-icon="settings">settings</span>
+<span class="font-label-md text-label-md mt-1">Settings</span>
+</button>
+</nav>
+<style>
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        /* Hide scrollbar for IE, Edge and Firefox */
+        .hide-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Navigation routing
+        document.querySelectorAll('.nav-home').forEach(el => {
+            el.addEventListener('click', () => { window.location.href = 'index.html'; });
+        });
+        document.querySelectorAll('.nav-downloads').forEach(el => {
+            el.addEventListener('click', () => { window.location.href = 'download-queue.html'; });
+        });
+        document.querySelectorAll('.nav-settings').forEach(el => {
+            el.addEventListener('click', () => { window.location.href = 'app-settings.html'; });
+        });
+
+        // ─── GLOBAL PASTE / ANALYZE HANDLER ──────────────────────────────
+        window.handlePasteOrAnalyze = async function() {
+            const inp  = document.getElementById('url-input');
+            const icon = document.getElementById('analyze-btn-icon');
+            const txt  = document.getElementById('analyze-btn-text');
+            const errBox = document.getElementById('error-container');
+            const errMsg = document.getElementById('error-message');
+
+            const showErr = (m) => { if(errBox && errMsg){ errMsg.textContent = m; errBox.classList.remove('hidden'); } };
+            const hideErr = ()  => { if(errBox) errBox.classList.add('hidden'); };
+
+            // If input already has text → run Analyze
+            if (inp && inp.value.trim().length > 0) {
+                hideErr();
+                if (typeof triggerParse === 'function') triggerParse();
+                return;
+            }
+
+            // Strategy 1: Modern Clipboard API
+            if (navigator.clipboard && navigator.clipboard.readText) {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    if (text && text.trim()) {
+                        inp.value = text.trim();
+                        inp.dispatchEvent(new Event('input', { bubbles: true }));
+                        if(icon){ icon.textContent = 'search'; }
+                        if(txt){ txt.textContent = 'Analyze'; }
+                        hideErr();
+                        inp.focus();
+                        return;
+                    }
+                } catch(e) { /* blocked, fall through */ }
+            }
+
+            // Strategy 2: Focus input and dispatch paste event (works from user gesture)
+            inp.focus();
+            const beforeVal = inp.value;
+            try {
+                document.execCommand('paste');
+            } catch(e) { /* ignore */ }
+
+            // Give execCommand a tick to fill the input
+            setTimeout(() => {
+                if (inp.value.trim() !== beforeVal.trim() && inp.value.trim().length > 0) {
+                    inp.dispatchEvent(new Event('input', { bubbles: true }));
+                    if(icon){ icon.textContent = 'search'; }
+                    if(txt){ txt.textContent = 'Analyze'; }
+                    hideErr();
+                    return;
+                }
+
+                // Strategy 3: Nothing worked — show clear tip
+                showErr('Click inside the box below and press Ctrl+V to paste your link');
+                inp.style.boxShadow = '0 0 0 3px rgba(255,85,64,0.6)';
+                setTimeout(() => { inp.style.boxShadow = ''; }, 2500);
+            }, 100);
+        };
+
+        // ─── URL INPUT + KEYBOARD LISTENERS ───────────────────────────────
+        const urlInput = document.getElementById('url-input');
+        const analyzeBtn = document.getElementById('analyze-btn');
+
+        function updateAnalyzeBtnState() {
+            const icon = document.getElementById('analyze-btn-icon');
+            const txt  = document.getElementById('analyze-btn-text');
+            if (!icon || !txt) return;
+            if (urlInput && urlInput.value.trim().length > 0) {
+                icon.textContent = 'search';
+                icon.classList.remove('animate-spin');
+                txt.textContent  = 'Analyze';
+            } else {
+                icon.textContent = 'content_paste';
+                icon.classList.remove('animate-spin');
+                txt.textContent  = 'Paste Link';
+            }
+        }
+
+        if (urlInput) {
+            let analyzeDebounceTimer = null;
+            urlInput.addEventListener('input', (e) => {
+                updateAnalyzeBtnState();
+                
+                clearTimeout(analyzeDebounceTimer);
+                const val = e.target.value.trim();
+                
+                // Only auto-analyze if URL is present
+                if (val.length > 0) {
+                    analyzeDebounceTimer = setTimeout(() => {
+                        const check = window.URLParser.detectPlatform(val);
+                        if (check.valid && ['youtube', 'instagram', 'facebook', 'direct'].includes(check.type)) {
+                            triggerParse();
+                        }
+                    }, 500); // 500ms debounce
+                }
+            });
+            urlInput.addEventListener('keyup', (e) => {
+                if (e.key === 'Enter' && typeof triggerParse === 'function') {
+                    clearTimeout(analyzeDebounceTimer);
+                    triggerParse();
+                }
+            });
+            urlInput.focus();
+        }
+
+        // Trending cards redirect
+        document.querySelectorAll('.snap-start.shrink-0.w-72').forEach((card, index) => {
+            card.addEventListener('click', () => {
+                triggerParse();
+            });
+        });
+
+        // Tab State Logic
+        let activePlatformTab = 'youtube';
+        const tabIndicator = document.getElementById('tab-indicator');
+        const tabYoutube = document.getElementById('tab-youtube');
+        const tabSocial = document.getElementById('tab-social');
+        const formatWrapper = document.getElementById('format-section-wrapper');
+        const step2Label = document.getElementById('step-2-label') || document.querySelector('h3:nth-of-type(2)');
+        
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const target = e.currentTarget.dataset.tab;
+                if (activePlatformTab === target) return;
+                activePlatformTab = target;
+                
+                // Update styling
+                if (target === 'youtube') {
+                    tabIndicator.style.transform = 'translateX(0%)';
+                    tabYoutube.classList.add('text-primary', 'font-bold');
+                    tabYoutube.classList.remove('text-on-surface-variant', 'font-normal');
+                    tabSocial.classList.add('text-on-surface-variant', 'font-normal');
+                    tabSocial.classList.remove('text-primary', 'font-bold');
+                    urlInput.placeholder = "Paste media URL here (e.g., YouTube)...";
+                    
+                    // Show Format
+                    formatWrapper.classList.remove('hidden');
+                    if(step2Label) step2Label.innerHTML = `<span class="material-symbols-outlined text-primary">high_quality</span> 2. Select Quality`;
+                } else {
+                    tabIndicator.style.transform = 'translateX(100%)';
+                    tabSocial.classList.add('text-primary', 'font-bold');
+                    tabSocial.classList.remove('text-on-surface-variant', 'font-normal');
+                    tabYoutube.classList.add('text-on-surface-variant', 'font-normal');
+                    tabYoutube.classList.remove('text-primary', 'font-bold');
+                    urlInput.placeholder = "Paste Instagram or Facebook URL here...";
+                    // Show Format for both platforms so selection can happen
+                    formatWrapper.classList.remove('hidden');
+                    if(step2Label) step2Label.innerHTML = `<span class="material-symbols-outlined text-primary">high_quality</span> 2. Select Quality`;
+                }
+            });
+        });
+
+        function getYouTubeId(url) {
+            try {
+                const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+                const match = url.match(regExp);
+                if (match && match[2].length === 11) {
+                    return match[2];
+                }
+            } catch (e) {
+                console.error("[StreamVault] Error parsing YouTube ID:", e);
+            }
+            return null;
+        }
+
+        let currentAnalyzeController = null;
+
+        async function triggerParse() {
+            if (!analyzeBtn) return;
+            const val = (urlInput.value || '').trim();
+            if (!val) return;
+            
+            try {
+            
+            if (!window.isLoggedIn && window.loginEnabled === true) {
+                showLoginModal();
+                return;
+            }
+
+            // Cancel previous analysis if URL changes
+            if (currentAnalyzeController) {
+                currentAnalyzeController.abort();
+                currentAnalyzeController = null;
+            }
+
+            const errorContainer = document.getElementById('error-container');
+            const errorMsg = document.getElementById('error-message');
+            
+            // Reset Error UI
+            if (errorContainer) errorContainer.classList.add('hidden');
+            
+            console.log(`[StreamVault] Initiating link parsing for: "${val}"`);
+
+            const t0 = performance.now();
+            analyzeBtn.disabled = true;
+            analyzeBtn.innerHTML = '<span id="analyze-btn-icon" class="material-symbols-outlined animate-spin">sync</span> <span id="analyze-btn-text">Detecting URL...</span>';
+
+            // 1. Detect Platform
+            const check = window.URLParser.detectPlatform(val);
+            const t1 = performance.now();
+            console.log(`[Perf] Platform Detection: ${(t1 - t0).toFixed(2)} ms`);
+
+            // STRICT TAB VALIDATION
+            if (activePlatformTab === 'youtube') {
+                if (check.type === 'instagram' || check.type === 'facebook') {
+                    if (errorContainer && errorMsg) {
+                        errorMsg.innerHTML = 'This appears to be an Instagram/Facebook link. <a href="javascript:void(0)" onclick="document.getElementById(\'tab-social\').click(); setTimeout(()=>window.handlePasteOrAnalyze(), 100);" class="underline font-bold hover:text-white ml-2">[ Switch To Instagram/Facebook Tab ]</a>';
+                        errorContainer.classList.remove('hidden');
+                    }
+                    analyzeBtn.disabled = false;
+                    updateAnalyzeBtnState();
+                    return;
+                }
+                if (check.type !== 'youtube' && check.type !== 'direct') {
+                    if (errorContainer && errorMsg) {
+                        errorMsg.textContent = 'Please enter a valid YouTube URL.';
+                        errorContainer.classList.remove('hidden');
+                    }
+                    analyzeBtn.disabled = false;
+                    updateAnalyzeBtnState();
+                    return;
+                }
+            } else if (activePlatformTab === 'social') {
+                if (check.type === 'youtube') {
+                    if (errorContainer && errorMsg) {
+                        errorMsg.innerHTML = 'This appears to be a YouTube link. <a href="javascript:void(0)" onclick="document.getElementById(\'tab-youtube\').click(); setTimeout(()=>window.handlePasteOrAnalyze(), 100);" class="underline font-bold hover:text-white ml-2">[ Switch To YouTube Tab ]</a>';
+                        errorContainer.classList.remove('hidden');
+                    }
+                    analyzeBtn.disabled = false;
+                    updateAnalyzeBtnState();
+                    return;
+                }
+                if (check.type !== 'instagram' && check.type !== 'facebook' && check.type !== 'direct') {
+                    if (errorContainer && errorMsg) {
+                        errorMsg.textContent = 'Please enter a valid Instagram or Facebook URL.';
+                        errorContainer.classList.remove('hidden');
+                    }
+                    analyzeBtn.disabled = false;
+                    updateAnalyzeBtnState();
+                    return;
+                }
+            }
+
+            if (!check.valid) {
+                console.error(`[StreamVault] URL Validation Failed. Reason: "${check.reason}"`);
+                if (errorContainer && errorMsg) {
+                    errorMsg.textContent = check.reason || "Invalid URL detected.";
+                    errorContainer.classList.remove('hidden');
+                }
+                analyzeBtn.disabled = false;
+                updateAnalyzeBtnState();
+                return;
+            }
+
+            // Prepare pending video object early to avoid ReferenceError
+            let pendingVideo = {
+                title: "Loading Stream...",
+                platform: check.type === 'youtube' ? 'YouTube' : check.type === 'instagram' ? 'Instagram' : check.type === 'facebook' ? 'Facebook' : 'Web Stream',
+                thumbnail: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=400&auto=format&fit=crop",
+                url: check.normalizedUrl,
+                directDownload: check.type === 'direct',
+                restricted: false,
+                sizes: null
+            };
+
+            // Progressive UI Loading: Show Workflow Section Immediately
+            document.getElementById('video-title').textContent = pendingVideo.title;
+            document.getElementById('video-platform-badge').textContent = pendingVideo.platform || 'Web';
+            
+            const thumbImg = document.getElementById('video-thumbnail');
+            if (pendingVideo.thumbnail) {
+                thumbImg.src = Array.isArray(pendingVideo.thumbnail) ? (pendingVideo.thumbnail[0]?.url || '') : pendingVideo.thumbnail;
+                thumbImg.style.display = 'block';
+            } else {
+                thumbImg.style.display = 'none';
+                thumbImg.src = '';
+            }
+            
+            if (pendingVideo.directDownload) {
+                document.getElementById('direct-stream-info').classList.remove('hidden');
+            } else {
+                document.getElementById('direct-stream-info').classList.add('hidden');
+            }
+
+            // 2. Fetch Metadata
+            analyzeBtn.innerHTML = '<span id="analyze-btn-icon" class="material-symbols-outlined animate-spin">sync</span> <span id="analyze-btn-text">Analyzing...</span>';
+            const t2 = performance.now();
+            currentAnalyzeController = new AbortController();
+
+            if (!pendingVideo.directDownload) {
+                try {
+                    const isSocial = check.type === 'facebook' || check.type === 'instagram';
+                    const apiEndpoint = isSocial ? '/api/social/metadata' : '/api/metadata';
+                    const response = await fetch((window.API_BASE_URL || '') + apiEndpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: check.normalizedUrl, type: check.type }),
+                        signal: currentAnalyzeController.signal
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.title && data.title !== 'NA') pendingVideo.title = data.title;
+                        if (data.thumbnail && data.thumbnail !== 'NA') pendingVideo.thumbnail = data.thumbnail;
+                        if (data.sizes) pendingVideo.sizes = data.sizes;
+                        if (data.videoFormats) pendingVideo.videoFormats = data.videoFormats;
+                        if (data.audioFormats) pendingVideo.audioFormats = data.audioFormats;
+                        
+                        if (data.debug) {
+                            pendingVideo.yt_dlp_command = data.debug.yt_dlp_command;
+                            pendingVideo.exit_code = data.debug.exit_code;
+                            pendingVideo.stdout = data.debug.stdout;
+                            pendingVideo.stderr = data.debug.stderr;
+                        }
+                        
+                        if (data.extractionError) {
+                            console.error("[Diagnostics] Backend Extraction Error:", data.extractionError);
+                        }
+                        
+                        const totalFormats = (data.videoFormats?.length || 0) + (data.audioFormats?.length || 0);
+                        console.log(`[Diagnostics] FORMATS_FOUND = ${totalFormats}`);
+                        if (data.videoFormats?.length > 0) {
+                            console.log("[Diagnostics] yt-dlp format list:", data.videoFormats);
+                        }
+                    } else {
+                         if (response.status === 429) {
+                             const errData = await response.json().catch(() => ({}));
+                             showLimitModal(errData.error || 'Daily Limit Reached');
+                             updateAnalyzeBtnState();
+                             return;
+                         }
+                         let errData = {};
+                         let rawText = '';
+                         try {
+                             rawText = await response.text();
+                             errData = JSON.parse(rawText);
+                         } catch (e) {
+                             errData = { 
+                                 actual_error: `HTTP ${response.status} ${response.statusText}\n\n${rawText.substring(0, 500)}`,
+                                 stderr: `HTTP ${response.status} ${response.statusText}`,
+                                 stdout: rawText,
+                                 exit_code: response.status,
+                                 yt_dlp_command: 'N/A'
+                             };
+                         }
+                         // Expose server errors directly to the user in the UI format block
+                         if (errData.actual_error || errData.error || errData.details) {
+                             pendingVideo.extractionError = errData.actual_error || errData.details || errData.error;
+                             pendingVideo.yt_dlp_command = errData.yt_dlp_command;
+                             pendingVideo.exit_code = errData.exit_code;
+                             pendingVideo.stdout = errData.stdout;
+                             pendingVideo.stderr = errData.stderr;
+                         }
+
+                         if (isSocial) {
+                             alert(`Failed: ${errData.error || 'Extraction Error'}\n\n${errData.details || ''}`);
+                             analyzeBtn.innerHTML = '<span class="material-symbols-outlined text-[18px]">search</span> <span class="font-semibold tracking-wide">Analyze</span>';
+                             analyzeBtn.disabled = false;
+                             urlInput.disabled = false;
+                             return;
+                         }
+                         
+                         // Fallback for YouTube
+                         if (check.type === 'youtube') {
+                             try {
+                                 const noembedRes = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(check.normalizedUrl)}`);
+                                 if (noembedRes.ok) {
+                                     const noembedData = await noembedRes.json();
+                                     if (noembedData.title) pendingVideo.title = noembedData.title;
+                                     if (noembedData.thumbnail_url) pendingVideo.thumbnail = noembedData.thumbnail_url;
+                                 }
+                             } catch(err) {}
+                         }
+                    }
+                } catch(e) {
+                    if (e.name === 'AbortError') {
+                        console.log("[StreamVault] Analysis aborted due to URL change.");
+                        return; // Exit silently
+                    }
+                    console.warn("[StreamVault] Failed to fetch metadata", e);
+                    throw new Error("Backend Offline. Please check your backend deployment URL.");
+                }
+            } else {
+                try {
+                    const urlObj = new URL(check.normalizedUrl);
+                    pendingVideo.title = urlObj.pathname.split('/').pop() || "Direct Video Stream";
+                } catch (e) {
+                    pendingVideo.title = "Direct Video Stream.mp4";
+                }
+            }
+
+            const t3 = performance.now();
+            console.log(`[Perf] Metadata Fetch: ${(t3 - t2).toFixed(2)} ms`);
+            
+            analyzeBtn.innerHTML = '<span id="analyze-btn-icon" class="material-symbols-outlined animate-spin">sync</span> <span id="analyze-btn-text">Loading formats...</span>';
+
+            // 3. Finalize UI Update
+            setTimeout(() => {
+                const t4 = performance.now();
+                analyzeBtn.disabled = false;
+                
+                // Show final ready state
+                analyzeBtn.innerHTML = '<span id="analyze-btn-icon" class="material-symbols-outlined">check_circle</span> <span id="analyze-btn-text">Ready</span>';
+                
+                document.getElementById('video-title').textContent = pendingVideo.title;
+                const finalThumb = document.getElementById('video-thumbnail');
+                if (pendingVideo.thumbnail) {
+                    finalThumb.src = Array.isArray(pendingVideo.thumbnail) ? (pendingVideo.thumbnail[0]?.url || '') : pendingVideo.thumbnail;
+                    finalThumb.style.display = 'block';
+                } else {
+                    finalThumb.style.display = 'none';
+                    finalThumb.src = '';
+                }
+
+                if (pendingVideo.restricted) {
+                    document.getElementById('restricted-warning').classList.remove('hidden');
+                } else {
+                    document.getElementById('restricted-warning').classList.add('hidden');
+                }
+
+                const t5 = performance.now();
+                console.log(`[Perf] Quality Render & UI Finalize: ${(t5 - t4).toFixed(2)} ms`);
+                console.log(`[Perf] Total Time: ${(t5 - t0).toFixed(2)} ms`);
+
+                document.getElementById('download-workflow-section').classList.remove('hidden');
+                document.getElementById('download-workflow-section').classList.add('flex');
+                
+                // Scroll down quickly
+                document.getElementById('download-workflow-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                // Initialize the workflow with fetched data
+                initializeWorkflow(pendingVideo);
+
+                // Auto-focus quality selection
+                const qualitySection = document.getElementById('quality-section');
+                if (qualitySection) {
+                    qualitySection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    qualitySection.classList.add('ring-2', 'ring-primary', 'rounded-xl', 'transition-all');
+                    setTimeout(() => qualitySection.classList.remove('ring-2', 'ring-primary'), 2000);
+                }
+            }, 50);
+
+            } catch (err) {
+                console.error("[StreamVault] Critical Error in triggerParse:", err);
+                const errorContainer = document.getElementById('error-container');
+                const errorMsg = document.getElementById('error-message');
+                if (errorContainer && errorMsg) {
+                    errorMsg.textContent = "An error occurred during detection: " + (err.message || "Unknown error");
+                    errorContainer.classList.remove('hidden');
+                }
+                
+                const workflowSection = document.getElementById('download-workflow-section');
+                if (workflowSection) {
+                    workflowSection.classList.add('hidden');
+                    workflowSection.classList.remove('flex');
+                }
+                
+                if (analyzeBtn) {
+                    analyzeBtn.disabled = false;
+                    analyzeBtn.innerHTML = '<span id="analyze-btn-icon" class="material-symbols-outlined">search</span> <span id="analyze-btn-text">Analyze</span>';
+                }
+            }
+        }
+
+        // Setup Selection Logic
+        function initializeWorkflow(videoData) {
+            let validation = {
+                urlValid: true,
+                platformDetected: !!videoData.platform,
+                formatSelected: true,
+                qualitySelected: true
+            };
+            
+            let selectedFormat = 'mp4';
+            let selectedQuality = 'Original';
+
+            const formatRadios = document.querySelectorAll('.format-radio');
+            const mp4Options = document.getElementById('mp4-options');
+            const mp3Options = document.getElementById('mp3-options');
+            const qualitySection = document.getElementById('quality-section');
+            const startBtn = document.getElementById('btn-start-download');
+
+            function updateDiagnostics() {
+                // Diagnostics panel removed — just update the button state
+                const ready = validation.urlValid && validation.platformDetected && validation.formatSelected && validation.qualitySelected;
+                const currentBtn = document.getElementById('btn-start-download');
+                if (currentBtn) currentBtn.disabled = !ready;
+            }
+
+            function createQualityChip(type, name, value, sizeStr, isRecommended=false, extraDetails='') {
+                return `
+                    <label class="relative cursor-pointer group">
+                        <input class="sr-only quality-radio" name="${type}_quality" type="radio" value="${value}" data-size="${sizeStr}"/>
+                        <div class="glass-panel rounded-xl p-4 flex items-center justify-between transition-all duration-200 border-2 border-transparent group-hover:border-white/20 quality-card relative overflow-hidden bg-surface-container-high/50">
+                            <div class="flex items-center gap-4">
+                                <div class="w-5 h-5 rounded-full border-2 border-outline-variant flex items-center justify-center radio-border">
+                                    <div class="w-2.5 h-2.5 rounded-full bg-transparent transform scale-0 transition-transform duration-200 radio-inner"></div>
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="font-title-md text-title-md text-on-surface">${name}</span>
+                                        ${isRecommended ? '<span class="bg-primary/20 text-primary px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase">Recommended</span>' : ''}
+                                    </div>
+                                    ${extraDetails ? `<div class="text-xs text-on-surface-variant/70 font-medium tracking-wide mt-1">${extraDetails}</div>` : ''}
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <span class="font-title-md text-title-md text-on-surface">~ ${sizeStr}</span>
+                                <span class="material-symbols-outlined text-primary opacity-0 check-icon transition-opacity">check_circle</span>
+                            </div>
+                        </div>
+                    </label>
+                `;
+            }
+
+            function buildQualityUI(format) {
+                let html = '';
+                let count = 0;
+                
+                if (format === 'mp4') {
+                    if (videoData.videoFormats && videoData.videoFormats.length > 0) {
+                        videoData.videoFormats.forEach(f => {
+                            let details = [];
+                            if (f.resolution && f.resolution !== f.quality) details.push(f.resolution);
+                            if (f.fps) details.push(f.fps);
+                            if (f.codec && f.codec !== 'Unknown') details.push(f.codec);
+                            
+                            html += createQualityChip('video', f.quality, f.id, f.sizeStr, f.recommended, details.join(' • '));
+                            count++;
+                        });
+                    } else {
+                        const sizes = videoData.sizes || {};
+                        if (sizes.Original) { html += createQualityChip('video', 'Original Quality', 'Original', sizes.Original, true); count++; }
+                        if (sizes.v4k && !sizes.Original) { html += createQualityChip('video', '4K', '4k', sizes.v4k, true); count++; }
+                        if (sizes.v1080) { html += createQualityChip('video', '1080p', '1080p', sizes.v1080); count++; }
+                        if (sizes.v720) { html += createQualityChip('video', '720p', '720p', sizes.v720); count++; }
+                        if (sizes.v480) { html += createQualityChip('video', '480p', '480p', sizes.v480); count++; }
+                    }
+                    if (count === 0) { 
+                        const actualErr = videoData.extractionError || videoData.stderr || "No explicit stderr returned. (Check stdout)";
+                        const cmd = videoData.yt_dlp_command ? `\n> ${videoData.yt_dlp_command}` : '';
+                        const extCode = videoData.exit_code !== undefined ? `\nExit Code: ${videoData.exit_code}` : '';
+                        html += `
+                        <div class="glass-panel rounded-xl p-4 flex flex-col items-center justify-center border border-error/30 bg-error/10 w-full text-center">
+                            <span class="text-error font-title-md">EXTRACTION FAILED</span>
+                            <span class="text-sm text-error/80 mt-2 block break-all font-mono text-left w-full bg-surface/50 p-2 rounded whitespace-pre-wrap">${actualErr}</span>
+                            <button type="button" onclick="document.getElementById('debug-modal-${format}').classList.toggle('hidden')" class="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 rounded border border-white/20 text-xs font-mono transition-colors text-white">Show Extraction Debug</button>
+                        </div>
+                        <div id="debug-modal-${format}" class="hidden w-full mt-4 flex flex-col gap-2 text-left">
+                            <div class="text-xs font-mono text-on-surface-variant bg-surface/80 p-3 rounded-lg overflow-x-auto border border-outline/30">
+                                <div class="text-primary font-bold mb-1">COMMAND EXECUTED:</div>
+                                ${cmd}<br><br>
+                                <div class="text-primary font-bold mb-1">EXIT CODE:</div>
+                                ${extCode}<br><br>
+                                <div class="text-primary font-bold mb-1">STDERR:</div>
+                                <pre class="whitespace-pre-wrap text-error/90">${videoData.stderr || 'N/A'}</pre><br>
+                                <div class="text-primary font-bold mb-1">STDOUT (First 1000 chars):</div>
+                                <pre class="whitespace-pre-wrap">${videoData.stdout ? videoData.stdout.substring(0, 1000) : 'N/A'}</pre>
+                            </div>
+                        </div>`; 
+                    }
+                    mp4Options.innerHTML = html;
+                } else {
+                    if (videoData.audioFormats && videoData.audioFormats.length > 0) {
+                        videoData.audioFormats.forEach(f => {
+                            html += createQualityChip('audio', f.quality, f.id, f.sizeStr, f.recommended);
+                            count++;
+                        });
+                    } else {
+                        const sizes = videoData.sizes || {};
+                        if (sizes.a640) { html += createQualityChip('audio', '640 kbps', '640K', sizes.a640, true); count++; }
+                        if (sizes.a320) { html += createQualityChip('audio', '320 kbps', '320K', sizes.a320, !sizes.a640); count++; }
+                        if (sizes.a192) { html += createQualityChip('audio', '192 kbps', '192K', sizes.a192); count++; }
+                        if (sizes.a128) { html += createQualityChip('audio', '128 kbps', '128K', sizes.a128); count++; }
+                        if (sizes.a64) { html += createQualityChip('audio', '64 kbps', '64K', sizes.a64); count++; }
+                    }
+                    if (count === 0) { 
+                        const actualErr = videoData.extractionError || videoData.stderr || "No explicit stderr returned. (Check stdout)";
+                        const cmd = videoData.yt_dlp_command ? `\n> ${videoData.yt_dlp_command}` : '';
+                        const extCode = videoData.exit_code !== undefined ? `\nExit Code: ${videoData.exit_code}` : '';
+                        html += `
+                        <div class="glass-panel rounded-xl p-4 flex flex-col items-center justify-center border border-error/30 bg-error/10 w-full text-center">
+                            <span class="text-error font-title-md">EXTRACTION FAILED</span>
+                            <span class="text-sm text-error/80 mt-2 block break-all font-mono text-left w-full bg-surface/50 p-2 rounded whitespace-pre-wrap">${actualErr}</span>
+                            <button type="button" onclick="document.getElementById('debug-modal-${format}').classList.toggle('hidden')" class="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 rounded border border-white/20 text-xs font-mono transition-colors text-white">Show Extraction Debug</button>
+                        </div>
+                        <div id="debug-modal-${format}" class="hidden w-full mt-4 flex flex-col gap-2 text-left">
+                            <div class="text-xs font-mono text-on-surface-variant bg-surface/80 p-3 rounded-lg overflow-x-auto border border-outline/30">
+                                <div class="text-primary font-bold mb-1">COMMAND EXECUTED:</div>
+                                ${cmd}<br><br>
+                                <div class="text-primary font-bold mb-1">EXIT CODE:</div>
+                                ${extCode}<br><br>
+                                <div class="text-primary font-bold mb-1">STDERR:</div>
+                                <pre class="whitespace-pre-wrap text-error/90">${videoData.stderr || 'N/A'}</pre><br>
+                                <div class="text-primary font-bold mb-1">STDOUT (First 1000 chars):</div>
+                                <pre class="whitespace-pre-wrap">${videoData.stdout ? videoData.stdout.substring(0, 1000) : 'N/A'}</pre>
+                            </div>
+                        </div>`; 
+                    }
+                    mp3Options.innerHTML = html;
+                }
+                
+                // Hide download button if no formats available
+                if (count === 0) {
+                    startBtn.classList.add('hidden');
+                } else {
+                    startBtn.classList.remove('hidden');
+                }
+
+                // Re-attach listeners to dynamically generated radios
+                const container = format === 'mp4' ? mp4Options : mp3Options;
+                const newRadios = container.querySelectorAll('.quality-radio');
+                newRadios.forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        selectedQuality = e.target.value;
+                        validation.qualitySelected = true;
+                        updateDiagnostics();
+                    });
+                });
+                
+                // Auto-select first quality if available
+                setTimeout(() => {
+                    const firstQuality = container.querySelector('.quality-radio');
+                    if (firstQuality && !firstQuality.checked) {
+                        firstQuality.click();
+                    }
+                }, 50);
+            }
+
+                // Reset UI — button disabled until format + quality selected
+                startBtn.disabled = true;
+                qualitySection.classList.add('hidden', 'opacity-0');
+                qualitySection.classList.remove('flex');
+                formatRadios.forEach(r => r.checked = false);
+                updateDiagnostics();
+
+            // STEP 1: Attach format radio listeners FIRST before any auto-selection
+            formatRadios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    selectedFormat = e.target.value;
+                    selectedQuality = null;
+                    validation.formatSelected = true;
+                    validation.qualitySelected = false;
+                    updateDiagnostics();
+
+                    // Show Quality Section
+                    qualitySection.classList.remove('hidden');
+                    qualitySection.classList.add('flex');
+                    setTimeout(() => qualitySection.classList.remove('opacity-0'), 50);
+
+                    // Toggle mp4 / mp3 containers
+                    if (selectedFormat === 'mp4') {
+                        mp3Options.classList.add('hidden');
+                        mp3Options.classList.remove('flex');
+                        mp4Options.classList.remove('hidden');
+                        mp4Options.classList.add('flex');
+                    } else {
+                        mp4Options.classList.add('hidden');
+                        mp4Options.classList.remove('flex');
+                        mp3Options.classList.add('hidden');
+                        mp3Options.classList.remove('flex');
+                        mp3Options.classList.remove('hidden');
+                        mp3Options.classList.add('flex');
+                    }
+
+                    buildQualityUI(selectedFormat);
+                });
+            });
+
+            // STEP 2: Auto-select appropriate tab to trigger everything
+            const hasVideo = videoData.videoFormats && videoData.videoFormats.length > 0;
+            const hasAudio = videoData.audioFormats && videoData.audioFormats.length > 0;
+            const fallbackToAudio = !hasVideo && hasAudio;
+            
+            const targetFormat = fallbackToAudio ? 'mp3' : 'mp4';
+            const targetRadio = document.querySelector(`input[name="format"][value="${targetFormat}"]`);
+            if (targetRadio) {
+                targetRadio.click();
+            }
+
+            // Re-bind click listener cleanly to avoid duplicates
+            const newStartBtn = startBtn.cloneNode(true);
+            startBtn.parentNode.replaceChild(newStartBtn, startBtn);
+            
+            newStartBtn.addEventListener('click', () => {
+                startInlineDownload(videoData, selectedFormat, selectedQuality);
+            });
+        }
+
+        function formatSize(bytes) {
+            if (bytes === 0 || isNaN(bytes)) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        async function startInlineDownload(videoData, format, selectedQuality) {
+            if (!window.isLoggedIn && window.loginEnabled === true) {
+                showLoginModal();
+                return;
+            }
+            
+            // --- REWARDED AD LOGIC ---
+            const userSub = (window.currentUser && window.currentUser.subscription) ? window.currentUser.subscription.plan_id : 'free';
+            const isFreeUser = !window.isLoggedIn || userSub === 'free';
+            
+            if (window.rewardedAdsEnabled === 'true' && isFreeUser && window.subscriptionEnabled !== false) {
+                const now = Date.now();
+                const cooldownMins = parseInt(window.rewardedAdCooldown) || 15;
+                const freqDl = parseInt(window.rewardedAdFrequency) || 3;
+                
+                const lastAdTime = parseInt(localStorage.getItem('sv_last_rewarded_ad')) || 0;
+                let dlCount = parseInt(localStorage.getItem('sv_dl_since_ad')) || 0;
+                
+                const minsSinceLastAd = (now - lastAdTime) / (1000 * 60);
+                const needsAd = (minsSinceLastAd >= cooldownMins) || (dlCount >= freqDl);
+                
+                if (needsAd) {
+                    const modal = document.getElementById('rewarded-ad-modal');
+                    if (modal) {
+                        modal.classList.remove('hidden');
+                        modal.classList.add('flex');
+                        
+                        const timerEl = document.getElementById('rewarded-ad-timer');
+                        const skipBtn = document.getElementById('btn-skip-rewarded');
+                        
+                        let timeLeft = 5;
+                        timerEl.innerText = '05';
+                        skipBtn.disabled = true;
+                        skipBtn.innerText = 'Skip Ad & Download';
+                        
+                        // Force hide ads underneath
+                        if (typeof window.toggleAds === 'function') window.toggleAds(false);
+                        
+                        fetch((window.API_BASE_URL || '') + '/api/ads/track', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({location:'rewarded_video', type:'shown'})}).catch(e=>{});
+                        
+                        return new Promise(resolve => {
+                            const interval = setInterval(() => {
+                                timeLeft--;
+                                timerEl.innerText = '0' + timeLeft;
+                                if (timeLeft <= 0) {
+                                    clearInterval(interval);
+                                    skipBtn.disabled = false;
+                                    skipBtn.innerText = 'Continue to Download';
+                                }
+                            }, 1000);
+                            
+                            skipBtn.onclick = () => {
+                                clearInterval(interval);
+                                modal.classList.remove('flex');
+                                modal.classList.add('hidden');
+                                
+                                fetch((window.API_BASE_URL || '') + '/api/ads/track', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({location:'rewarded_video', type:'completed'})}).catch(e=>{});
+                                
+                                localStorage.setItem('sv_last_rewarded_ad', Date.now());
+                                localStorage.setItem('sv_dl_since_ad', 1); // Count this download
+                                
+                                resolve(_executeInlineDownload(videoData, format, selectedQuality));
+                            };
+                        });
+                    }
+                } else {
+                    localStorage.setItem('sv_dl_since_ad', dlCount + 1);
+                }
+            }
+            // --- END REWARDED AD LOGIC ---
+
+            return _executeInlineDownload(videoData, format, selectedQuality);
+        }
+
+        async function _executeInlineDownload(videoData, format, selectedQuality) {
+            if (typeof window.toggleAds === 'function') window.toggleAds(false);
+
+            const stepsContainer   = document.getElementById('selection-steps-container');
+            const progressSection  = document.getElementById('inline-progress-section');
+            const statusText       = document.getElementById('dl-status-text');
+            const speedText        = document.getElementById('dl-speed');
+            const sizeInfo         = document.getElementById('dl-size-info');
+            const pctText          = document.getElementById('dl-percentage');
+            const progressBar      = document.getElementById('dl-progress-bar');
+            const downloadAnotherBtn = document.getElementById('btn-download-another');
+
+            // ── Switch UI to downloading state ───────────────
+            stepsContainer.classList.add('hidden');
+            progressSection.classList.remove('hidden');
+            progressSection.classList.add('flex');
+
+            statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Getting download link...';
+            speedText.textContent  = '--';
+            sizeInfo.textContent   = '--';
+            pctText.textContent    = '';
+            progressBar.style.width = '60%';
+
+            const isAudio = format === 'mp3';
+            let filename  = (videoData.title || 'download').replace(/[/\\?%*:|"<>]/g, '-');
+            if (!filename.toLowerCase().endsWith('.mp4') && !filename.toLowerCase().endsWith('.mp3')) {
+                filename += isAudio ? '.mp3' : '.mp4';
+            }
+
+            try {
+                // ── Call Local /api/download Function ─────
+                const targetUrl = (window.API_BASE_URL || '') + '/api/download';
+                console.log("=== DOWNLOAD REQUEST TRACE ===");
+                console.log("Request URL:", targetUrl);
+                console.log("Request Method:", "POST");
+
+                const reqBody = {
+                    url:     videoData.url,
+                    quality: selectedQuality,
+                    format:  format,
+                    filename: filename,
+                    id:      'dl-' + Date.now()
+                };
+
+                const dlRes = await fetch(targetUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(reqBody)
+                });
+
+                console.log("Response Status:", dlRes.status, dlRes.statusText);
+
+                const dlData = await dlRes.json();
+                console.log("Response Body:", dlData);
+
+                if (!dlRes.ok || !dlData.success) {
+                    throw new Error(dlData.error || `Download failed (HTTP ${dlRes.status})`);
+                }
+
+                const dlId = reqBody.id;
+                const dlFilename = dlData.filename || filename;
+
+                // ── Poll for Local Download Status ───────────
+                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Downloading to PC...';
+                progressBar.style.width = '0%';
+                
+                const pollInterval = setInterval(async () => {
+                    try {
+                        const statusRes = await fetch((window.API_BASE_URL || '') + `/api/download-status?id=${dlId}`);
+                        if (statusRes.ok) {
+                            const st = await statusRes.json();
+                            
+                            if (st.status === 'completed') {
+                                clearInterval(pollInterval);
+                                
+                                const filePath = st.path || dlData.path || '';
+                                const serveUrl = (window.API_BASE_URL || '') + `/api/serve-file?path=${encodeURIComponent(filePath)}&filename=${encodeURIComponent(dlFilename)}`;
+                                
+                                // Verify File Exists and Size > 0
+                                try {
+                                    const verifyRes = await fetch((window.API_BASE_URL || '') + '/api/verify-file', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ path: filePath })
+                                    });
+                                    const verifyData = await verifyRes.json();
+                                    
+                                    console.log("=== DOWNLOAD VERIFICATION ===");
+                                    console.log("File path:", filePath);
+                                    console.log("File name:", dlFilename);
+                                    console.log("File size:", verifyData.size || 0);
+                                    console.log("HTTP response:", verifyRes.status);
+                                    console.log("Download URL:", serveUrl);
+
+                                    if (!verifyData.success) {
+                                        if (verifyData.error && verifyData.error.includes('0 bytes')) {
+                                            throw new Error("Invalid file generated.");
+                                        } else {
+                                            throw new Error("File was not created.");
+                                        }
+                                    }
+                                } catch(ve) {
+                                    // Bubble to outer catch
+                                    throw ve;
+                                }
+
+                                // Save to queue history
+                                saveToQueueHistory(videoData, dlFilename, dlId, format, null, true);
+                                
+                                console.log("TRIGGERING NATIVE DOWNLOAD: ", serveUrl);
+                                const a = document.createElement('a');
+                                a.style.display = 'none';
+                                a.href = serveUrl;
+                                a.download = dlFilename;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                
+                                // Update UI to success after brief delay to verify browser received file intent
+                                setTimeout(() => {
+                                    progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
+                                    progressBar.style.width = '100%';
+                                    statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Successful!';
+                                    statusText.classList.replace('text-primary', 'text-green-400');
+                                    speedText.textContent  = '';
+                                    sizeInfo.textContent   = '';
+                                    pctText.textContent    = '';
+                                    downloadAnotherBtn.classList.remove('hidden');
+                                }, 500);
+
+                                setTimeout(() => {
+                                    if (typeof autoResetDownloader === 'function') autoResetDownloader();
+                                }, 4000);
+                            } else if (st.status === 'failed') {
+                                clearInterval(pollInterval);
+                                throw new Error(st.error || 'Download failed during extraction');
+                            } else {
+                                // Update progress bar
+                                progressBar.style.width = (st.progress || 0) + '%';
+                                pctText.textContent = (st.progress || 0) + '%';
+                                speedText.textContent = st.speed || '';
+                                if (st.status === 'saving') {
+                                    statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Merging Audio/Video...';
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        clearInterval(pollInterval);
+                        console.error('[StreamVault] Polling Error:', e);
+                        progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
+                        progressBar.style.width = '100%';
+                        statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">error</span> ${e.message}`;
+                        statusText.classList.replace('text-primary', 'text-red-400');
+                        downloadAnotherBtn.classList.remove('hidden');
+                    }
+                }, 1000);
+
+            } catch (err) {
+                console.log("=== ERROR TRACE ===");
+                console.log("Stack Trace:", err.stack || err);
+                
+                console.error('[StreamVault] Download Error:', err);
+                progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
+                progressBar.style.width = '100%';
+                statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">error</span> Download Failed<br><pre class='text-xs mt-2 text-left bg-black/20 p-2 rounded whitespace-pre-wrap'>${err.message}</pre>`;
+                statusText.classList.replace('text-primary', 'text-red-400');
+                downloadAnotherBtn.classList.remove('hidden');
+            }
+
+            // ── Download Another button ───────────────────────
+            downloadAnotherBtn.onclick = () => {
+                document.getElementById('download-workflow-section').classList.add('hidden');
+                document.getElementById('download-workflow-section').classList.remove('flex');
+                progressSection.classList.add('hidden');
+                progressSection.classList.remove('flex');
+                stepsContainer.classList.remove('hidden');
+
+                // Reset status colours
+                statusText.classList.replace('text-green-400', 'text-primary');
+                statusText.classList.replace('text-red-400',   'text-primary');
+                progressBar.classList.replace('bg-green-500',  'bg-gradient-to-r');
+                progressBar.classList.replace('bg-red-500',    'bg-gradient-to-r');
+                progressBar.style.width = '0%';
+                pctText.textContent = '0%';
+                downloadAnotherBtn.classList.add('hidden');
+
+                const uiInput = document.getElementById('url-input');
+                if (uiInput) { uiInput.value = ''; uiInput.focus(); }
+                if (typeof updateAnalyzeBtnState === 'function') updateAnalyzeBtnState();
+            };
+        }
+
+        function saveToQueueHistory(videoData, filename, id, format, path, success) {
+            const queue = JSON.parse(localStorage.getItem('download_queue') || '[]');
+            queue.unshift({
+                id: id,
+                title: filename,
+                size: '--',
+                speed: '0 MB/s',
+                progress: success ? 100 : 0,
+                status: success ? 'completed' : 'failed',
+                thumbnail: videoData.thumbnail || '',
+                quality: format.toUpperCase(),
+                duration: '--',
+                directDownload: videoData.directDownload,
+                url: videoData.url,
+                isAudioOnly: format === 'mp3',
+                path: path,
+                downloadTriggered: true // Do not auto-retry
+            });
+            localStorage.setItem('download_queue', JSON.stringify(queue));
+        }
+        
+    }); // Close DOMContentLoaded
+
+    // Define global functions so they can be called from inline onclick handlers (e.g., manualSaveDownloader)
+    async function triggerDownloaderSave(downloadId, defaultName, sourcePath, statusText) {
+        console.log('BROWSER_DOWNLOAD_TRIGGERED');
+
+        try {
+            statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Preparing File...';
+            
+            const downloadUrl = `/api/serve-file?path=${encodeURIComponent(sourcePath)}&filename=${encodeURIComponent(defaultName)}`;
+            
+            // Create a hidden anchor tag to trigger the browser's native download manager
+
+            const response = await fetch(downloadUrl);
+            if (!response.ok) throw new Error('File download failed');
+            
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = objectUrl;
+            a.download = defaultName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(objectUrl);
+
+            
+            console.log('SAVE_PATH_SELECTED');
+            console.log('FILE_DOWNLOAD_TRIGGERED');
+            
+            statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> File Ready for Download<br><span class="text-xs text-on-surface-variant break-all">Check your browser's download manager.</span>`;
+            statusText.classList.replace('text-yellow-400', 'text-green-400');
+            
+            setTimeout(() => {
+                if(typeof autoResetDownloader === 'function') autoResetDownloader();
+            }, 2000);
+            
+        } catch (err) {
+            try { clearTimeout(timeoutId); } catch(e) {}
+            
+            if (err.name === 'AbortError') {
+                console.log('TIMEOUT_TRIGGERED');
+                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] text-error">error</span> Dialog Failed to Open';
+                statusText.classList.replace('text-green-400', 'text-error');
+                
+                let mContainer = document.getElementById('dl-manual-save-container');
+                if (mContainer) {
+                    mContainer.classList.remove('hidden');
+                    mContainer.classList.add('flex');
+                    mContainer.dataset.dlId = downloadId;
+                }
+                return;
+            }
+            
+            alert("Save error: " + err.message);
+            statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] text-error">error</span> Save Failed';
+            statusText.classList.replace('text-green-400', 'text-error');
+        }
+    }
+    
+    async function manualSaveDownloader() {
+        const mContainer = document.getElementById('dl-manual-save-container');
+        const downloadId = mContainer.dataset.dlId;
+        const manualPath = document.getElementById('dl-manual-save-path').value.trim();
+        
+        if (!manualPath) return alert("Please enter a valid path.");
+        
+        const statusText = document.getElementById('dl-status-text');
+        
+        try {
+            // Re-trigger via URL
+            const sourcePath = window.lastDownloadPath || ''; // We need to store this or we can't do manual re-download easily
+            
+            if (!sourcePath) return alert("Source file path lost. Please download again.");
+            
+            // We check the manual save path from the input (although it's mainly for backend saves if implemented, here it triggers browser save)
+            // But we must verify the SOURCE file exists on the backend first!
+            const verifyRes = await fetch((window.API_BASE_URL || '') + '/api/verify-file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: sourcePath })
+            });
+            const verifyData = await verifyRes.json();
+            
+            if (!verifyData.success) {
+                return alert("Cannot save: " + verifyData.error);
+            }
+            
+            const downloadUrl = `/api/serve-file?path=${encodeURIComponent(sourcePath)}&filename=download_retry.mp4`;
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = downloadUrl;
+            a.download = "download_retry.mp4";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> File Ready for Download<br><span class="text-xs text-on-surface-variant break-all">Check your browser's download manager.</span>`;
+            statusText.classList.replace('text-error', 'text-green-400');
+            
+            mContainer.classList.add('hidden');
+            mContainer.classList.remove('flex');
+            
+            setTimeout(() => {
+                if(typeof autoResetDownloader === 'function') autoResetDownloader();
+            }, 2000);
+        } catch(e) {
+            alert("Save failed: " + e.message);
+        }
+    }
+    </script>
+    
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+    <script>
+        function showToast(message) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'bg-green-500/90 text-white px-4 py-2 rounded-full shadow-lg font-sans font-semibold text-sm backdrop-blur-md transition-all duration-300 transform translate-y-full opacity-0 flex items-center gap-2';
+            toast.innerHTML = `<span class="material-symbols-outlined text-[18px]">check_circle</span> ${message}`;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-full', 'opacity-0');
+                toast.classList.add('translate-y-0', 'opacity-100');
+            }, 10);
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-full', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        async function autoResetDownloader() {
+            showToast("Download Completed Successfully");
+            if (typeof window.toggleAds === 'function') window.toggleAds(true); // Re-enable ads on complete
+            setTimeout(async () => {
+                // Clear backend cache
+                const inputUrl = document.getElementById('url-input').value;
+                if (inputUrl) {
+                    await fetch((window.API_BASE_URL || '') + '/api/metadata', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: inputUrl })
+                    }).catch(()=>{});
+                }
+                
+                // Hard refresh the page for a clean slate for the next download
+                window.location.reload();
+            }, 2500);
+        }
+
+        // Login Required Logic
+        function showLoginModal() {
+            document.getElementById('login-required-modal').classList.remove('hidden');
+            fetch((window.API_BASE_URL || '') + '/api/track', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'Download Requests Blocked', details: 'Guest attempted action without login' })
+            }).catch(e=>{});
+        }
+
+        function saveStateAndRedirect(mode) {
+            const val = (document.getElementById('url-input').value || '').trim();
+            sessionStorage.setItem('resumeState', JSON.stringify({
+                url: val,
+                tab: activePlatformTab
+            }));
+            sessionStorage.setItem('redirectUrl', window.location.href);
+            window.location.href = 'streamvault-login.html' + (mode ? '?mode=' + mode : '');
+        }
+    </script>
+    
+    <!-- Login Required Modal -->
+    <div id="login-required-modal" class="hidden fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-surface-container-high border border-white/10 rounded-2xl p-5 w-full max-w-sm shadow-2xl relative text-center">
+            <button onclick="document.getElementById('login-required-modal').classList.add('hidden')" class="absolute top-4 right-4 text-on-surface-variant hover:text-white"><span class="material-symbols-outlined">close</span></button>
+            <span class="material-symbols-outlined text-[48px] text-primary mb-4">lock</span>
+            <h3 class="text-2xl font-display font-bold text-on-surface mb-2">Login Required</h3>
+            <p class="text-on-surface-variant text-sm mb-4">Please login to continue analyzing, downloading, and converting files.</p>
+            
+            <div class="flex flex-col gap-3">
+                <button onclick="saveStateAndRedirect()" class="w-full bg-primary text-on-primary py-2 rounded-xl font-bold hover:bg-primary-container transition-colors">Sign In</button>
+                <button onclick="saveStateAndRedirect('register')" class="w-full bg-surface border border-white/10 text-on-surface py-2 rounded-xl font-bold hover:bg-white/5 transition-colors">Create Free Account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Limit Reached Modal -->
+    <div id="limit-reached-modal" class="hidden fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-surface-container-high border border-white/10 rounded-3xl p-5 max-w-md w-full relative shadow-[0_20px_60px_rgba(0,0,0,0.8)] animate-fade-in-up text-center">
+            <button onclick="document.getElementById('limit-reached-modal').classList.add('hidden')" class="absolute top-4 right-4 text-on-surface-variant hover:text-white"><span class="material-symbols-outlined">close</span></button>
+            <div class="w-20 h-20 bg-error/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span class="material-symbols-outlined text-error text-4xl">block</span>
+            </div>
+            <h3 class="text-2xl font-display font-bold text-on-surface mb-2">Limit Reached</h3>
+            <p id="limit-reached-msg" class="text-on-surface-variant mb-5">You have reached your daily download limit. Upgrade to Premium for unlimited downloads and conversions.</p>
+            <div class="flex flex-col gap-3">
+                <a href="streamvault-upgrade.html" id="btn-upgrade-limit" class="bg-primary text-on-primary font-bold py-2 px-4 rounded-xl hover:bg-primary-container transition-colors shadow-[0_0_20px_rgba(255,85,64,0.3)] block">Upgrade Now</a>
+                <button onclick="document.getElementById('limit-reached-modal').classList.add('hidden')" class="bg-white/5 border border-white/10 text-on-surface font-bold py-2 px-4 rounded-xl hover:bg-white/10 transition-colors">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function showLimitModal(msg) {
+            document.getElementById('limit-reached-msg').innerText = msg;
+            document.getElementById('limit-reached-modal').classList.remove('hidden');
+            
+            // Hide the upgrade button if the subscription system is disabled globally
+            if (window.subscriptionEnabled === false) {
+                const upBtn = document.getElementById('btn-upgrade-limit');
+                if (upBtn) upBtn.style.display = 'none';
+            }
+        }
+    </script>
+
+    <!-- Feedback Floating Widget -->
+    <button onclick="document.getElementById('feedback-modal').classList.remove('hidden')" class="fixed bottom-6 right-6 bg-primary text-on-primary p-4 rounded-full shadow-[0_0_20px_rgba(255,85,64,0.3)] hover:scale-110 transition-transform z-40 flex items-center justify-center" title="Send Feedback">
+        <span class="material-symbols-outlined text-[24px]">feedback</span>
+    </button>
+
+    <div id="feedback-modal" class="hidden fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-surface-container-high border border-white/10 rounded-2xl p-4 w-full max-w-md shadow-2xl relative">
+            <button onclick="document.getElementById('feedback-modal').classList.add('hidden')" class="absolute top-4 right-4 text-on-surface-variant hover:text-white"><span class="material-symbols-outlined">close</span></button>
+            <h3 class="text-xl font-display font-bold text-on-surface mb-4">Send Feedback</h3>
+            
+            <div class="flex flex-col gap-4">
+                <div>
+                    <label class="text-sm text-on-surface-variant mb-1 block">Feedback Type</label>
+                    <select id="fb-type" class="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-on-surface outline-none">
+                        <option value="suggestion">Suggestion</option>
+                        <option value="bug">Bug Report</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="text-sm text-on-surface-variant mb-1 block">Rating (1-5)</label>
+                    <div class="flex gap-2">
+                        <button type="button" class="fb-star text-on-surface-variant hover:text-yellow-400" onclick="setFbRating(1)"><span class="material-symbols-outlined">star</span></button>
+                        <button type="button" class="fb-star text-on-surface-variant hover:text-yellow-400" onclick="setFbRating(2)"><span class="material-symbols-outlined">star</span></button>
+                        <button type="button" class="fb-star text-on-surface-variant hover:text-yellow-400" onclick="setFbRating(3)"><span class="material-symbols-outlined">star</span></button>
+                        <button type="button" class="fb-star text-on-surface-variant hover:text-yellow-400" onclick="setFbRating(4)"><span class="material-symbols-outlined">star</span></button>
+                        <button type="button" class="fb-star text-on-surface-variant hover:text-yellow-400" onclick="setFbRating(5)"><span class="material-symbols-outlined">star</span></button>
+                    </div>
+                    <input type="hidden" id="fb-rating" value="0">
+                </div>
+                
+                <div>
+                    <label class="text-sm text-on-surface-variant mb-1 block">Message</label>
+                    <textarea id="fb-msg" class="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-on-surface outline-none h-24" placeholder="Tell us what you think..."></textarea>
+                </div>
+                
+                <button onclick="submitFeedback()" class="w-full bg-primary text-on-primary py-2 rounded-xl font-bold mt-2 hover:bg-primary-container transition-colors">Submit Feedback</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function setFbRating(val) {
+            document.getElementById('fb-rating').value = val;
+            const stars = document.querySelectorAll('.fb-star');
+            stars.forEach((s, i) => {
+                if (i < val) s.classList.add('text-yellow-400');
+                else s.classList.remove('text-yellow-400');
+            });
+        }
+        
+        async function submitFeedback() {
+            const type = document.getElementById('fb-type').value;
+            const rating = document.getElementById('fb-rating').value;
+            const message = document.getElementById('fb-msg').value.trim();
+            
+            if(!message) return alert("Please enter a message");
+            
+            try {
+                const res = await fetch((window.API_BASE_URL || '') + '/api/feedback', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ type, rating: rating > 0 ? parseInt(rating) : null, message })
+                });
+                if(res.ok) {
+                    alert('Feedback submitted successfully. Thank you!');
+                    document.getElementById('feedback-modal').classList.add('hidden');
+                    document.getElementById('fb-msg').value = '';
+                    setFbRating(0);
+                } else {
+                    const err = await res.json();
+                    alert(err.error || 'Failed to submit feedback. Please ensure you are logged in.');
+                }
+            } catch(e) {
+                alert('Network error');
+            }
+        }
+    </script>
+    <footer class="w-full mt-12 border-t border-white/10 py-8 text-center text-sm text-on-surface-variant z-10 flex flex-col md:flex-row justify-center items-center gap-4 md:gap-5 px-4 backdrop-blur-sm bg-background/50 shrink-0">
+        <a href="streamvault-legal.html#about" class="hover:text-primary transition-colors">About Us</a>
+        <a href="streamvault-legal.html#contact" class="hover:text-primary transition-colors">Contact</a>
+        <a href="streamvault-legal.html#copyright" class="hover:text-primary transition-colors">Copyright Claims</a>
+        <a href="streamvault-legal.html#faq" class="hover:text-primary transition-colors">FAQ</a>
+        <a href="streamvault-legal.html#privacy" class="hover:text-primary transition-colors">Privacy Policy</a>
+        <a href="streamvault-legal.html#terms" class="hover:text-primary transition-colors">Terms of Use</a>
+    </footer>
+
+    <!-- BETA WIDGET -->
+    <div id="beta-widget" class="fixed bottom-4 right-4 z-[100] flex flex-col items-end gap-2 group pointer-events-none">
+        <div class="bg-surface-container-high/90 backdrop-blur-xl border border-white/10 p-2 rounded-xl shadow-2xl flex flex-col gap-2 translate-y-4 opacity-0 pointer-events-none group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-300">
+            <a href="streamvault-legal.html#contact" class="px-4 py-2 bg-primary/20 hover:bg-primary/40 text-primary text-sm font-bold rounded-lg transition-colors flex items-center gap-2">
+                <span class="material-symbols-outlined text-[16px]">bug_report</span> Report Bug
+            </a>
+            <a href="streamvault-legal.html#contact" class="px-4 py-2 bg-white/5 hover:bg-white/10 text-on-surface-variant text-sm rounded-lg transition-colors flex items-center gap-2">
+                <span class="material-symbols-outlined text-[16px]">feedback</span> Feedback
+            </a>
+        </div>
+        <button class="bg-gradient-to-r from-primary to-orange-500 text-on-primary px-4 py-2 rounded-full shadow-[0_4px_20px_rgba(255,85,64,0.4)] font-bold text-sm tracking-widest uppercase flex items-center gap-2 pointer-events-auto cursor-help">
+            <span class="material-symbols-outlined text-[18px]">science</span> Beta Mode
+        </button>
+    </div>
+
+</body></html>
+

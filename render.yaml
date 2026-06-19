@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: streamvault-pro
+    env: node
+    region: oregon
+    plan: starter
+    buildCommand: npm install && mkdir -p bin && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o bin/yt-dlp && chmod a+rx bin/yt-dlp
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DOWNLOAD_PATH
+        value: /opt/render/project/data
+      - key: SUPABASE_URL
+        value: https://fmgybyjmgnhionbmthfb.supabase.co
+      - key: SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtZ3lieWptZ25oaW9uYm10aGZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0MzIzMTgsImV4cCI6MjA5NzAwODMxOH0.sjJao3V21yfrwEi3m1M5UlzOg_CIR_Y1isvVovKQD18
+    disk:
+      name: streamvault-data
+      mountPath: /opt/render/project/data
+      sizeGB: 10

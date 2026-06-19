@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>StreamVault PRO - Interstitial Ad</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>`n    <script type="module" src="js/config.js"></script>
+    <script type="module" src="js/config.js"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&amp;family=Inter:wght@400&amp;family=Geist:wght@500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed-dim": "#ffafd2",
+                        "background": "#0b1326",
+                        "on-tertiary-fixed": "#3d0025",
+                        "on-secondary-fixed": "#001a41",
+                        "outline": "#b18780",
+                        "surface-bright": "#31394d",
+                        "on-primary-fixed": "#410000",
+                        "on-tertiary-fixed-variant": "#8b005a",
+                        "on-secondary-fixed-variant": "#004493",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "on-primary": "#690100",
+                        "tertiary": "#ffafd2",
+                        "tertiary-fixed": "#ffd8e6",
+                        "secondary-container": "#0070eb",
+                        "error-container": "#93000a",
+                        "outline-variant": "#603e39",
+                        "on-surface-variant": "#ebbbb4",
+                        "surface-container-low": "#131b2e",
+                        "surface-container": "#171f33",
+                        "surface-variant": "#2d3449",
+                        "on-tertiary": "#63003f",
+                        "on-background": "#dae2fd",
+                        "inverse-surface": "#dae2fd",
+                        "surface-container-lowest": "#060e20",
+                        "on-surface": "#dae2fd",
+                        "on-primary-container": "#5c0000",
+                        "inverse-on-surface": "#283044",
+                        "tertiary-container": "#ed5aa8",
+                        "on-secondary": "#002e69",
+                        "surface-container-high": "#222a3d",
+                        "surface-dim": "#0b1326",
+                        "secondary": "#adc6ff",
+                        "on-error": "#690005",
+                        "error": "#ffb4ab",
+                        "surface-container-highest": "#2d3449",
+                        "primary-container": "#ff5540",
+                        "primary": "#ffb4a8",
+                        "on-tertiary-container": "#570036",
+                        "surface": "#0b1326",
+                        "on-secondary-container": "#fefcff",
+                        "primary-fixed-dim": "#ffb4a8",
+                        "surface-tint": "#ffb4a8",
+                        "on-primary-fixed-variant": "#930100",
+                        "secondary-fixed": "#d8e2ff",
+                        "primary-fixed": "#ffdad4",
+                        "on-error-container": "#ffdad6",
+                        "inverse-primary": "#c00100"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "16px",
+                        "container-max": "1200px",
+                        "margin-mobile": "16px",
+                        "base": "4px",
+                        "margin-desktop": "32px"
+                    },
+                    "fontFamily": {
+                        "body-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Geist"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "title-md": ["Hanken Grotesk"],
+                        "headline-lg-mobile": ["Hanken Grotesk"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "mono-sm": ["Geist"]
+                    },
+                    "fontSize": {
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+                        "title-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "mono-sm": ["13px", { "lineHeight": "18px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .progress-bar-fill {
+            transition: width 5s linear;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex items-center justify-center font-body-lg">
+<!-- Underlying blurred content to simulate overlay -->
+<div class="fixed inset-0 z-0 bg-surface-container-low opacity-50 backdrop-blur-md"></div>
+<div class="fixed inset-0 z-0 flex flex-col items-center justify-center opacity-30 pointer-events-none">
+<span class="material-symbols-outlined text-display-lg" style="font-variation-settings: 'FILL' 1; font-size: 120px;">download</span>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile mt-4">Starting Download...</h2>
+</div>
+<!-- Interstitial Ad Container -->
+<div class="relative z-50 w-full h-full md:w-[400px] md:h-[700px] bg-surface flex flex-col rounded-none md:rounded-xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.8)] border-0 md:border border-white/10">
+<!-- Top Bar: Sponsor Label & Close Button -->
+<div class="absolute top-0 w-full flex justify-between items-center px-4 py-2 z-20 bg-gradient-to-b from-black/80 to-transparent">
+<div class="flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-3 py-1 border border-white/10">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Sponsored</span>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">info</span>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-on-surface hover:bg-white/10 transition-colors pointer-events-none opacity-50 relative group" id="close-ad-btn">
+<!-- Circular Progress SVG to show time remaining before close -->
+<svg class="absolute inset-0 w-full h-full -rotate-90" viewbox="0 0 36 36">
+<circle class="stroke-white/20" cx="18" cy="18" fill="none" r="16" stroke-width="2"></circle>
+<circle class="stroke-primary" cx="18" cy="18" fill="none" id="close-progress" r="16" stroke-dasharray="100" stroke-dashoffset="100" stroke-width="2" style="transition: stroke-dashoffset 5s linear;"></circle>
+</svg>
+<span class="material-symbols-outlined hidden" id="close-icon">close</span>
+<span class="font-mono-sm text-mono-sm absolute" id="close-timer">5</span>
+</button>
+</div>
+<!-- Main Ad Media (Image/Video Placeholder) -->
+<div class="flex-grow relative bg-surface-container-highest">
+<img alt="Ad visual" class="w-full h-full object-cover object-center absolute inset-0" data-alt="A sleek, high-performance gaming laptop resting on an industrial dark metal desk, illuminated by vibrant cyan and magenta neon rim lights in a moody, modern environment. The screen displays intense, high-fidelity graphics, evoking professional-grade power and extreme speed. The overall aesthetic is dark, premium, and tech-forward, perfectly matching a high-bandwidth digital ecosystem." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCeIeTFhk1KmzNbGtEw-O63ucM80-VyaJJL0oVuO47WioQ8LStLtuJ6xBv4jVI5jhR-a_ddTthCZESi7IOdNk2ZO-PxxSos_0Dh7RHUV1g_kZDTKxYNqXhsr80gIi4lQNX9nnBxuJeU4YBeQZD9R6B4GAyc8aX02pJOd3oW0QYhoRXP0WcUb93p6T6Q7RzB7hJ1gEoYdh6dJB3-MGqy_sB2LAm6kL2YNEbewvOKLUcEwwsyb2Lk4U6ky4MmmsvYgztfCHsdla1oGCNg"/>
+<!-- Gradient Overlay for Bottom Content -->
+<div class="absolute inset-0 bg-gradient-to-t from-surface via-surface/80 to-transparent"></div>
+</div>
+<!-- Ad Details & CTA -->
+<div class="relative z-10 bg-surface px-4 pb-8 pt-4 flex flex-col gap-4">
+<!-- App Info -->
+<div class="flex items-start gap-4">
+<div class="w-16 h-16 rounded-xl bg-surface-container flex items-center justify-center border border-white/10 shadow-md shrink-0">
+<span class="material-symbols-outlined text-[32px] text-primary" style="font-variation-settings: 'FILL' 1;">rocket_launch</span>
+</div>
+<div class="flex flex-col justify-center">
+<h3 class="font-title-md text-title-md text-on-surface">Velocity VPN Shield</h3>
+<div class="flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-[16px] text-primary" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[16px] text-primary" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[16px] text-primary" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[16px] text-primary" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[16px] text-primary">star_half</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant ml-2">4.8 (12k)</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-2 line-clamp-2">
+                        Experience ultra-fast, secure streaming and downloading. Protect your high-bandwidth connections today.
+                    </p>
+</div>
+</div>
+<!-- CTA Button -->
+<button id="cta-install-btn" class="w-full bg-primary hover:bg-primary-container text-on-primary-container font-title-md text-title-md py-2 rounded-lg transition-colors flex items-center justify-center gap-2 group">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">download</span>
+                Install Now
+            </button>
+<!-- Secondary action subtly placed -->
+<div class="text-center">
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors underline-offset-4 hover:underline" href="#">
+                    Learn more about our privacy policy
+                </a>
+</div>
+</div>
+<!-- Progress Bar at the very bottom indicating the ad is playing -->
+<div class="h-1 w-full bg-surface-container-highest absolute bottom-0 left-0">
+<div class="h-full bg-primary w-0 progress-bar-fill" id="ad-progress-bar"></div>
+</div>
+</div>
+<script>
+        function activatePendingDownload() {
+            try {
+                const queue = JSON.parse(localStorage.getItem('download_queue') || '[]');
+                const pendingItem = queue.find(item => item.status === 'pending');
+                if (pendingItem) {
+                    pendingItem.status = 'downloading';
+                    localStorage.setItem('download_queue', JSON.stringify(queue));
+                }
+            } catch (e) {
+                console.error("Failed to activate download:", e);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const closeBtn = document.getElementById('close-ad-btn');
+            const closeIcon = document.getElementById('close-icon');
+            const closeTimer = document.getElementById('close-timer');
+            const closeProgress = document.getElementById('close-progress');
+            const adProgressBar = document.getElementById('ad-progress-bar');
+            const ctaBtn = document.getElementById('cta-install-btn');
+            
+            let timeLeft = 5;
+            const duration = 5000; // 5 seconds
+            
+            // Start bottom progress bar
+            setTimeout(() => {
+                adProgressBar.style.width = '100%';
+                closeProgress.style.strokeDashoffset = '0';
+            }, 50);
+
+            // Make CTA install button redirect directly
+            if (ctaBtn) {
+                ctaBtn.addEventListener('click', () => {
+                    activatePendingDownload();
+                    document.body.innerHTML = '<div class="flex flex-col items-center justify-center h-screen"><span class="material-symbols-outlined text-display-lg text-primary animate-pulse" style="font-variation-settings: \'FILL\' 1; font-size: 80px;">check_circle</span><h2 class="font-headline-lg-mobile text-headline-lg-mobile mt-4 text-on-surface">Resuming Download...</h2></div>';
+                    setTimeout(() => {
+                        window.location.href = 'download-queue.html';
+                    }, 1200);
+                });
+            }
+
+            const timerInterval = setInterval(() => {
+                timeLeft -= 1;
+                if (timeLeft > 0) {
+                    closeTimer.textContent = timeLeft;
+                } else {
+                    clearInterval(timerInterval);
+                    closeTimer.classList.add('hidden');
+                    closeIcon.classList.remove('hidden');
+                    closeBtn.classList.remove('pointer-events-none', 'opacity-50');
+                    closeBtn.classList.add('hover:bg-error-container', 'hover:text-on-error-container', 'hover:border-error');
+                    
+                    // Add click event once enabled
+                    closeBtn.addEventListener('click', () => {
+                        activatePendingDownload();
+                        document.body.innerHTML = '<div class="flex flex-col items-center justify-center h-screen"><span class="material-symbols-outlined text-display-lg text-primary animate-pulse" style="font-variation-settings: \'FILL\' 1; font-size: 80px;">check_circle</span><h2 class="font-headline-lg-mobile text-headline-lg-mobile mt-4 text-on-surface">Resuming Download...</h2></div>';
+                        setTimeout(() => {
+                            window.location.href = 'download-queue.html';
+                        }, 1200);
+                    });
+                }
+            }, 1000);
+        });
+    </script>
+</body></html>

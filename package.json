@@ -1,0 +1,76 @@
+{
+  "name": "streamvault-downloader",
+  "version": "1.0.0",
+  "description": "StreamVault PRO 4K Social Video Downloader Stitch Project",
+  "main": "main.js",
+  "scripts": {
+    "dev": "vite",
+    "server": "node server.js",
+    "build": "vite build",
+    "preview": "vite preview",
+    "electron": "concurrently \"npm run server\" \"electron .\"",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3",
+    "electron": "^30.0.0",
+    "electron-builder": "^26.15.3",
+    "vite": "^5.0.0",
+    "wait-on": "^9.0.10"
+  },
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@xaviabot/fb-downloader": "^1.0.14",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.10.0",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.5.2",
+    "fluent-ffmpeg": "^2.1.3",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.1.1",
+    "snapsave-media-downloader": "^2.4.0"
+  },
+  "build": {
+    "appId": "com.streamvault.pro",
+    "productName": "StreamVault PRO",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "main.js",
+      "preload.js",
+      "server.js",
+      "auth.js",
+      "admin.js",
+      "ads.js",
+      "database.js",
+      "global-status.js",
+      "payment.js",
+      "settings.js",
+      "updater-api.js",
+      "updater.js",
+      "providers/**/*",
+      "node_modules/**/*",
+      "bin/**/*",
+      "cookies.txt"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "npmRebuild": true,
+    "buildDependenciesFromSource": false,
+    "asar": false
+  }
+}

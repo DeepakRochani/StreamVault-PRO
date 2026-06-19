@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - StreamVault PRO</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Tailwind -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>`n    <script type="module" src="js/config.js"></script>
+    <script type="module" src="js/config.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ff5540",
+                        "on-primary": "#ffffff",
+                        "primary-container": "#ff8a7a",
+                        "background": "#0f0f11",
+                        "on-background": "#e2e2e2",
+                        "surface": "#121214",
+                        "surface-container-high": "#222225",
+                        "on-surface": "#e2e2e2",
+                        "on-surface-variant": "#c4c6c9",
+                        "error": "#ffb4ab"
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Outfit', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background min-h-screen flex items-center justify-center p-4">
+
+    <!-- Ambient Glow -->
+    <div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[150px] pointer-events-none z-0"></div>
+
+    <div class="w-full max-w-md bg-surface-container-high/60 backdrop-blur-2xl rounded-3xl p-5 border border-white/10 shadow-2xl relative z-10 flex flex-col gap-4">
+        
+        <div class="text-center">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-white/10 text-primary mb-4">
+                <span class="material-symbols-outlined text-[32px]">admin_panel_settings</span>
+            </div>
+            <h1 class="font-display font-extrabold text-2xl text-on-surface">Admin Portal</h1>
+            <p class="text-on-surface-variant font-sans text-sm mt-1">Sign in with your administrator credentials</p>
+        </div>
+
+        <form id="admin-login-form" class="flex flex-col gap-4 mt-2">
+            <div id="error-msg" class="hidden bg-error/10 border border-error/20 text-error text-sm rounded-lg p-3 font-medium flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px]">error</span>
+                <span id="error-text">Invalid credentials</span>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-bold text-on-surface-variant uppercase tracking-wider ml-1">Admin Email</label>
+                <div class="relative">
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">mail</span>
+                    <input type="email" id="email" required placeholder="admin@streamvault.com" class="w-full bg-surface/50 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-bold text-on-surface-variant uppercase tracking-wider ml-1">Password</label>
+                <div class="relative">
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">lock</span>
+                    <input type="password" id="password" required placeholder="••••••••" class="w-full bg-surface/50 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+                </div>
+            </div>
+
+            <button type="submit" id="submit-btn" class="mt-4 w-full bg-primary hover:bg-primary-container text-on-primary font-bold py-2.5 rounded-xl transition-all shadow-lg shadow-primary/20 hover:shadow-primary/40 active:scale-[0.98] flex items-center justify-center gap-2">
+                <span>Access Dashboard</span>
+                <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+            </button>
+        </form>
+
+        <div class="text-center mt-2">
+            <a href="index.html" class="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center gap-1">
+                <span class="material-symbols-outlined text-[16px]">arrow_back</span>
+                Return to App
+            </a>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const btn = document.getElementById('submit-btn');
+            const errBox = document.getElementById('error-msg');
+            const errText = document.getElementById('error-text');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">sync</span><span>Authenticating...</span>';
+            errBox.classList.add('hidden');
+
+            try {
+                const res = await fetch((window.API_BASE_URL || '') + '/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    window.location.href = 'streamvault-admin.html';
+                } else {
+                    throw new Error(data.error || 'Authentication failed');
+                }
+            } catch (err) {
+                errBox.classList.remove('hidden');
+                errText.innerText = err.message;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span>Access Dashboard</span><span class="material-symbols-outlined text-[20px]">arrow_forward</span>';
+            }
+        });
+    </script>
+</body>
+</html>

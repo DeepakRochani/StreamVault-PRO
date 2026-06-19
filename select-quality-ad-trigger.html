@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>StreamVault PRO - Quality Selection</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>`n    <script type="module" src="js/config.js"></script>
+    <script type="module" src="js/config.js"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&amp;family=Geist:wght@500;600&amp;family=Inter:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "outline-variant": "#603e39",
+                      "primary-container": "#ff5540",
+                      "surface-container-lowest": "#060e20",
+                      "on-secondary-fixed": "#001a41",
+                      "surface-container-highest": "#2d3449",
+                      "on-secondary": "#002e69",
+                      "on-tertiary-fixed": "#3d0025",
+                      "on-secondary-fixed-variant": "#004493",
+                      "on-tertiary-fixed-variant": "#8b005a",
+                      "surface-variant": "#2d3449",
+                      "surface-container-high": "#222a3d",
+                      "secondary-fixed": "#d8e2ff",
+                      "on-primary-fixed": "#410000",
+                      "primary-fixed": "#ffdad4",
+                      "on-error": "#690005",
+                      "tertiary": "#ffafd2",
+                      "surface-dim": "#0b1326",
+                      "inverse-on-surface": "#283044",
+                      "error": "#ffb4ab",
+                      "secondary-container": "#0070eb",
+                      "surface-bright": "#31394d",
+                      "on-primary-fixed-variant": "#930100",
+                      "surface": "#0b1326",
+                      "secondary": "#adc6ff",
+                      "error-container": "#93000a",
+                      "inverse-primary": "#c00100",
+                      "outline": "#b18780",
+                      "on-surface-variant": "#ebbbb4",
+                      "inverse-surface": "#dae2fd",
+                      "tertiary-fixed-dim": "#ffafd2",
+                      "on-secondary-container": "#fefcff",
+                      "primary-fixed-dim": "#ffb4a8",
+                      "tertiary-fixed": "#ffd8e6",
+                      "surface-tint": "#ffb4a8",
+                      "secondary-fixed-dim": "#adc6ff",
+                      "background": "#0b1326",
+                      "on-tertiary-container": "#570036",
+                      "on-primary-container": "#5c0000",
+                      "tertiary-container": "#ed5aa8",
+                      "surface-container-low": "#131b2e",
+                      "on-tertiary": "#63003f",
+                      "primary": "#ffb4a8",
+                      "on-background": "#dae2fd",
+                      "surface-container": "#171f33",
+                      "on-surface": "#dae2fd",
+                      "on-error-container": "#ffdad6",
+                      "on-primary": "#690100"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "16px",
+                      "margin-mobile": "16px",
+                      "container-max": "1200px",
+                      "base": "4px",
+                      "margin-desktop": "32px"
+              },
+              "fontFamily": {
+                      "title-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "mono-sm": [
+                              "Geist"
+                      ],
+                      "display-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "label-md": [
+                              "Geist"
+                      ],
+                      "headline-lg-mobile": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "title-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "mono-sm": [
+                              "13px",
+                              {
+                                      "lineHeight": "18px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "800"
+                              }
+                      ],
+                      "label-md": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<style>
+        body {
+            background-color: theme('colors.background');
+            color: theme('colors.on-background');
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .format-radio:checked + .format-card {
+            border-color: theme('colors.primary');
+            background: rgba(255, 180, 168, 0.1);
+        }
+        .format-radio:checked + .format-card .check-icon {
+            opacity: 1;
+        }
+        .format-radio:checked + .format-card .icon-color {
+            color: theme('colors.primary');
+        }
+
+        .quality-radio:checked + .quality-card {
+            border-color: theme('colors.primary');
+            background: rgba(255, 180, 168, 0.1);
+        }
+        .quality-radio:checked + .quality-card .check-icon {
+            opacity: 1;
+        }
+        .quality-radio:checked + .quality-card .radio-border {
+            border-color: theme('colors.primary');
+        }
+        .quality-radio:checked + .quality-card .radio-inner {
+            background-color: theme('colors.primary');
+            transform: scale(1);
+        }
+
+        /* Hide scrollbar for clean look */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.2);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-surface/80 backdrop-blur-xl border-b border-white/10 shadow-sm flex items-center justify-between px-margin-mobile md:px-margin-desktop h-16">
+<div class="flex items-center gap-3">
+<button class="btn-back p-2 rounded-full hover:bg-white/5 transition-colors active:scale-95 transition-transform text-on-surface-variant md:hidden">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+<span class="material-symbols-outlined text-primary dark:text-primary-fixed md:flex hidden" data-icon="speed" style="font-variation-settings: 'FILL' 1;">speed</span>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg font-extrabold text-primary dark:text-primary-container tracking-tighter">StreamVault PRO</h1>
+</div>
+<!-- Desktop Nav Cluster -->
+<nav class="hidden md:flex items-center gap-4">
+<a class="nav-home font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors cursor-pointer">Home</a>
+<a class="nav-downloads font-label-md text-label-md text-primary bg-primary-container/20 px-4 py-2 rounded-full flex items-center gap-2 cursor-pointer">
+<span class="material-symbols-outlined text-[18px]">download_for_offline</span>
+                Downloads
+            </a>
+<a class="nav-settings font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors cursor-pointer">Settings</a>
+</nav>
+<button class="nav-settings p-2 rounded-full hover:bg-white/5 transition-colors active:scale-95 transition-transform text-on-surface-variant hidden md:block">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow pt-[88px] pb-[100px] md:pb-12 px-margin-mobile md:px-margin-desktop w-full max-w-container-max mx-auto flex flex-col md:flex-row gap-5">
+<!-- Left Column: Preview & Metadata -->
+<div class="w-full md:w-5/12 flex flex-col gap-4">
+<!-- Video Preview Card -->
+<div class="glass-panel rounded-2xl overflow-hidden shadow-2xl relative group">
+<!-- Aspect Ratio 16:9 Container -->
+<div class="relative w-full pb-[56.25%] bg-surface-container-highest">
+<img id="video-thumbnail" class="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500" data-alt="A cinematic still from a high budget sci-fi movie showing a glowing neon city at night. The scene is incredibly sharp with intense magenta and cyan lighting reflecting off wet pavement. Deep shadows and bright highlights demonstrate HDR capabilities. The overall aesthetic is dark, moody, and extremely high-resolution, matching a premium video streaming application." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDi1K3sHpS3-QWraq4yvrr02QmslFGpOxIl7TVbUOdtPuZsgFuKalJ05_O6rt6Lz04TmpE9Sm8Iz3u4yGa--7tDVowh5TfeirBkvf9G36wleaO_V0A-jUMi2kbiytiokbvf7s1eFjtzdJ0QfFkGi4PDCyAlKHJUxf6L8sYc5INEy7kPAT-HQJFLMw8rv8vsKYPkt6ArOiG7VW5lEjHGiXZC3hpNAdPdvcNBSZujF4K6nKSTGyL-VtRyArh99hskCG3uvQv7xJmQPggA"/>
+<!-- Gradient Overlay -->
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+<!-- Play Button Overlay -->
+<div class="absolute inset-0 flex items-center justify-center">
+<button class="w-16 h-16 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-primary-container/80 hover:scale-105 transition-all duration-300 shadow-[0_0_30px_rgba(255,85,64,0.3)]">
+<span class="material-symbols-outlined text-white text-3xl ml-1" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<!-- Quality Chip -->
+<div class="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-1">
+<span class="material-symbols-outlined text-primary text-[16px]" style="font-variation-settings: 'FILL' 1;">4k</span>
+<span class="font-mono-sm text-mono-sm text-white">Source</span>
+</div>
+</div>
+<!-- Video Metadata -->
+<div class="p-5 bg-surface-container-low/50">
+<h2 id="video-title" class="font-title-md text-title-md text-on-surface line-clamp-2 mb-2">Neon Nights: The Cyberpunk Symphony Director's Cut</h2>
+<div class="flex items-center gap-4 text-on-surface-variant font-body-sm text-body-sm">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+<span id="video-duration">2h 14m</span>
+</div>
+<div class="w-1 h-1 rounded-full bg-outline-variant"></div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">hd</span>
+<span id="video-platform">2160p HDR</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Contextual Warning / Info -->
+<div id="restricted-warning" class="glass-panel rounded-xl p-4 flex gap-3 items-start border-l-4 border-l-red-500 mb-4 hidden">
+<span class="material-symbols-outlined text-red-500">warning</span>
+<div>
+<h4 class="font-label-md text-label-md text-on-surface mb-1">Restricted Content Warning</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Browser-only parsing failed to read official details. This stream may be private, age-restricted, geo-blocked, or violate terms. A local helper backend is recommended to bypass limitations.</p>
+</div>
+</div>
+<div id="direct-stream-info" class="glass-panel rounded-xl p-4 flex gap-3 items-start border-l-4 border-l-primary mb-4 hidden">
+<span class="material-symbols-outlined text-primary">download</span>
+<div>
+<h4 class="font-label-md text-label-md text-on-surface mb-1">Direct Media File</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">This is a direct media file. StreamVault will trigger an actual download save in your browser once processing is complete.</p>
+</div>
+</div>
+<div class="glass-panel rounded-xl p-4 flex gap-3 items-start border-l-4 border-l-secondary-container">
+<span class="material-symbols-outlined text-secondary-container">info</span>
+<div>
+<h4 class="font-label-md text-label-md text-on-surface mb-1">High Bandwidth Required</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">4K Ultra HD downloads may take significantly longer depending on your current connection speed.</p>
+</div>
+</div>
+</div>
+<!-- Right Column: Selection Form -->
+<div class="w-full md:w-7/12 flex flex-col pb-8">
+    
+    <!-- STEP 1: Format Selection -->
+    <h3 class="font-title-md text-title-md text-on-surface mb-4 flex items-center gap-2">
+        <span class="material-symbols-outlined text-primary">category</span>
+        1. Select Format
+    </h3>
+    <div class="grid grid-cols-2 gap-4 mb-4">
+        <!-- Format: MP4 -->
+        <label class="relative cursor-pointer group">
+            <input type="radio" name="media_format" value="mp4" class="sr-only format-radio">
+            <div class="glass-panel rounded-xl p-4 flex flex-col items-center text-center transition-all duration-200 border-2 border-transparent group-hover:border-white/20 h-full relative overflow-hidden format-card">
+                <div class="absolute top-2 right-2 opacity-0 check-icon transition-opacity">
+                    <span class="material-symbols-outlined text-primary">check_circle</span>
+                </div>
+                <span class="material-symbols-outlined text-4xl mb-2 text-on-surface-variant icon-color transition-colors">movie</span>
+                <span class="font-title-md text-title-md text-on-surface mb-1">MP4 Video</span>
+                <span class="font-body-sm text-body-sm text-on-surface-variant">Download video with audio</span>
+            </div>
+        </label>
+
+        <!-- Format: MP3 -->
+        <label class="relative cursor-pointer group">
+            <input type="radio" name="media_format" value="mp3" class="sr-only format-radio">
+            <div class="glass-panel rounded-xl p-4 flex flex-col items-center text-center transition-all duration-200 border-2 border-transparent group-hover:border-white/20 h-full relative overflow-hidden format-card">
+                <div class="absolute top-2 right-2 opacity-0 check-icon transition-opacity">
+                    <span class="material-symbols-outlined text-primary">check_circle</span>
+                </div>
+                <span class="material-symbols-outlined text-4xl mb-2 text-on-surface-variant icon-color transition-colors">headphones</span>
+                <span class="font-title-md text-title-md text-on-surface mb-1">MP3 Audio</span>
+                <span class="font-body-sm text-body-sm text-on-surface-variant">Extract audio only</span>
+            </div>
+        </label>
+    </div>
+
+    <!-- STEP 2: Quality Selection -->
+    <div id="quality-section" class="hidden opacity-0 transition-opacity duration-500 flex-col mb-auto">
+        <h3 class="font-title-md text-title-md text-on-surface mb-4 flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary">tune</span>
+            2. Select Quality
+        </h3>
+        
+        <!-- MP4 Quality Options -->
+        <div id="mp4-options" class="flex-col gap-3 hidden">
+            <!-- 4K -->
+            <label class="relative cursor-pointer group">
+                <input class="sr-only quality-radio" name="video_quality" type="radio" value="4k" data-size="560 MB" data-speed="12.5 MB/s"/>
+                <div class="glass-panel rounded-xl p-4 flex items-center justify-between transition-all duration-200 border-2 border-transparent group-hover:border-white/20 quality-card relative overflow-hidden">
+                    <div class="flex items-center gap-4">
+                        <div class="w-5 h-5 rounded-full border-2 border-outline-variant flex items-center justify-center radio-border">
+                            <div class="w-2.5 h-2.5 rounded-full bg-transparent transform scale-0 transition-transform duration-200 radio-inner"></div>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-title-md text-title-md text-on-surface">4K Ultra HD</span>
+                            </div>
+                            <div class="font-mono-sm text-mono-sm text-on-surface-variant flex gap-3">
+                                <span>3840x2160</span><span>•</span><span>60fps HDR</span><span>•</span><span>HEVC</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="font-title-md text-title-md text-on-surface">~ 560 MB</span>
+                        <span class="material-symbols-outlined text-primary opacity-0 check-icon transition-opacity">check_circle</span>
+                    </div>
+                </div>
+            </label>
+            <!-- 1080p -->
+            <label class="relative cursor-pointer group">
+                <input class="sr-only quality-radio" name="video_quality" type="radio" value="1080p" data-size="140 MB" data-speed="8.2 MB/s"/>
+                <div class="glass-panel rounded-xl p-4 flex items-center justify-between transition-all duration-200 border-2 border-transparent group-hover:border-white/20 quality-card relative overflow-hidden">
+                    <div class="flex items-center gap-4">
+                        <div class="w-5 h-5 rounded-full border-2 border-outline-variant flex items-center justify-center radio-border">
+                            <div class="w-2.5 h-2.5 rounded-full bg-transparent transform scale-0 transition-transform duration-200 radio-inner"></div>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-title-md text-title-md text-on-surface">1080p Full HD</span>
+                            </div>
+                            <div class="font-mono-sm text-mono-sm text-on-surface-variant flex gap-3">
+                                <span>1920x1080</span><span>•</span><span>60fps</span><span>•</span><span>H.264</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="font-title-md text-title-md text-on-surface">~ 140 MB</span>
+                        <span class="material-symbols-outlined text-primary opacity-0 check-icon transition-opacity">check_circle</span>
+                    </div>
+                </div>
+            </label>
+            <!-- 720p -->
+            <label class="relative cursor-pointer group">
+                <input class="sr-only quality-radio" name="video_quality" type="radio" value="720p" data-size="56 MB" data-speed="4.5 MB/s"/>
+                <div class="glass-panel rounded-xl p-4 flex items-center justify-between transition-all duration-200 border-2 border-transparent group-hover:border-white/20 quality-card relative overflow-hidden">
+                    <div class="flex items-center gap-4">
+                        <div class="w-5 h-5 rounded-full border-2 border-outline-variant flex items-center justify-center radio-border">
+                            <div class="w-2.5 h-2.5 rounded-full bg-transparent transform scale-0 transition-transform duration-200 radio-inner"></div>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-title-md text-title-md text-on-surface">720p HD</span>
+                            </div>
+                            <div class="font-mono-sm text-mono-sm text-on-surface-variant flex gap-3">
+                                <span>1280x720</span><span>•</span><span>30fps</span><span>•</span><span>H.264</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="font-title-md text-title-md text-on-surface">~ 56 MB</span>
+                        <span class="material-symbols-outlined text-primary opacity-0 check-icon transition-opacity">check_circle</span>
+                    </div>
+                </div>
+            </label>
+        </div>
+
+        <!-- MP3 Quality Options -->
+        <div id="mp3-options" class="flex-col gap-3 hidden">
+            <!-- 320kbps -->
+            <label class="relative cursor-pointer group">
+                <input class="sr-only quality-radio" name="audio_quality" type="radio" value="320kbps" data-size="12 MB" data-speed="5 MB/s"/>
+                <div class="glass-panel rounded-xl p-4 flex items-center justify-between transition-all duration-200 border-2 border-transparent group-hover:border-white/20 quality-card relative overflow-hidden">
+                    <div class="flex items-center gap-4">
+                        <div class="w-5 h-5 rounded-full border-2 border-outline-variant flex items-center justify-center radio-border">
+                            <div class="w-2.5 h-2.5 rounded-full bg-transparent transform scale-0 transition-transform duration-200 radio-inner"></div>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-title-md text-title-md text-on-surface">320 kbps</span>
+                                <span class="bg-primary/20 text-primary px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase">Recommended</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="font-title-md text-title-md text-on-surface">~ 12 MB</span>
+                        <span class="material-symbols-outlined text-primary opacity-0 check-icon transition-opacity">check_circle</span>
+                    </div>
+                </div>
+            </label>
+            <!-- 256kbps -->
+            <label class="relative cursor-pointer group">
+                <input class="sr-only quality-radio" name="audio_quality" type="radio" value="256kbps" data-size="9 MB" data-speed="4 MB/s"/>
+                <div class="glass-panel rounded-xl p-4 flex items-center justify-between transition-all duration-200 border-2 border-transparent group-hover:border-white/20 quality-card relative overflow-hidden">
+                    <div class="flex items-center gap-4">
+                        <div class="w-5 h-5 rounded-full border-2 border-outline-variant flex items-center justify-center radio-border">
+                            <div class="w-2.5 h-2.5 rounded-full bg-transparent transform scale-0 transition-transform duration-200 radio-inner"></div>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-title-md text-title-md text-on-surface">256 kbps</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="font-title-md text-title-md text-on-surface">~ 9 MB</span>
+                        <span class="material-symbols-outlined text-primary opacity-0 check-icon transition-opacity">check_circle</span>
+                    </div>
+                </div>
+            </label>
+            <!-- 192kbps -->
+            <label class="relative cursor-pointer group">
+                <input class="sr-only quality-radio" name="audio_quality" type="radio" value="192kbps" data-size="7 MB" data-speed="3 MB/s"/>
+                <div class="glass-panel rounded-xl p-4 flex items-center justify-between transition-all duration-200 border-2 border-transparent group-hover:border-white/20 quality-card relative overflow-hidden">
+                    <div class="flex items-center gap-4">
+                        <div class="w-5 h-5 rounded-full border-2 border-outline-variant flex items-center justify-center radio-border">
+                            <div class="w-2.5 h-2.5 rounded-full bg-transparent transform scale-0 transition-transform duration-200 radio-inner"></div>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-title-md text-title-md text-on-surface">192 kbps</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="font-title-md text-title-md text-on-surface">~ 7 MB</span>
+                        <span class="material-symbols-outlined text-primary opacity-0 check-icon transition-opacity">check_circle</span>
+                    </div>
+                </div>
+            </label>
+            <!-- 128kbps -->
+            <label class="relative cursor-pointer group">
+                <input class="sr-only quality-radio" name="audio_quality" type="radio" value="128kbps" data-size="4 MB" data-speed="2 MB/s"/>
+                <div class="glass-panel rounded-xl p-4 flex items-center justify-between transition-all duration-200 border-2 border-transparent group-hover:border-white/20 quality-card relative overflow-hidden">
+                    <div class="flex items-center gap-4">
+                        <div class="w-5 h-5 rounded-full border-2 border-outline-variant flex items-center justify-center radio-border">
+                            <div class="w-2.5 h-2.5 rounded-full bg-transparent transform scale-0 transition-transform duration-200 radio-inner"></div>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-title-md text-title-md text-on-surface">128 kbps</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="font-title-md text-title-md text-on-surface">~ 4 MB</span>
+                        <span class="material-symbols-outlined text-primary opacity-0 check-icon transition-opacity">check_circle</span>
+                    </div>
+                </div>
+            </label>
+        </div>
+        
+        <!-- Summary Card -->
+        <div id="selection-summary" class="glass-panel rounded-xl p-4 mt-4 hidden items-center justify-between border-primary/30 border bg-primary/5">
+            <div>
+                <span class="block font-label-md text-label-md text-primary uppercase tracking-wider mb-1">Ready to Download</span>
+                <span id="summary-text" class="font-title-md text-title-md text-on-surface">Format: -- | Quality: --</span>
+            </div>
+            <span class="material-symbols-outlined text-primary text-3xl">task_alt</span>
+        </div>
+    </div>
+</div>
+<!-- Action Area (Sticky on mobile, static on desktop) -->
+<div class="fixed md:static bottom-0 left-0 w-full p-margin-mobile md:p-0 bg-surface/90 md:bg-transparent backdrop-blur-xl md:backdrop-blur-none border-t border-white/5 md:border-none z-40 pb-[80px] md:pb-0 mt-5">
+<div class="flex gap-4 max-w-container-max mx-auto">
+<button class="btn-back hidden md:flex w-14 h-14 rounded-xl border border-white/20 items-center justify-center text-on-surface hover:bg-white/5 transition-colors">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<button id="btn-start-download" class="flex-grow h-14 rounded-xl text-on-primary font-title-md text-title-md flex items-center justify-center gap-2 hover:bg-primary-container transition-colors shadow-[0_0_20px_rgba(255,85,64,0.2)] bg-primary-container"><div class="flex flex-col items-center leading-tight">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+<span>Start Download</span>
+</div>
+<span class="text-[10px] font-bold uppercase tracking-widest opacity-90">Ad will play</span>
+</div></button>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 w-full z-50 rounded-t-xl bg-surface/90 dark:bg-surface/90 backdrop-blur-2xl border-t border-white/5 shadow-[0_-4px_20px_rgba(0,0,0,0.4)] flex justify-around items-center px-4 py-2 pb-6 max-w-7xl mx-auto">
+<a class="nav-home flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary transition-all active:scale-90 duration-200 cursor-pointer">
+<span class="material-symbols-outlined mb-1">home</span>
+<span class="font-label-md text-label-md">Home</span>
+</a>
+<a class="nav-downloads flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-5 py-1.5 active:scale-90 duration-200 cursor-pointer">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">download_for_offline</span>
+<span class="font-label-md text-label-md">Downloads</span>
+</a>
+<a class="nav-settings flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary transition-all active:scale-90 duration-200 cursor-pointer">
+<span class="material-symbols-outlined mb-1">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</nav>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Navigation routing
+    document.querySelectorAll('.nav-home').forEach(el => {
+        el.addEventListener('click', () => { window.location.href = 'streamvault-home-tall.html'; });
+    });
+    document.querySelectorAll('.nav-downloads').forEach(el => {
+        el.addEventListener('click', () => { window.location.href = 'download-queue.html'; });
+    });
+    document.querySelectorAll('.nav-settings').forEach(el => {
+        el.addEventListener('click', () => { window.location.href = 'app-settings.html'; });
+    });
+    document.querySelectorAll('.btn-back').forEach(el => {
+        el.addEventListener('click', () => { window.location.href = 'streamvault-home-tall.html'; });
+    });
+
+    // Populate video details if parsed from home screen
+    const pendingData = localStorage.getItem('pending_video_details');
+    let videoTitle = "Neon Nights: The Cyberpunk Symphony Director's Cut";
+    let videoPlatform = "2160p HDR";
+    let videoThumbnail = "https://lh3.googleusercontent.com/aida-public/AB6AXuDi1K3sHpS3-QWraq4yvrr02QmslFGpOxIl7TVbUOdtPuZsgFuKalJ05_O6rt6Lz04TmpE9Sm8Iz3u4yGa--7tDVowh5TfeirBkvf9G36wleaO_V0A-jUMi2kbiytiokbvf7s1eFjtzdJ0QfFkGi4PDCyAlKHJUxf6L8sYc5INEy7kPAT-HQJFLMw8rv8vsKYPkt6ArOiG7VW5lEjHGiXZC3hpNAdPdvcNBSZujF4K6nKSTGyL-VtRyArh99hskCG3uvQv7xJmQPggA";
+    let videoDuration = "2h 14m";
+    let isDirect = false;
+    let originalUrl = "";
+
+    if (pendingData) {
+        try {
+            const parsed = JSON.parse(pendingData);
+            videoTitle = parsed.title;
+            videoPlatform = parsed.platform;
+            isDirect = parsed.directDownload || false;
+            originalUrl = parsed.url || "";
+            if (parsed.thumbnail) {
+                videoThumbnail = parsed.thumbnail;
+            } else {
+                videoThumbnail = ""; // Shows default music icon fallback in queue
+            }
+            videoDuration = isDirect ? "01:25" : "03:45"; // Mock duration for streams
+            
+            // Render on screen
+            document.getElementById('video-title').textContent = videoTitle;
+            document.getElementById('video-platform').textContent = videoPlatform;
+            document.getElementById('video-duration').textContent = videoDuration;
+            if (videoThumbnail) {
+                document.getElementById('video-thumbnail').src = videoThumbnail;
+            }
+
+            // Show appropriate banners
+            if (parsed.restricted) {
+                const warnBanner = document.getElementById('restricted-warning');
+                if (warnBanner) warnBanner.classList.remove('hidden');
+            }
+            if (isDirect) {
+                const infoBanner = document.getElementById('direct-stream-info');
+                if (infoBanner) infoBanner.classList.remove('hidden');
+            }
+        } catch (e) {
+            console.error("Failed to load pending video data:", e);
+         const startBtn = document.getElementById('btn-start-download');
+    const formatRadios = document.querySelectorAll('.format-radio');
+    const qualityRadios = document.querySelectorAll('.quality-radio');
+    const qualitySection = document.getElementById('quality-section');
+    const mp4Options = document.getElementById('mp4-options');
+    const mp3Options = document.getElementById('mp3-options');
+    const summaryCard = document.getElementById('selection-summary');
+    const summaryText = document.getElementById('summary-text');
+
+    let selectedFormat = null;
+    let selectedQuality = null;
+
+    // Initially disable Start button
+    if (startBtn) {
+        startBtn.disabled = true;
+        startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+
+    function updateSummary() {
+        if (selectedFormat && selectedQuality) {
+            summaryText.textContent = `Format: ${selectedFormat.toUpperCase()} | Quality: ${selectedQuality}`;
+            summaryCard.classList.remove('hidden');
+            summaryCard.classList.add('flex');
+            
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        } else {
+            summaryCard.classList.add('hidden');
+            summaryCard.classList.remove('flex');
+            
+            if (startBtn) {
+                startBtn.disabled = true;
+                startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+    }
+
+    formatRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            selectedFormat = e.target.value;
+            
+            // Reset quality selection
+            selectedQuality = null;
+            qualityRadios.forEach(qr => qr.checked = false);
+            updateSummary();
+            
+            // Show quality section with animation
+            qualitySection.classList.remove('hidden');
+            qualitySection.classList.add('flex');
+            setTimeout(() => qualitySection.classList.remove('opacity-0'), 50);
+            
+            if (selectedFormat === 'mp4') {
+                mp3Options.classList.add('hidden');
+                mp3Options.classList.remove('flex');
+                mp4Options.classList.remove('hidden');
+                mp4Options.classList.add('flex');
+            } else {
+                mp4Options.classList.add('hidden');
+                mp4Options.classList.remove('flex');
+                mp3Options.classList.remove('hidden');
+                mp3Options.classList.add('flex');
+            }
+        });
+    });
+
+    qualityRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            selectedQuality = e.target.value;
+            updateSummary();
+        });
+    });
+
+    if (startBtn) {
+        startBtn.addEventListener('click', () => {
+            if (!selectedFormat || !selectedQuality) return;
+
+            const selectedRadio = document.querySelector(`input[name="${selectedFormat === 'mp4' ? 'video_quality' : 'audio_quality'}"]:checked`);
+            
+            let size = selectedRadio ? selectedRadio.getAttribute('data-size') : "140 MB";
+            let speed = selectedRadio ? selectedRadio.getAttribute('data-speed') : "8.2 MB/s";
+            
+            // For direct media links
+            if (isDirect) {
+                size = "15.4 MB";
+                speed = "3.2 MB/s";
+            }
+            
+            const isAudioOnly = selectedFormat === 'mp3';
+
+            // Create a new pending download item matching the actual parsed video details
+            const newItem = {
+                id: 'dl-' + Date.now(),
+                title: videoTitle,
+                size: size,
+                speed: speed,
+                progress: 0,
+                status: 'downloading',
+                thumbnail: videoThumbnail,
+                quality: selectedQuality.toUpperCase(),
+                duration: videoDuration,
+                directDownload: isDirect,
+                url: originalUrl,
+                isAudioOnly: isAudioOnly
+            };
+            
+            // Save to localStorage
+            const queue = JSON.parse(localStorage.getItem('download_queue') || '[]');
+            queue.unshift(newItem);
+            localStorage.setItem('download_queue', JSON.stringify(queue));
+            
+            // Clear pending video details
+            localStorage.removeItem('pending_video_details');
+            
+            // Proceed to interstitial ad instead of downloading right away
+            window.location.href = 'ad-interstitial.html';
+        });
+    }
+});
+</script>
+</body></html>
