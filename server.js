@@ -884,7 +884,7 @@ app.post('/api/metadata', (req, res) => {
     }
 
     // Use yt-dlp --dump-json to extract metadata quickly without downloading
-    const args = ['--dump-json', '--no-warnings', '--no-playlist', '--extractor-args', 'youtube:player_client=android,web'];
+    const args = ['--dump-json', '--no-warnings', '--no-playlist', '--no-update', '--js-runtimes', 'node', '--remote-components', 'ejs:github'];
     if (cookiesPath) {
         args.push('--cookies', cookiesPath);
     }
