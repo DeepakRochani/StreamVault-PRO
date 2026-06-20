@@ -1,0 +1,10 @@
+providers = ["node", "python"]
+
+[phases.setup]
+nixPkgs = ["...", "ffmpeg", "python3", "python3Packages.pip"]
+
+[phases.build]
+cmds = ["...", "pip install -U yt-dlp"]
+
+[start]
+cmd = "node server.js"
