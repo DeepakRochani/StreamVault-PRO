@@ -983,7 +983,7 @@ app.post('/api/metadata', (req, res) => {
               console.log("format_id | resolution | filesize | fps | video codec | audio codec");
               
               // Filter out storyboards, mhtml, and audio-only formats
-              const totalFormats = metadata.formats.length;
+              const totalFormats = metadata.formats ? metadata.formats.length : 0;
               let rejectedCount = 0;
               
               const allVids = (metadata.formats || []).filter(f => {
