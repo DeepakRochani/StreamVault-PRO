@@ -979,62 +979,83 @@ app.post('/api/metadata', (req, res) => {
               buildAudio(64, '64 kbps', false);
 
               // Helper to build explicit video formats
-              const buildVideo = (minH, label, recommended, estMbps) => {
-                  const vids = metadata.formats.filter(f => f.vcodec !== 'none' && f.height >= minH);
-                  if (vids.length === 0) return;
-                  vids.sort((a,b) => (a.height - b.height));
-                  const closest = vids.filter(f => f.height === vids[0].height);
-                  closest.sort((a,b) => (b.fps||0) - (a.fps||0) || (b.tbr||0) - (a.tbr||0));
+              console.log("\n=== VERIFY BACKEND ===");
+              console.log("format_id | resolution | filesize | fps | video codec | audio codec");
+              
+              const allVids = metadata.formats.filter(f => f.vcodec !== 'none');
+              allVids.forEach(f => {
+                  console.log(`${f.format_id} | ${f.width}x${f.height} | ${f.filesize || f.filesize_approx} | ${f.fps} | ${f.vcodec} | ${f.acodec}`);
+              });
+              console.log("======================\n");
+
+              const resolutionsToFind = [
+                  { minH: 2160, label: '2160p (4K)', rec: true },
+                  { minH: 1440, label: '1440p (2K)', rec: false },
+                  { minH: 1080, label: '1080p', rec: false },
+                  { minH: 720, label: '720p', rec: false },
+                  { minH: 480, label: '480p', rec: false },
+                  { minH: 360, label: '360p', rec: false }
+              ];
+
+              resolutionsToFind.forEach(({minH, label, rec}) => {
+                  let maxH = 9999;
+                  if (minH === 1440) maxH = 2159;
+                  if (minH === 1080) maxH = 1439;
+                  if (minH === 720) maxH = 1079;
+                  if (minH === 480) maxH = 719;
+                  if (minH === 360) maxH = 479;
+                  if (minH === 2160) maxH = 99999;
                   
-                  const f = closest[0];
+                  const vids = allVids.filter(f => f.height >= minH && f.height <= maxH);
+                  if (vids.length === 0) return;
+                  
+                  vids.sort((a,b) => (b.fps||0) - (a.fps||0) || (b.tbr||0) - (a.tbr||0) || (b.filesize||0) - (a.filesize||0));
+                  const f = vids[0];
+                  
                   let s = f.filesize || f.filesize_approx || 0;
                   if (s > 0 && f.acodec === 'none') s += bestAudioSize;
-                  if (s === 0) s = dur * (estMbps * 1024 * 1024 / 8);
-                  
-                  const resDisplay = f.width && f.height ? `${f.width}x${f.height}` : label;
-                  const codec = (f.vcodec || '').split('.')[0] || 'Unknown';
+                  if (s === 0 && dur > 0) {
+                      let estMbps = minH >= 2160 ? 15 : minH >= 1440 ? 8 : minH >= 1080 ? 4 : minH >= 720 ? 1.5 : minH >= 480 ? 0.8 : 0.4;
+                      s = dur * (estMbps * 1024 * 1024 / 8);
+                  }
                   
                   videoFormats.push({
                       id: f.format_id,
                       quality: label,
-                      resolution: resDisplay,
+                      resolution: `${f.width || '?'}x${f.height || minH}`,
                       fps: f.fps ? `${f.fps}fps` : '',
-                      codec: codec,
+                      codec: (f.vcodec || '').split('.')[0] || 'Unknown',
+                      sizeStr: s > 0 ? formatBytes(s) : 'Unknown',
+                      bytes: s,
+                      recommended: rec
+                  });
+              });
+
+              if (videoFormats.length === 0 && allVids.length > 0) {
+                  const bestVid = allVids[allVids.length - 1];
+                  let s = bestVid.filesize || bestVid.filesize_approx || 0;
+                  if (s > 0 && bestVid.acodec === 'none') s += bestAudioSize;
+                  videoFormats.push({
+                      id: bestVid.format_id || 'bestvideo',
+                      quality: 'Original Quality',
+                      resolution: bestVid.resolution || 'Unknown',
+                      fps: bestVid.fps ? `${bestVid.fps}fps` : '',
+                      codec: (bestVid.vcodec || '').split('.')[0] || 'Unknown',
                       sizeStr: formatBytes(s),
                       bytes: s,
-                      recommended
+                      recommended: true
                   });
-              };
-              buildVideo(2160, '4K', true, 15);
-              buildVideo(1440, '2K', false, 8);
-              buildVideo(1080, '1080p', false, 4);
-              buildVideo(720, '720p', false, 1.5);
-              buildVideo(480, '480p', false, 0.8);
-              buildVideo(360, '360p', false, 0.4);
-              
-              // If NO formats matched because height is missing from metadata (common on Instagram/FB/TikTok)
-              if (videoFormats.length === 0) {
-                  const anyVideo = metadata.formats.filter(f => f.vcodec !== 'none');
-                  if (anyVideo.length > 0) {
-                      const bestVid = anyVideo[anyVideo.length - 1]; // usually last is best in yt-dlp
-                      let s = bestVid.filesize || bestVid.filesize_approx || 0;
-                      if (s > 0 && bestVid.acodec === 'none') s += bestAudioSize;
-                      videoFormats.push({
-                          id: bestVid.format_id || 'bestvideo',
-                          quality: 'Original Quality',
-                          resolution: bestVid.resolution || 'Unknown',
-                          fps: bestVid.fps ? `${bestVid.fps}fps` : '',
-                          codec: (bestVid.vcodec || '').split('.')[0] || 'Unknown',
-                          sizeStr: formatBytes(s),
-                          bytes: s,
-                          recommended: true
-                      });
-                  }
               }
-              
-              // Filter unique by quality label, sort by bytes desc
+
               videoFormats = videoFormats.filter((v,i,a)=>a.findIndex(t=>(t.quality===v.quality))===i);
               videoFormats.sort((a,b) => b.bytes - a.bytes);
+
+              console.log("\nAvailable Formats Found:");
+              videoFormats.forEach(v => console.log(v.quality));
+
+              if (videoFormats.length === 1 && videoFormats[0].quality === '360p') {
+                  videoFormats[0].quality = '360p (This source only provides 360p.)';
+              }
           }
 
           const dur = metadata.duration || 0;
