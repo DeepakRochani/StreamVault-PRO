@@ -986,8 +986,8 @@ app.post('/api/metadata', (req, res) => {
               const totalFormats = metadata.formats.length;
               let rejectedCount = 0;
               
-              const allVids = metadata.formats.filter(f => {
-                  if (f.vcodec === 'none' || f.vcodec === 'mhtml' || f.vcodec === 'images' || (f.format_id && f.format_id.startsWith('sb'))) {
+              const allVids = (metadata.formats || []).filter(f => {
+                  if (f.vcodec === 'none' || f.vcodec === 'mhtml' || f.vcodec === 'images' || (f.format_id && String(f.format_id).startsWith('sb'))) {
                       rejectedCount++;
                       return false;
                   }
