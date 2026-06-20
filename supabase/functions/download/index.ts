@@ -59,28 +59,85 @@ serve(async (req: Request) => {
     const vidQuality = VIDEO_QUALITY_MAP[quality] ?? "1080";
 
     // ── Call cobalt.tools ─────────────────────────────────────
-    // Using the official public instance. Self-host for production
-    // to avoid rate limits: https://github.com/imputnet/cobalt
-    const COBALT_API = Deno.env.get("COBALT_API_URL") ?? "https://api.cobalt.tools/";
+    // Use a list of known public instances because the official instance
+    // now requires JWT authentication or Turnstile for API access.
+    let customApi = Deno.env.get("COBALT_API_URL");
+    const cobaltInstances = customApi ? [customApi] : [
+      "https://cobalt.canine.tools/",
+      "https://cobalt.mgytr.top/",
+      "https://cobalt.kittycat.boo/",
+      "https://qwkuns.me/",
+      "https://cobalt.squair.xyz/",
+      "https://cobalt.blackcat.sweeux.org/",
+      "https://cobalt.liubquanti.click/",
+      "https://cobalt.xenon.zone/",
+      "https://cobalt.cjs.nz/",
+      "https://api.cobalt.best/",
+      "https://co.wuk.sh/",
+      "https://api.cobalt.tools/" // Official fallback
+    ];
 
-    const cobaltRes = await fetch(COBALT_API, {
-      method: "POST",
-      headers: {
-        "Content-Type":  "application/json",
-        "Accept":        "application/json",
-        "User-Agent":    "StreamVault/1.0",
-      },
-      body: JSON.stringify({
-        url,
-        videoQuality:     vidQuality,
-        downloadMode:     isAudio ? "audio" : "auto",
-        audioFormat:      isAudio ? "mp3"   : "best",
-        filenamePattern:  "basic",
-        isNoTTWatermark:  true,
-      }),
-    });
+    let cobaltData: any = null;
+    let lastErrorMsg = "No working Cobalt instance found.";
 
-    const cobaltData = await cobaltRes.json();
+    for (let i = 0; i < cobaltInstances.length; i++) {
+      let instanceUrl = cobaltInstances[i];
+      if (!instanceUrl.endsWith("/")) instanceUrl += "/";
+      
+      try {
+        const cobaltRes = await fetch(instanceUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type":  "application/json",
+            "Accept":        "application/json",
+            "User-Agent":    "StreamVault/1.0",
+          },
+          body: JSON.stringify({
+            url,
+            videoQuality:     vidQuality,
+            downloadMode:     isAudio ? "audio" : "auto",
+            audioFormat:      isAudio ? "mp3"   : "best",
+            filenamePattern:  "basic",
+            isNoTTWatermark:  true,
+          }),
+        });
+
+        const textRes = await cobaltRes.text();
+        if (!textRes) continue; // Empty response (some instances block)
+        
+        try {
+          cobaltData = JSON.parse(textRes);
+        } catch (_) {
+          continue; // Not JSON (Cloudflare challenge, HTML, etc)
+        }
+
+        // Check if it's an API key / auth error
+        if (cobaltData.error) {
+           const errCode = cobaltData.error?.code || cobaltData.error;
+           if (typeof errCode === 'string' && (errCode.includes('auth') || errCode.includes('jwt') || errCode.includes('turnstile'))) {
+              lastErrorMsg = errCode;
+              continue; // Try next instance
+           }
+        }
+
+        // If we got here and it's not a block/auth error, we accept this response
+        // Even if it's another error (like "video too long"), we break and return it.
+        if (cobaltData.status || cobaltData.error) {
+            break;
+        }
+
+      } catch (err: any) {
+        lastErrorMsg = err.message || "Network error";
+        continue; // Network error, try next
+      }
+    }
+
+    if (!cobaltData) {
+        return new Response(JSON.stringify({ error: lastErrorMsg }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+    }
 
     // ── Handle cobalt response statuses ──────────────────────
     // "redirect"  → direct CDN URL (no tunnel needed)
