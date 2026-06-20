@@ -1056,7 +1056,7 @@ app.post('/api/metadata', (req, res) => {
                       sizeStr: s > 0 ? formatBytes(s) : 'Unknown',
                       bytes: s,
                       recommended: rec,
-                      tier: tier
+                      
                   });
               });
 
