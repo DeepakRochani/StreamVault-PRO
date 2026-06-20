@@ -1557,18 +1557,18 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
           let formatStr = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
           
           if (!isLegacyVideo && requestedQuality !== 'Original') {
-              // Use explicit format_id and merge with best audio
-              formatStr = `${requestedQuality}+bestaudio[ext=m4a]/best[ext=mp4]/best`;
+              // Try the exact format_id requested. If it fails, fallback gracefully through resolutions.
+              formatStr = `${requestedQuality}+bestaudio/bestvideo[height<=2160]+bestaudio/bestvideo[height<=1440]+bestaudio/bestvideo[height<=1080]+bestaudio/bestvideo[height<=720]+bestaudio/bestvideo[height<=480]+bestaudio/bestvideo[height<=360]+bestaudio/bestvideo+bestaudio/best`;
           } else if (requestedQuality.toLowerCase() === '4k') {
-              formatStr = 'bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
+              formatStr = 'bestvideo[height<=2160]+bestaudio/bestvideo[height<=1440]+bestaudio/bestvideo[height<=1080]+bestaudio/bestvideo[height<=720]+bestaudio/bestvideo+bestaudio/best';
           } else if (requestedQuality.toLowerCase() === '1080p') {
-              formatStr = 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
+              formatStr = 'bestvideo[height<=1080]+bestaudio/bestvideo[height<=720]+bestaudio/bestvideo[height<=480]+bestaudio/bestvideo+bestaudio/best';
           } else if (requestedQuality.toLowerCase() === '720p') {
-              formatStr = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
+              formatStr = 'bestvideo[height<=720]+bestaudio/bestvideo[height<=480]+bestaudio/bestvideo[height<=360]+bestaudio/bestvideo+bestaudio/best';
           } else if (requestedQuality.toLowerCase() === '480p') {
-              formatStr = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
+              formatStr = 'bestvideo[height<=480]+bestaudio/bestvideo[height<=360]+bestaudio/bestvideo+bestaudio/best';
           } else if (requestedQuality.toLowerCase() === '360p') {
-              formatStr = 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
+              formatStr = 'bestvideo[height<=360]+bestaudio/bestvideo+bestaudio/best';
           }
 
           ytdlpArgs = [
