@@ -884,7 +884,7 @@ app.post('/api/metadata', (req, res) => {
     }
 
     // Use yt-dlp --dump-json to extract metadata quickly without downloading
-    const args = ['--dump-json', '--no-warnings', '--no-playlist', '--extractor-args', 'youtube:player_client=android'];
+    const args = ['--dump-json', '--no-warnings', '--no-playlist', '--extractor-args', 'youtube:player_client=tv_embedded,web', '--js-runtimes', 'nodejs'];
     if (cookiesPath) {
         args.push('--cookies', cookiesPath);
     }
@@ -989,15 +989,15 @@ app.post('/api/metadata', (req, res) => {
               console.log("======================\n");
 
               const resolutionsToFind = [
-                  { minH: 2160, label: '2160p (4K)', rec: true },
-                  { minH: 1440, label: '1440p (2K)', rec: false },
-                  { minH: 1080, label: '1080p', rec: false },
-                  { minH: 720, label: '720p', rec: false },
-                  { minH: 480, label: '480p', rec: false },
-                  { minH: 360, label: '360p', rec: false }
+                  { minH: 360, label: '360p', rec: false, tier: 'Free' },
+                  { minH: 480, label: '480p', rec: false, tier: 'Free' },
+                  { minH: 720, label: '720p HD', rec: false, tier: 'Free' },
+                  { minH: 1080, label: '1080p Full HD', rec: false, tier: 'Premium' },
+                  { minH: 1440, label: '1440p 2K', rec: false, tier: 'Pro' },
+                  { minH: 2160, label: '2160p 4K', rec: true, tier: 'Lifetime' }
               ];
 
-              resolutionsToFind.forEach(({minH, label, rec}) => {
+              resolutionsToFind.forEach(({minH, label, rec, tier}) => {
                   let maxH = 9999;
                   if (minH === 1440) maxH = 2159;
                   if (minH === 1080) maxH = 1439;
@@ -1027,7 +1027,8 @@ app.post('/api/metadata', (req, res) => {
                       codec: (f.vcodec || '').split('.')[0] || 'Unknown',
                       sizeStr: s > 0 ? formatBytes(s) : 'Unknown',
                       bytes: s,
-                      recommended: rec
+                      recommended: rec,
+                      tier: tier
                   });
               });
 
@@ -1048,7 +1049,7 @@ app.post('/api/metadata', (req, res) => {
               }
 
               videoFormats = videoFormats.filter((v,i,a)=>a.findIndex(t=>(t.quality===v.quality))===i);
-              videoFormats.sort((a,b) => b.bytes - a.bytes);
+              videoFormats.sort((a,b) => a.bytes - b.bytes);
 
               console.log("\nAvailable Formats Found:");
               videoFormats.forEach(v => console.log(v.quality));
@@ -1527,7 +1528,8 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
             '--no-playlist',
             '--no-warnings',
             '--newline',
-            '--extractor-args', 'youtube:player_client=android',
+            '--extractor-args', 'youtube:player_client=tv_embedded,web',
+            '--js-runtimes', 'nodejs',
             ...(cookiesPath ? ['--cookies', cookiesPath] : []),
             '--extract-audio',
             '--audio-format', 'mp3',
@@ -1575,7 +1577,8 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
             '--no-playlist',
             '--no-warnings',
             '--newline',
-            '--extractor-args', 'youtube:player_client=android',
+            '--extractor-args', 'youtube:player_client=tv_embedded,web',
+            '--js-runtimes', 'nodejs',
             ...(cookiesPath ? ['--cookies', cookiesPath] : []),
             '--format', formatStr,
             '--merge-output-format', 'mp4',
