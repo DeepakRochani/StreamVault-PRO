@@ -884,7 +884,7 @@ app.post('/api/metadata', (req, res) => {
     }
 
     // Use yt-dlp --dump-json to extract metadata quickly without downloading
-    const args = ['--dump-json', '--no-warnings', '--no-playlist', '--extractor-args', 'youtube:player_client=android_vr'];
+    const args = ['--dump-json', '--no-warnings', '--no-playlist', '--extractor-args', 'youtube:player_client=android'];
     if (cookiesPath) {
         args.push('--cookies', cookiesPath);
     }
@@ -1506,7 +1506,7 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
             '--no-playlist',
             '--no-warnings',
             '--newline',
-            '--extractor-args', 'youtube:player_client=android_vr',
+            '--extractor-args', 'youtube:player_client=android',
             ...(cookiesPath ? ['--cookies', cookiesPath] : []),
             '--extract-audio',
             '--audio-format', 'mp3',
@@ -1554,7 +1554,7 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
             '--no-playlist',
             '--no-warnings',
             '--newline',
-            '--extractor-args', 'youtube:player_client=android_vr',
+            '--extractor-args', 'youtube:player_client=android',
             ...(cookiesPath ? ['--cookies', cookiesPath] : []),
             '--format', formatStr,
             '--merge-output-format', 'mp4',
