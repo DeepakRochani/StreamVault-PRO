@@ -907,9 +907,12 @@ app.post('/api/metadata', (req, res) => {
     process.stderr.on('data', (data) => { errorOutput += data.toString(); });
 
     process.on('close', async (code) => {
+      let parseError = null;
       if (code === 0) {
         try {
           const metadata = JSON.parse(output);
+          // ... (keep the rest the same)
+
           
           let sizes = { v4k: null, v1080: null, v720: null, a320: null, a256: null, a128: null };
           let bestAudioSize = 0;
@@ -1136,6 +1139,7 @@ app.post('/api/metadata', (req, res) => {
             }
           });
         } catch (e) {
+          parseError = e.stack || e.message;
           console.error("JSON parse failed, falling back. Output:", output.substring(0, 200));
         }
       }
@@ -1150,6 +1154,7 @@ app.post('/api/metadata', (req, res) => {
 
       return res.status(500).json({
           success: false,
+          parse_error: parseError,
           actual_error: errorOutput || output || 'Extraction failed with no output',
           stdout: output,
           stderr: errorOutput,
