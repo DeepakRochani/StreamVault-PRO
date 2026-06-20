@@ -1174,7 +1174,7 @@ const checkFeatureAndLimits = (req, res, next) => {
         }
 
         // Master Subscription Bypass
-        const subEnabled = db.prepare('SELECT value_json FROM app_settings WHERE key = "subscription_enabled"').get();
+        const subEnabled = db.prepare('SELECT value_json FROM app_settings WHERE key = ?').get('subscription_enabled');
         if (subEnabled && subEnabled.value_json === 'false') {
             return next(); // Bypass all subscription/plan checks
         }
@@ -2138,18 +2138,18 @@ function logConvertIfToken(id) {
 // Public Settings API
 app.get('/api/public-settings', (req, res) => {
     try {
-        const ads = db.prepare('SELECT value_json FROM app_settings WHERE key = "ads_enabled"').get();
-        const mm = db.prepare('SELECT value_json FROM app_settings WHERE key = "maintenance_mode"').get();
-        const le = db.prepare('SELECT value_json FROM app_settings WHERE key = "login_enabled"').get();
+        const ads = db.prepare('SELECT value_json FROM app_settings WHERE key = ?').get('ads_enabled');
+        const mm = db.prepare('SELECT value_json FROM app_settings WHERE key = ?').get('maintenance_mode');
+        const le = db.prepare('SELECT value_json FROM app_settings WHERE key = ?').get('login_enabled');
         
-        const se = db.prepare('SELECT value_json FROM app_settings WHERE key = "subscription_enabled"').get();
-        const ppe = db.prepare('SELECT value_json FROM app_settings WHERE key = "plan_premium_enabled"').get();
-        const ppro = db.prepare('SELECT value_json FROM app_settings WHERE key = "plan_pro_enabled"').get();
-        const plife = db.prepare('SELECT value_json FROM app_settings WHERE key = "plan_lifetime_enabled"').get();
+        const se = db.prepare('SELECT value_json FROM app_settings WHERE key = ?').get('subscription_enabled');
+        const ppe = db.prepare('SELECT value_json FROM app_settings WHERE key = ?').get('plan_premium_enabled');
+        const ppro = db.prepare('SELECT value_json FROM app_settings WHERE key = ?').get('plan_pro_enabled');
+        const plife = db.prepare('SELECT value_json FROM app_settings WHERE key = ?').get('plan_lifetime_enabled');
         
-        const rAds = db.prepare('SELECT value_json FROM app_settings WHERE key = "rewarded_ads_enabled"').get();
-        const rAdCool = db.prepare('SELECT value_json FROM app_settings WHERE key = "rewarded_ad_cooldown_mins"').get();
-        const rAdFreq = db.prepare('SELECT value_json FROM app_settings WHERE key = "rewarded_ad_frequency_downloads"').get();
+        const rAds = db.prepare('SELECT value_json FROM app_settings WHERE key = ?').get('rewarded_ads_enabled');
+        const rAdCool = db.prepare('SELECT value_json FROM app_settings WHERE key = ?').get('rewarded_ad_cooldown_mins');
+        const rAdFreq = db.prepare('SELECT value_json FROM app_settings WHERE key = ?').get('rewarded_ad_frequency_downloads');
 
         let placements = {};
         try {

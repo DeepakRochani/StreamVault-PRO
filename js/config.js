@@ -8,11 +8,11 @@
 // ============================================================
 
 // ── Supabase project reference ───────────────────────────────
-window.SUPABASE_PROJECT_REF = 'fmgybyjmgnhionbmthfb';
+window.SUPABASE_PROJECT_REF = 'xphhazisatxmlulhqxvi';
 
 // ── Supabase Auth configuration ──────────────────────────────
-window.SUPABASE_URL     = 'https://fmgybyjmgnhionbmthfb.supabase.co';
-window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtZ3lieWptZ25oaW9uYm10aGZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0MzIzMTgsImV4cCI6MjA5NzAwODMxOH0.sjJao3V21yfrwEi3m1M5UlzOg_CIR_Y1isvVovKQD18';
+window.SUPABASE_URL     = 'https://xphhazisatxmlulhqxvi.supabase.co';
+window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwaGhhemlzYXR4bWx1bGhxeHZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MjE3MDgsImV4cCI6MjA5NzQ5NzcwOH0.AXKS6RQjzGJYCig5mzWoCwKQ6e27TWLX2GAlvTsInwM';
 
 // ── API base URL ──────────────────────────────────────────────
 // Edge Function URLs: https://<project-ref>.supabase.co/functions/v1/<name>

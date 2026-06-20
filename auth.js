@@ -155,8 +155,8 @@ router.post('/supabase-sync', async (req, res) => {
         const { access_token } = req.body;
         if (!access_token) return res.status(400).json({ error: 'Access token required' });
 
-        const SUPABASE_URL = process.env.SUPABASE_URL || 'https://fmgybyjmgnhionbmthfb.supabase.co';
-        const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtZ3lieWptZ25oaW9uYm10aGZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0MzIzMTgsImV4cCI6MjA5NzAwODMxOH0.sjJao3V21yfrwEi3m1M5UlzOg_CIR_Y1isvVovKQD18';
+        const SUPABASE_URL = process.env.SUPABASE_URL || 'https://xphhazisatxmlulhqxvi.supabase.co';
+        const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwaGhhemlzYXR4bWx1bGhxeHZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MjE3MDgsImV4cCI6MjA5NzQ5NzcwOH0.AXKS6RQjzGJYCig5mzWoCwKQ6e27TWLX2GAlvTsInwM';
 
         // Verify the token by calling Supabase user info endpoint
         const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
