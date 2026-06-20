@@ -1366,7 +1366,18 @@
                 if (currentBtn) currentBtn.disabled = !ready;
             }
 
-            function createQualityChip(type, name, value, sizeStr, isRecommended=false, extraDetails='') {
+            function createQualityChip(type, name, value, sizeStr, isRecommended = false, extraDetails = '', tier = 'Free') {
+                let tierBadge = '';
+                if (tier === 'Premium') {
+                    tierBadge = '<span class="bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ml-2 border border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.2)]">Premium</span>';
+                } else if (tier === 'Pro') {
+                    tierBadge = '<span class="bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ml-2 border border-purple-500/30 shadow-[0_0_8px_rgba(168,85,247,0.2)]">Pro</span>';
+                } else if (tier === 'Lifetime') {
+                    tierBadge = '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ml-2 border border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.2)]">Lifetime</span>';
+                } else {
+                    tierBadge = '<span class="bg-surface-variant/50 text-on-surface-variant px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ml-2 border border-outline/30">Free</span>';
+                }
+
                 return `
                     <label class="relative cursor-pointer group">
                         <input class="sr-only quality-radio" name="${type}_quality" type="radio" value="${value}" data-size="${sizeStr}"/>
@@ -1376,9 +1387,10 @@
                                     <div class="w-2.5 h-2.5 rounded-full bg-transparent transform scale-0 transition-transform duration-200 radio-inner"></div>
                                 </div>
                                 <div>
-                                    <div class="flex items-center gap-2 mb-1">
+                                    <div class="flex items-center flex-wrap gap-y-1 mb-1">
                                         <span class="font-title-md text-title-md text-on-surface">${name}</span>
-                                        ${isRecommended ? '<span class="bg-primary/20 text-primary px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase">Recommended</span>' : ''}
+                                        ${tierBadge}
+                                        ${isRecommended ? '<span class="bg-primary/20 text-primary px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ml-2 border border-primary/30 shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.2)]">Recommended</span>' : ''}
                                     </div>
                                     ${extraDetails ? `<div class="text-xs text-on-surface-variant/70 font-medium tracking-wide mt-1">${extraDetails}</div>` : ''}
                                 </div>
@@ -1404,7 +1416,7 @@
                             if (f.fps) details.push(f.fps);
                             if (f.codec && f.codec !== 'Unknown') details.push(f.codec);
                             
-                            html += createQualityChip('video', f.quality, f.id, f.sizeStr, f.recommended, details.join(' • '));
+                            html += createQualityChip('video', f.quality, f.id, f.sizeStr, f.recommended, details.join(' • '), f.tier || 'Free');
                             count++;
                         });
                     } else {
