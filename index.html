@@ -374,19 +374,6 @@
                 });
             }
 
-            // Show upgrade banner for free users
-            const checkAndShowBanner = () => {
-                if ((!data.user.subscription || data.user.subscription.plan_id === 'free') && window.subscriptionEnabled !== false) {
-                    const banner = document.getElementById('upgrade-banner');
-                    if (banner) {
-                        banner.classList.remove('hidden');
-                        banner.classList.add('flex');
-                    }
-                }
-            };
-            if (typeof window.subscriptionEnabled !== 'undefined') checkAndShowBanner();
-            else window.onSettingsLoaded = checkAndShowBanner;
-
             // Auto-Resume Workflow
             if (sessionStorage.getItem('resumeState')) {
                 try {
@@ -410,7 +397,7 @@
                     <div class="absolute inset-0 bg-gradient-to-b from-transparent to-surface-container pointer-events-none"></div>
                     <span class="material-symbols-outlined text-[48px] text-on-surface-variant mb-4 relative z-10">lock</span>
                     <h3 class="font-title-md text-xl text-on-surface font-bold relative z-10 mb-2">History & Sync Locked</h3>
-                    <p class="text-sm text-on-surface-variant max-w-sm relative z-10 mb-4" id="guest-promo-text">Create an account to sync your downloads across devices and access Premium features.</p>
+                    <p class="text-sm text-on-surface-variant max-w-sm relative z-10 mb-4" id="guest-promo-text">100% Free Video Downloader</p>
                     <a href="streamvault-login.html?mode=register" class="bg-primary hover:bg-primary-container text-[#5c0000] font-bold px-4 py-2 rounded-xl transition-all relative z-10">Create Free Account</a>
                 </div>`;
                 
@@ -431,11 +418,6 @@
 </script>
 </header>
 
-<!-- Upgrade Banner (Hidden by default, shown for free users) -->
-<div id="upgrade-banner" class="hidden bg-primary/10 border-b border-primary/20 text-center py-2 px-4 flex-col sm:flex-row justify-center items-center gap-3 w-full z-40 mt-16 sm:mt-0">
-    <span class="text-sm font-medium">Unlock 4K downloads, batch processing, and an ad-free experience.</span>
-    <a href="streamvault-upgrade.html" class="bg-primary text-on-primary font-bold px-4 py-1.5 rounded-lg text-xs hover:bg-primary-container transition-colors whitespace-nowrap">Upgrade to PRO</a>
-</div>
 <!-- Rewarded Ad Modal -->
 <div id="rewarded-ad-modal" class="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md hidden flex-col items-center justify-center p-4">
     <div class="bg-surface-container-high border border-white/10 rounded-2xl p-4 w-full max-w-lg flex flex-col items-center gap-4 shadow-2xl relative text-center">
@@ -1051,11 +1033,7 @@
             if (!val) return;
             
             try {
-            
-            if (!window.isLoggedIn && window.loginEnabled === true) {
-                showLoginModal();
-                return;
-            }
+
 
             // Cancel previous analysis if URL changes
             if (currentAnalyzeController) {
@@ -1366,18 +1344,7 @@
                 if (currentBtn) currentBtn.disabled = !ready;
             }
 
-            function createQualityChip(type, name, value, sizeStr, isRecommended = false, extraDetails = '', tier = 'Free') {
-                let tierBadge = '';
-                if (tier === 'Premium') {
-                    tierBadge = '<span class="bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ml-2 border border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.2)]">Premium</span>';
-                } else if (tier === 'Pro') {
-                    tierBadge = '<span class="bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ml-2 border border-purple-500/30 shadow-[0_0_8px_rgba(168,85,247,0.2)]">Pro</span>';
-                } else if (tier === 'Lifetime') {
-                    tierBadge = '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ml-2 border border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.2)]">Lifetime</span>';
-                } else {
-                    tierBadge = '<span class="bg-surface-variant/50 text-on-surface-variant px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ml-2 border border-outline/30">Free</span>';
-                }
-
+            function createQualityChip(type, name, value, sizeStr, isRecommended = false, extraDetails = '') {
                 return `
                     <label class="relative cursor-pointer group">
                         <input class="sr-only quality-radio" name="${type}_quality" type="radio" value="${value}" data-size="${sizeStr}"/>
@@ -1389,7 +1356,6 @@
                                 <div>
                                     <div class="flex items-center flex-wrap gap-y-1 mb-1">
                                         <span class="font-title-md text-title-md text-on-surface">${name}</span>
-                                        ${tierBadge}
                                         ${isRecommended ? '<span class="bg-primary/20 text-primary px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ml-2 border border-primary/30 shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.2)]">Recommended</span>' : ''}
                                     </div>
                                     ${extraDetails ? `<div class="text-xs text-on-surface-variant/70 font-medium tracking-wide mt-1">${extraDetails}</div>` : ''}
@@ -1416,7 +1382,7 @@
                             if (f.fps) details.push(f.fps);
                             if (f.codec && f.codec !== 'Unknown') details.push(f.codec);
                             
-                            html += createQualityChip('video', f.quality, f.id, f.sizeStr, f.recommended, details.join(' • '), f.tier || 'Free');
+                            html += createQualityChip('video', f.quality, f.id, f.sizeStr, f.recommended, details.join(' • '));
                             count++;
                         });
                     } else {
@@ -1587,76 +1553,6 @@
         }
 
         async function startInlineDownload(videoData, format, selectedQuality) {
-            if (!window.isLoggedIn && window.loginEnabled === true) {
-                showLoginModal();
-                return;
-            }
-            
-            // --- REWARDED AD LOGIC ---
-            const userSub = (window.currentUser && window.currentUser.subscription) ? window.currentUser.subscription.plan_id : 'free';
-            const isFreeUser = !window.isLoggedIn || userSub === 'free';
-            
-            if (window.rewardedAdsEnabled === 'true' && isFreeUser && window.subscriptionEnabled !== false) {
-                const now = Date.now();
-                const cooldownMins = parseInt(window.rewardedAdCooldown) || 15;
-                const freqDl = parseInt(window.rewardedAdFrequency) || 3;
-                
-                const lastAdTime = parseInt(localStorage.getItem('sv_last_rewarded_ad')) || 0;
-                let dlCount = parseInt(localStorage.getItem('sv_dl_since_ad')) || 0;
-                
-                const minsSinceLastAd = (now - lastAdTime) / (1000 * 60);
-                const needsAd = (minsSinceLastAd >= cooldownMins) || (dlCount >= freqDl);
-                
-                if (needsAd) {
-                    const modal = document.getElementById('rewarded-ad-modal');
-                    if (modal) {
-                        modal.classList.remove('hidden');
-                        modal.classList.add('flex');
-                        
-                        const timerEl = document.getElementById('rewarded-ad-timer');
-                        const skipBtn = document.getElementById('btn-skip-rewarded');
-                        
-                        let timeLeft = 5;
-                        timerEl.innerText = '05';
-                        skipBtn.disabled = true;
-                        skipBtn.innerText = 'Skip Ad & Download';
-                        
-                        // Force hide ads underneath
-                        if (typeof window.toggleAds === 'function') window.toggleAds(false);
-                        
-                        fetch((window.API_BASE_URL || '') + '/api/ads/track', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({location:'rewarded_video', type:'shown'})}).catch(e=>{});
-                        
-                        return new Promise(resolve => {
-                            const interval = setInterval(() => {
-                                timeLeft--;
-                                timerEl.innerText = '0' + timeLeft;
-                                if (timeLeft <= 0) {
-                                    clearInterval(interval);
-                                    skipBtn.disabled = false;
-                                    skipBtn.innerText = 'Continue to Download';
-                                }
-                            }, 1000);
-                            
-                            skipBtn.onclick = () => {
-                                clearInterval(interval);
-                                modal.classList.remove('flex');
-                                modal.classList.add('hidden');
-                                
-                                fetch((window.API_BASE_URL || '') + '/api/ads/track', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({location:'rewarded_video', type:'completed'})}).catch(e=>{});
-                                
-                                localStorage.setItem('sv_last_rewarded_ad', Date.now());
-                                localStorage.setItem('sv_dl_since_ad', 1); // Count this download
-                                
-                                resolve(_executeInlineDownload(videoData, format, selectedQuality));
-                            };
-                        });
-                    }
-                } else {
-                    localStorage.setItem('sv_dl_since_ad', dlCount + 1);
-                }
-            }
-            // --- END REWARDED AD LOGIC ---
-
             return _executeInlineDownload(videoData, format, selectedQuality);
         }
 
@@ -2072,9 +1968,8 @@
                 <span class="material-symbols-outlined text-error text-4xl">block</span>
             </div>
             <h3 class="text-2xl font-display font-bold text-on-surface mb-2">Limit Reached</h3>
-            <p id="limit-reached-msg" class="text-on-surface-variant mb-5">You have reached your daily download limit. Upgrade to Premium for unlimited downloads and conversions.</p>
+            <p id="limit-reached-msg" class="text-on-surface-variant mb-5">You have reached your daily download limit. Please try again tomorrow.</p>
             <div class="flex flex-col gap-3">
-                <a href="streamvault-upgrade.html" id="btn-upgrade-limit" class="bg-primary text-on-primary font-bold py-2 px-4 rounded-xl hover:bg-primary-container transition-colors shadow-[0_0_20px_rgba(255,85,64,0.3)] block">Upgrade Now</a>
                 <button onclick="document.getElementById('limit-reached-modal').classList.add('hidden')" class="bg-white/5 border border-white/10 text-on-surface font-bold py-2 px-4 rounded-xl hover:bg-white/10 transition-colors">Close</button>
             </div>
         </div>
@@ -2084,12 +1979,6 @@
         function showLimitModal(msg) {
             document.getElementById('limit-reached-msg').innerText = msg;
             document.getElementById('limit-reached-modal').classList.remove('hidden');
-            
-            // Hide the upgrade button if the subscription system is disabled globally
-            if (window.subscriptionEnabled === false) {
-                const upBtn = document.getElementById('btn-upgrade-limit');
-                if (upBtn) upBtn.style.display = 'none';
-            }
         }
     </script>
 

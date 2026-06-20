@@ -994,10 +994,15 @@ app.post('/api/metadata', (req, res) => {
                   { minH: 720, label: '720p HD', rec: false, tier: 'Free' },
                   { minH: 1080, label: '1080p Full HD', rec: false, tier: 'Premium' },
                   { minH: 1440, label: '1440p 2K', rec: false, tier: 'Pro' },
-                  { minH: 2160, label: '2160p 4K', rec: true, tier: 'Lifetime' }
+                  { minH: 360, label: '360p', rec: false },
+                  { minH: 480, label: '480p', rec: false },
+                  { minH: 720, label: '720p HD', rec: false },
+                  { minH: 1080, label: '1080p Full HD', rec: false },
+                  { minH: 1440, label: '1440p 2K', rec: false },
+                  { minH: 2160, label: '2160p 4K', rec: true }
               ];
 
-              resolutionsToFind.forEach(({minH, label, rec, tier}) => {
+              resolutionsToFind.forEach(({minH, label, rec}) => {
                   let maxH = 9999;
                   if (minH === 1440) maxH = 2159;
                   if (minH === 1080) maxH = 1439;
@@ -1199,133 +1204,8 @@ function getFeatureKeyFromUrl(url) {
 }
 
 const checkFeatureAndLimits = (req, res, next) => {
-    try {
-        const mm = db.prepare("SELECT value_json FROM app_settings WHERE key = 'maintenance_mode'").get();
-        if (mm && mm.value_json === 'true') return res.status(503).json({ error: 'System is in maintenance mode' });
-
-        let featureKey = req.body.url ? getFeatureKeyFromUrl(req.body.url) : 'converter_enabled';
-        if (req.originalUrl === '/api/convert') featureKey = 'converter_enabled';
-
-        // 1. Global Check
-        const globalFlag = db.prepare('SELECT value_json FROM app_settings WHERE key = ?').get(featureKey);
-        if (globalFlag && globalFlag.value_json === 'false') {
-            return res.status(403).json({ error: 'This feature is currently disabled globally by administrators' });
-        }
-
-        // Master Subscription Bypass
-        const subEnabled = db.prepare('SELECT value_json FROM app_settings WHERE key = ?').get('subscription_enabled');
-        if (subEnabled && subEnabled.value_json === 'false') {
-            return next(); // Bypass all subscription/plan checks
-        }
-
-        // 2. Identify User
-        let user = null;
-        const token = req.cookies ? req.cookies.token : null;
-        if (token) {
-            try {
-                const decoded = jwt.verify(token, auth.JWT_SECRET);
-                user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.id);
-            } catch(e) {}
-        }
-
-        // Check Login Requirement
-        const loginRequired = db.prepare("SELECT value_json FROM app_settings WHERE key = 'login_enabled'").get();
-        if (loginRequired && loginRequired.value_json === 'true' && !user) {
-            return res.status(401).json({ error: 'Login required to use this feature.' });
-        }
-
-        if (user) {
-            if (user.status === 'suspended') return res.status(403).json({ error: 'Your account is suspended.' });
-            if (user.status === 'banned') return res.status(403).json({ error: 'Your account is banned.' });
-
-            // User Override Check
-            if (user.feature_toggles_json) {
-                try {
-                    const toggles = JSON.parse(user.feature_toggles_json);
-                    if (toggles[featureKey] === false) {
-                        return res.status(403).json({ error: 'This feature has been disabled for your account.' });
-                    }
-                } catch(e){}
-            }
-
-            // Fetch Subscription Limits
-            let limits = { daily_downloads: 10, daily_conversions: 5, converter_access: 0 };
-            try {
-                const sub = db.prepare('SELECT * FROM subscriptions WHERE user_id = ? AND status IN ("active", "lifetime") AND (expiry_date IS NULL OR expiry_date > CURRENT_TIMESTAMP) ORDER BY start_date DESC LIMIT 1').get(user.id);
-                if (sub) {
-                    limits = db.prepare('SELECT * FROM plans WHERE id = ?').get(sub.plan_id);
-                } else {
-                    limits = db.prepare('SELECT * FROM plans WHERE id = "free"').get();
-                }
-            } catch(e) {}
-
-            // Platform Access Check
-            if (featureKey === 'youtube_enabled' && !limits.youtube_enabled) return res.status(403).json({ error: 'YouTube downloads are not available on your current plan.' });
-            if (featureKey === 'instagram_enabled' && !limits.instagram_enabled) return res.status(403).json({ error: 'Instagram downloads are not available on your current plan.' });
-            if (featureKey === 'facebook_enabled' && !limits.facebook_enabled) return res.status(403).json({ error: 'Facebook downloads are not available on your current plan.' });
-
-            // Format Access Check
-            const reqFormat = req.body.format || req.body.ext || (req.body.options && req.body.options.format) || '';
-            const isAudio = reqFormat === 'mp3' || reqFormat === 'm4a' || reqFormat === 'audio' || (req.body.options && req.body.options.extractAudio);
-            if (isAudio && !limits.mp3_enabled) return res.status(403).json({ error: 'Audio (MP3) downloads are not available on your plan.' });
-            if (!isAudio && reqFormat && (reqFormat === 'mp4' || reqFormat === 'video') && !limits.mp4_enabled) return res.status(403).json({ error: 'Video (MP4) downloads are not available on your plan.' });
-
-            // Resolution Check
-            const reqQual = req.body.quality || (req.body.options && req.body.options.quality);
-            if (reqQual && !isAudio) {
-                const q = reqQual.toString().toLowerCase();
-                const allowed = limits.max_resolution || '720p';
-                
-                const resMap = { '360p': 360, '480p': 480, '720p': 720, '1080p': 1080, '1440p': 1440, '4k': 2160, '2160p': 2160, 'best': 2160 };
-                const reqResNum = parseInt(q.replace('p', '')) || (q === 'best' ? 2160 : 0);
-                const allowedNum = resMap[allowed] || 720;
-                
-                if (reqResNum > allowedNum && reqResNum > 0) {
-                    return res.status(403).json({ error: `Your plan limits you to ${allowed} resolution. Please upgrade to download ${q}.` });
-                }
-            }
-
-            // Converter Access Check
-            if (featureKey === 'converter_enabled' && !limits.converter_access) {
-                return res.status(403).json({ error: 'Converter is not available on your current plan. Please upgrade.' });
-            }
-
-            const today = new Date().toISOString().split('T')[0] + ' 00:00:00';
-            const thisMonth = new Date().toISOString().substring(0, 7) + '-01 00:00:00';
-
-            // Daily & Monthly Limit Check
-            if (featureKey !== 'converter_enabled') {
-                const limitD = limits.daily_downloads;
-                const limitM = limits.monthly_downloads;
-                
-                if (limitD !== null && limitD !== -1) {
-                    const countD = db.prepare('SELECT COUNT(*) as c FROM download_history WHERE user_id = ? AND download_date >= ?').get(user.id, today).c;
-                    if (countD >= limitD) return res.status(429).json({ error: `Daily download limit reached (${limitD}). Please wait until tomorrow.` });
-                }
-                if (limitM !== null && limitM !== -1) {
-                    const countM = db.prepare('SELECT COUNT(*) as c FROM download_history WHERE user_id = ? AND download_date >= ?').get(user.id, thisMonth).c;
-                    if (countM >= limitM) return res.status(429).json({ error: `Monthly download limit reached (${limitM}). Please upgrade your plan.` });
-                }
-            } else {
-                const limitD = limits.daily_conversions;
-                const limitM = limits.monthly_conversions;
-                
-                if (limitD !== null && limitD !== -1) {
-                    const countD = db.prepare('SELECT COUNT(*) as c FROM conversion_history WHERE user_id = ? AND conversion_date >= ?').get(user.id, today).c;
-                    if (countD >= limitD) return res.status(429).json({ error: `Daily conversion limit reached (${limitD}). Please wait until tomorrow.` });
-                }
-                if (limitM !== null && limitM !== -1) {
-                    const countM = db.prepare('SELECT COUNT(*) as c FROM conversion_history WHERE user_id = ? AND conversion_date >= ?').get(user.id, thisMonth).c;
-                    if (countM >= limitM) return res.status(429).json({ error: `Monthly conversion limit reached (${limitM}). Please upgrade your plan.` });
-                }
-            }
-        }
-        
-        next();
-    } catch(e) {
-        console.error("Feature limit check error:", e);
-        next();
-    }
+    // 100% Free Mode Configuration: Bypass all login, subscription, and quality limits.
+    next();
 };
 
 // 2. Start download
