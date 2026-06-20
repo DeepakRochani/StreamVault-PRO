@@ -24,6 +24,15 @@ if (typeof window !== 'undefined' && window.location && (window.location.hostnam
 } else {
     window.API_BASE_URL = `https://${window.SUPABASE_PROJECT_REF}.supabase.co/functions/v1`;
     console.log('[StreamVault Config] Production mode — API:', window.API_BASE_URL);
+    
+    // Intercept fetch to fix /api/ prefix for Supabase Edge Functions
+    const originalFetch = window.fetch;
+    window.fetch = async function() {
+        if (typeof arguments[0] === 'string' && arguments[0].startsWith(window.API_BASE_URL + '/api/')) {
+            arguments[0] = arguments[0].replace(window.API_BASE_URL + '/api/', window.API_BASE_URL + '/');
+        }
+        return originalFetch.apply(this, arguments);
+    };
 }
 
 // ── Supabase client init ──────────────────────────────────────
