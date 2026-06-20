@@ -1077,7 +1077,7 @@ app.post('/api/metadata', (req, res) => {
               }
 
               videoFormats = videoFormats.filter((v,i,a)=>a.findIndex(t=>(t.quality===v.quality))===i);
-              videoFormats.sort((a,b) => a.bytes - b.bytes);
+              videoFormats.sort((a,b) => (parseInt(a.quality) || 0) - (parseInt(b.quality) || 0));
 
               console.log("\nAvailable Formats Found:");
               videoFormats.forEach(v => console.log(v.quality));
@@ -1460,19 +1460,10 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
           // Video Quality mapping
           let formatStr = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
           
-          if (!isLegacyVideo && requestedQuality !== 'Original') {
+          if (requestedQuality && requestedQuality !== 'Original' && requestedQuality !== 'best') {
               // Try the exact format_id requested. If it fails, fallback gracefully through resolutions.
+              // Note: We don't enforce [ext=mp4] here so we can grab 4K WebM streams if necessary.
               formatStr = `${requestedQuality}+bestaudio/bestvideo[height<=2160]+bestaudio/bestvideo[height<=1440]+bestaudio/bestvideo[height<=1080]+bestaudio/bestvideo[height<=720]+bestaudio/bestvideo[height<=480]+bestaudio/bestvideo[height<=360]+bestaudio/bestvideo+bestaudio/best`;
-          } else if (requestedQuality.toLowerCase() === '4k') {
-              formatStr = 'bestvideo[height<=2160]+bestaudio/bestvideo[height<=1440]+bestaudio/bestvideo[height<=1080]+bestaudio/bestvideo[height<=720]+bestaudio/bestvideo+bestaudio/best';
-          } else if (requestedQuality.toLowerCase() === '1080p') {
-              formatStr = 'bestvideo[height<=1080]+bestaudio/bestvideo[height<=720]+bestaudio/bestvideo[height<=480]+bestaudio/bestvideo+bestaudio/best';
-          } else if (requestedQuality.toLowerCase() === '720p') {
-              formatStr = 'bestvideo[height<=720]+bestaudio/bestvideo[height<=480]+bestaudio/bestvideo[height<=360]+bestaudio/bestvideo+bestaudio/best';
-          } else if (requestedQuality.toLowerCase() === '480p') {
-              formatStr = 'bestvideo[height<=480]+bestaudio/bestvideo[height<=360]+bestaudio/bestvideo+bestaudio/best';
-          } else if (requestedQuality.toLowerCase() === '360p') {
-              formatStr = 'bestvideo[height<=360]+bestaudio/bestvideo+bestaudio/best';
           }
 
           ytdlpArgs = [
@@ -1484,7 +1475,7 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
             '--no-update', '--js-runtimes', 'node', '--remote-components', 'ejs:github',
             ...(cookiesPath ? ['--cookies', cookiesPath] : []),
             '--format', formatStr,
-            '--merge-output-format', 'mp4',
+            '--remux-video', 'mp4',
             '--ffmpeg-location', ffmpegPath,
             '-o', destPath,
             targetUrl
