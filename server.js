@@ -884,7 +884,7 @@ app.post('/api/metadata', (req, res) => {
     }
 
     // Use yt-dlp --dump-json to extract metadata quickly without downloading
-    const args = ['--dump-json', '--no-warnings', '--no-playlist', '--extractor-args', 'youtube:player_client=android'];
+    const args = ['--dump-json', '--no-warnings', '--no-playlist', '--extractor-args', 'youtube:player_client=android,web'];
     if (cookiesPath) {
         args.push('--cookies', cookiesPath);
     }
@@ -982,18 +982,28 @@ app.post('/api/metadata', (req, res) => {
               console.log("\n=== VERIFY BACKEND ===");
               console.log("format_id | resolution | filesize | fps | video codec | audio codec");
               
-              const allVids = metadata.formats.filter(f => f.vcodec !== 'none');
+              // Filter out storyboards, mhtml, and audio-only formats
+              const totalFormats = metadata.formats.length;
+              let rejectedCount = 0;
+              
+              const allVids = metadata.formats.filter(f => {
+                  if (f.vcodec === 'none' || f.vcodec === 'mhtml' || f.vcodec === 'images' || (f.format_id && f.format_id.startsWith('sb'))) {
+                      rejectedCount++;
+                      return false;
+                  }
+                  return true;
+              });
+              
+              console.log(`Total formats found: ${totalFormats}`);
+              console.log(`Filtered (real video) formats: ${allVids.length}`);
+              console.log(`Rejected formats: ${rejectedCount}`);
+              
               allVids.forEach(f => {
                   console.log(`${f.format_id} | ${f.width}x${f.height} | ${f.filesize || f.filesize_approx} | ${f.fps} | ${f.vcodec} | ${f.acodec}`);
               });
               console.log("======================\n");
 
               const resolutionsToFind = [
-                  { minH: 360, label: '360p', rec: false, tier: 'Free' },
-                  { minH: 480, label: '480p', rec: false, tier: 'Free' },
-                  { minH: 720, label: '720p HD', rec: false, tier: 'Free' },
-                  { minH: 1080, label: '1080p Full HD', rec: false, tier: 'Premium' },
-                  { minH: 1440, label: '1440p 2K', rec: false, tier: 'Pro' },
                   { minH: 360, label: '360p', rec: false },
                   { minH: 480, label: '480p', rec: false },
                   { minH: 720, label: '720p HD', rec: false },
@@ -1002,7 +1012,17 @@ app.post('/api/metadata', (req, res) => {
                   { minH: 2160, label: '2160p 4K', rec: true }
               ];
 
-              resolutionsToFind.forEach(({minH, label, rec}) => {
+              // Remove duplicate resolution mappings since we stripped the tier logic
+              const uniqueResolutionsToFind = [];
+              const seenMinH = new Set();
+              for (const r of resolutionsToFind) {
+                  if (!seenMinH.has(r.minH)) {
+                      seenMinH.add(r.minH);
+                      uniqueResolutionsToFind.push(r);
+                  }
+              }
+
+              uniqueResolutionsToFind.forEach(({minH, label, rec}) => {
                   let maxH = 9999;
                   if (minH === 1440) maxH = 2159;
                   if (minH === 1080) maxH = 1439;
@@ -1408,7 +1428,7 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
             '--no-playlist',
             '--no-warnings',
             '--newline',
-            '--extractor-args', 'youtube:player_client=android',
+            '--extractor-args', 'youtube:player_client=android,web',
             ...(cookiesPath ? ['--cookies', cookiesPath] : []),
             '--extract-audio',
             '--audio-format', 'mp3',
@@ -1456,7 +1476,7 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
             '--no-playlist',
             '--no-warnings',
             '--newline',
-            '--extractor-args', 'youtube:player_client=android',
+            '--extractor-args', 'youtube:player_client=android,web',
             ...(cookiesPath ? ['--cookies', cookiesPath] : []),
             '--format', formatStr,
             '--merge-output-format', 'mp4',

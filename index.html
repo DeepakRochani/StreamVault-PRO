@@ -1385,13 +1385,6 @@
                             html += createQualityChip('video', f.quality, f.id, f.sizeStr, f.recommended, details.join(' • '));
                             count++;
                         });
-                    } else {
-                        const sizes = videoData.sizes || {};
-                        if (sizes.Original) { html += createQualityChip('video', 'Original Quality', 'Original', sizes.Original, true); count++; }
-                        if (sizes.v4k && !sizes.Original) { html += createQualityChip('video', '4K', '4k', sizes.v4k, true); count++; }
-                        if (sizes.v1080) { html += createQualityChip('video', '1080p', '1080p', sizes.v1080); count++; }
-                        if (sizes.v720) { html += createQualityChip('video', '720p', '720p', sizes.v720); count++; }
-                        if (sizes.v480) { html += createQualityChip('video', '480p', '480p', sizes.v480); count++; }
                     }
                     if (count === 0) { 
                         const actualErr = videoData.extractionError || videoData.stderr || "No explicit stderr returned. (Check stdout)";
