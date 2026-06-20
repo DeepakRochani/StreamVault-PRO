@@ -11,6 +11,20 @@ const http = require('http');
 const os = require('os');
 const { exec, execFile, execSync, spawn } = require('child_process');
 
+// --- YouTube Cookie Setup ---
+let cookiesPath = null;
+if (process.env.YOUTUBE_COOKIES) {
+    try {
+        cookiesPath = path.join(os.tmpdir(), 'youtube-cookies.txt');
+        fs.writeFileSync(cookiesPath, process.env.YOUTUBE_COOKIES, 'utf8');
+        console.log('[Daemon] Successfully loaded YOUTUBE_COOKIES from environment.');
+    } catch (e) {
+        console.error('[Daemon] Failed to write YOUTUBE_COOKIES:', e.message);
+    }
+} else if (fs.existsSync(path.join(__dirname, 'cookies.txt'))) {
+    cookiesPath = path.join(__dirname, 'cookies.txt');
+    console.log('[Daemon] Successfully loaded cookies.txt from local file.');
+}
 
 // Resolve local yt-dlp if packaged in Electron or deployed to server
 let ytDlpPath = process.platform === 'win32' 
@@ -871,6 +885,9 @@ app.post('/api/metadata', (req, res) => {
 
     // Use yt-dlp --dump-json to extract metadata quickly without downloading
     const args = ['--dump-json', '--no-warnings', '--no-playlist', '--extractor-args', 'youtube:player_client=android_vr'];
+    if (cookiesPath) {
+        args.push('--cookies', cookiesPath);
+    }
     
     args.push(url);
     
@@ -1490,6 +1507,7 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
             '--no-warnings',
             '--newline',
             '--extractor-args', 'youtube:player_client=android_vr',
+            ...(cookiesPath ? ['--cookies', cookiesPath] : []),
             '--extract-audio',
             '--audio-format', 'mp3',
             '--ffmpeg-location', ffmpegPath,
@@ -1537,6 +1555,7 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
             '--no-warnings',
             '--newline',
             '--extractor-args', 'youtube:player_client=android_vr',
+            ...(cookiesPath ? ['--cookies', cookiesPath] : []),
             '--format', formatStr,
             '--merge-output-format', 'mp4',
             '--ffmpeg-location', ffmpegPath,
