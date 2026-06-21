@@ -224,18 +224,18 @@ router.get('/me', (req, res) => {
     if (!token) return res.json({ loggedIn: false });
     
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
         const user = db.prepare('SELECT id, email, name, join_date, last_login, settings_json, role, status, plan, auto_update, auto_download_updates FROM users WHERE id = ?').get(decoded.id);
         if (!user || user.status === 'blocked') return res.json({ loggedIn: false });
         
         try {
-            const sub = db.prepare('SELECT * FROM subscriptions WHERE user_id = ? AND status IN ("active", "lifetime") AND (expiry_date IS NULL OR expiry_date > CURRENT_TIMESTAMP) ORDER BY start_date DESC LIMIT 1').get(user.id);
+            const sub = db.prepare("SELECT * FROM subscriptions WHERE user_id = ? AND status IN ('active', 'lifetime') AND (expiry_date IS NULL OR expiry_date > CURRENT_TIMESTAMP) ORDER BY start_date DESC LIMIT 1").get(user.id);
             if (sub) {
                 user.subscription = sub;
                 user.limits = db.prepare('SELECT * FROM plans WHERE id = ?').get(sub.plan_id);
             } else {
                 // Default to Free plan limits if no active subscription exists
-                user.limits = db.prepare('SELECT * FROM plans WHERE id = "free"').get();
+                user.limits = db.prepare("SELECT * FROM plans WHERE id = 'free'").get();
                 user.subscription = { status: 'expired', plan_id: 'free' };
             }
         } catch(e) { 
@@ -280,7 +280,7 @@ router.post('/notifications/:id/read', (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
         db.prepare(`
             INSERT INTO user_notifications (user_id, notification_id, is_read, read_at)
             VALUES (?, ?, 1, CURRENT_TIMESTAMP)
@@ -296,7 +296,7 @@ router.get('/history/downloads', (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
         const history = db.prepare('SELECT * FROM download_history WHERE user_id = ? ORDER BY download_date DESC').all(decoded.id);
         res.json({ success: true, history });
     } catch(e) {
@@ -308,7 +308,7 @@ router.get('/history/conversions', (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
         const history = db.prepare('SELECT * FROM conversion_history WHERE user_id = ? ORDER BY conversion_date DESC').all(decoded.id);
         res.json({ success: true, history });
     } catch(e) {
@@ -320,12 +320,12 @@ router.get('/stats', (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
         const dlCount = db.prepare('SELECT COUNT(*) as c FROM download_history WHERE user_id = ?').get(decoded.id).c;
         const cvCount = db.prepare('SELECT COUNT(*) as c FROM conversion_history WHERE user_id = ?').get(decoded.id).c;
-        const ytCount = db.prepare('SELECT COUNT(*) as c FROM download_history WHERE user_id = ? AND platform = "YouTube"').get(decoded.id).c;
-        const igCount = db.prepare('SELECT COUNT(*) as c FROM download_history WHERE user_id = ? AND platform = "Instagram"').get(decoded.id).c;
-        const fbCount = db.prepare('SELECT COUNT(*) as c FROM download_history WHERE user_id = ? AND platform = "Facebook"').get(decoded.id).c;
+        const ytCount = db.prepare("SELECT COUNT(*) as c FROM download_history WHERE user_id = ? AND platform = 'YouTube'").get(decoded.id).c;
+        const igCount = db.prepare("SELECT COUNT(*) as c FROM download_history WHERE user_id = ? AND platform = 'Instagram'").get(decoded.id).c;
+        const fbCount = db.prepare("SELECT COUNT(*) as c FROM download_history WHERE user_id = ? AND platform = 'Facebook'").get(decoded.id).c;
         res.json({ success: true, stats: { dlCount, cvCount, ytCount, igCount, fbCount } });
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -334,7 +334,7 @@ router.delete('/history/downloads/:id', (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
         db.prepare('DELETE FROM download_history WHERE id = ? AND user_id = ?').run(req.params.id, decoded.id);
         res.json({ success: true });
     } catch(e) { res.status(500).json({ error: e.message }); }
@@ -344,7 +344,7 @@ router.delete('/history/conversions/:id', (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
         db.prepare('DELETE FROM conversion_history WHERE id = ? AND user_id = ?').run(req.params.id, decoded.id);
         res.json({ success: true });
     } catch(e) { res.status(500).json({ error: e.message }); }
@@ -354,7 +354,7 @@ router.post('/settings', (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
         const newSettings = req.body;
         db.prepare('UPDATE users SET settings_json = ? WHERE id = ?').run(JSON.stringify(newSettings), decoded.id);
         res.json({ success: true });
@@ -365,7 +365,7 @@ router.post('/settings/auto-update', (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
         const { key, value } = req.body;
         if (key === 'auto_update') {
             db.prepare('UPDATE users SET auto_update = ? WHERE id = ?').run(value, decoded.id);
@@ -394,7 +394,7 @@ const logConversionHistory = (userId, type, fileName, filePath) => {
 const logDownloadWithToken = (token, platform, fileName, filePath, fileSize) => {
     if (!token) return;
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
         logDownloadHistory(decoded.id, platform, fileName, filePath, fileSize);
     } catch(e) {}
 };
@@ -402,7 +402,7 @@ const logDownloadWithToken = (token, platform, fileName, filePath, fileSize) => 
 const logConversionWithToken = (token, type, fileName, filePath) => {
     if (!token) return;
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
         logConversionHistory(decoded.id, type, fileName, filePath);
     } catch(e) {}
 };

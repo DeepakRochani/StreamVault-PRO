@@ -19,6 +19,7 @@
     "wait-on": "^9.0.10"
   },
   "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@xaviabot/fb-downloader": "^1.0.14",
     "bcryptjs": "^3.0.3",
@@ -29,6 +30,7 @@
     "fluent-ffmpeg": "^2.1.3",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
+    "play-dl": "^1.9.7",
     "snapsave-media-downloader": "^2.4.0"
   },
   "build": {

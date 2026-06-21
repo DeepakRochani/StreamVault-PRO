@@ -29,14 +29,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         const settingsRes = await fetch((window.API_BASE_URL || '') + '/api/public-settings');
         const settingsData = await settingsRes.json();
-        window.loginEnabled = settingsData.settings.login_enabled === 'true';
-        window.subscriptionEnabled = settingsData.settings.subscription_enabled;
-        window.planPremiumEnabled = settingsData.settings.plan_premium_enabled;
-        window.planProEnabled = settingsData.settings.plan_pro_enabled;
-        window.planLifetimeEnabled = settingsData.settings.plan_lifetime_enabled;
-        window.rewardedAdsEnabled = settingsData.settings.rewarded_ads_enabled;
-        window.rewardedAdCooldown = settingsData.settings.rewarded_ad_cooldown_mins;
-        window.rewardedAdFrequency = settingsData.settings.rewarded_ad_frequency_downloads;
+        
+        window.loginEnabled = settingsData.login_enabled === true || settingsData.login_enabled === 'true';
+        window.subscriptionEnabled = settingsData.subscription_enabled;
+        window.planPremiumEnabled = settingsData.plan_premium_enabled;
+        window.planProEnabled = settingsData.plan_pro_enabled;
+        window.planLifetimeEnabled = settingsData.plan_lifetime_enabled;
+        window.rewardedAdsEnabled = settingsData.rewarded_ads_enabled;
+        window.rewardedAdCooldown = settingsData.rewarded_ad_cooldown_mins;
+        window.rewardedAdFrequency = settingsData.rewarded_ad_frequency_downloads;
         
         if (typeof window.onSettingsLoaded === 'function') {
             window.onSettingsLoaded();

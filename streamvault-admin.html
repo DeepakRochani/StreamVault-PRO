@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7928165411445722"
+     crossorigin="anonymous"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StreamVault PRO - Admin Panel</title>
@@ -2908,10 +2910,10 @@
                 document.getElementById('flag-cv').checked = c.converter_enabled === 'true';
                 document.getElementById('flag-mm').checked = c.maintenance_mode === 'true';
                 document.getElementById('flag-ads').checked = c.ads_enabled === 'true';
-                document.getElementById('flag-playlist').checked = c.playlist_enabled === 'true';
-                document.getElementById('flag-batch').checked = c.batch_enabled === 'true';
-                document.getElementById('flag-4k').checked = c['4k_enabled'] === 'true';
-                document.getElementById('flag-history').checked = c.history_enabled === 'true';
+                if(document.getElementById('flag-playlist')) document.getElementById('flag-playlist').checked = c.playlist_enabled === 'true';
+                if(document.getElementById('flag-batch')) document.getElementById('flag-batch').checked = c.batch_enabled === 'true';
+                if(document.getElementById('flag-4k')) document.getElementById('flag-4k').checked = c['4k_enabled'] === 'true';
+                if(document.getElementById('flag-history')) document.getElementById('flag-history').checked = c.history_enabled === 'true';
                 document.getElementById('flag-login').checked = c.login_enabled === 'true';
                 
                 document.getElementById('flag-subscription').checked = c.subscription_enabled === 'true';
@@ -2949,10 +2951,10 @@
                 converter_enabled: document.getElementById('flag-cv').checked ? 'true' : 'false',
                 maintenance_mode: document.getElementById('flag-mm').checked ? 'true' : 'false',
                 ads_enabled: document.getElementById('flag-ads').checked ? 'true' : 'false',
-                playlist_enabled: document.getElementById('flag-playlist').checked ? 'true' : 'false',
-                batch_enabled: document.getElementById('flag-batch').checked ? 'true' : 'false',
-                '4k_enabled': document.getElementById('flag-4k').checked ? 'true' : 'false',
-                history_enabled: document.getElementById('flag-history').checked ? 'true' : 'false',
+                playlist_enabled: document.getElementById('flag-playlist') ? (document.getElementById('flag-playlist').checked ? 'true' : 'false') : 'false',
+                batch_enabled: document.getElementById('flag-batch') ? (document.getElementById('flag-batch').checked ? 'true' : 'false') : 'false',
+                '4k_enabled': document.getElementById('flag-4k') ? (document.getElementById('flag-4k').checked ? 'true' : 'false') : 'false',
+                history_enabled: document.getElementById('flag-history') ? (document.getElementById('flag-history').checked ? 'true' : 'false') : 'false',
                 login_enabled: document.getElementById('flag-login').checked ? 'true' : 'false',
                 subscription_enabled: document.getElementById('flag-subscription').checked ? 'true' : 'false',
                 plan_premium_enabled: document.getElementById('flag-plan-premium').checked ? 'true' : 'false',

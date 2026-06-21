@@ -153,7 +153,7 @@ router.post('/subscriptions/grant', requireAdmin, (req, res) => {
         }
 
         // Deactivate old active subscriptions
-        db.prepare('UPDATE subscriptions SET status = "expired" WHERE user_id = ? AND status IN ("active", "lifetime")').run(user_id);
+        db.prepare("UPDATE subscriptions SET status = 'expired' WHERE user_id = ? AND status IN ('active', 'lifetime')").run(user_id);
 
         db.prepare('INSERT INTO subscriptions (id, user_id, plan_id, status, expiry_date, payment_provider) VALUES (?, ?, ?, ?, ?, "manual")')
           .run(id, user_id, plan_id, status, expiry);
@@ -236,7 +236,7 @@ router.post('/subscriptions/:id/extend', requireAdmin, (req, res) => {
         const base = sub.expiry_date ? new Date(sub.expiry_date) : new Date();
         base.setDate(base.getDate() + parseInt(days));
         const newExpiry = base.toISOString().replace('T', ' ').substring(0, 19);
-        db.prepare('UPDATE subscriptions SET expiry_date = ?, status = "active" WHERE id = ?').run(newExpiry, req.params.id);
+        db.prepare("UPDATE subscriptions SET expiry_date = ?, status = 'active' WHERE id = ?").run(newExpiry, req.params.id);
         try { db.prepare('INSERT INTO subscription_history (user_id, subscription_id, action, details) VALUES (?,?,?,?)').run(sub.user_id, sub.id, 'extended', JSON.stringify({ days, new_expiry: newExpiry, by: req.adminUser.id })); } catch(e) {}
         res.json({ success: true, new_expiry: newExpiry });
     } catch(e) { res.status(500).json({ error: e.message }); }
