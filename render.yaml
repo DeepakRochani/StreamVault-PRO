@@ -18,8 +18,7 @@ services:
         value: /opt/render/project/data
       - key: SUPABASE_URL
         value: https://xphhazisatxmlulhqxvi.supabase.co
-      - key: SUPABASE_ANON_KEY
-        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwaGhhemlzYXR4bWx1bGhxeHZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MjE3MDgsImV4cCI6MjA5NzQ5NzcwOH0.AXKS6RQjzGJYCig5mzWoCwKQ6e27TWLX2GAlvTsInwM
+
     disk:
       name: streamvault-data
       mountPath: /opt/render/project/data

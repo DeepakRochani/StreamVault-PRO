@@ -55,8 +55,7 @@
       "updater.js",
       "providers/**/*",
       "node_modules/**/*",
-      "bin/**/*",
-      "cookies.txt"
+      "bin/**/*"
     ],
     "win": {
       "target": [

@@ -10,21 +10,7 @@ const https = require('https');
 const http = require('http');
 const os = require('os');
 const { exec, execFile, execSync, spawn } = require('child_process');
-
-// --- YouTube Cookie Setup ---
-let cookiesPath = null;
-if (process.env.YOUTUBE_COOKIES) {
-    try {
-        cookiesPath = path.join(os.tmpdir(), 'youtube-cookies.txt');
-        fs.writeFileSync(cookiesPath, process.env.YOUTUBE_COOKIES, 'utf8');
-        console.log('[Daemon] Successfully loaded YOUTUBE_COOKIES from environment.');
-    } catch (e) {
-        console.error('[Daemon] Failed to write YOUTUBE_COOKIES:', e.message);
-    }
-} else if (fs.existsSync(path.join(__dirname, 'cookies.txt'))) {
-    cookiesPath = path.join(__dirname, 'cookies.txt');
-    console.log('[Daemon] Successfully loaded cookies.txt from local file.');
-}
+const ytDlpService = require('./services/ytDlpService');
 
 // Resolve local yt-dlp if packaged in Electron or deployed to server
 let ytDlpPath = process.platform === 'win32' 
@@ -36,7 +22,7 @@ if (ytDlpPath.includes('app.asar')) {
 }
 if (!fs.existsSync(ytDlpPath)) {
     // If not in bin folder, fallback to global PATH
-    ytDlpPath = 'yt-dlp'; 
+    ytDlpPath = '/Users/drfilms/Library/Python/3.9/bin/yt-dlp'; // Fallback to absolute path on Mac
 }
 
 const app = express();
@@ -46,6 +32,9 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
   next();
 });
 app.use(express.json());
@@ -855,10 +844,23 @@ app.delete('/api/metadata', (req, res) => {
   return res.json({ success: true });
 });
 
-app.post('/api/metadata', (req, res) => {
+app.post('/api/metadata', async (req, res) => {
   try {
-    const { url } = req.body;
+    let { url } = req.body;
     if (!url) return res.status(400).json({ error: 'url is required' });
+
+    if (url.includes('youtube.com/shorts/')) {
+        url = url.replace('youtube.com/shorts/', 'youtube.com/watch?v=');
+    }
+
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.searchParams.has('list')) parsedUrl.searchParams.delete('list');
+      if (parsedUrl.searchParams.has('index')) parsedUrl.searchParams.delete('index');
+      url = parsedUrl.toString();
+    } catch (e) {
+      // Ignore
+    }
 
     console.log(`[Daemon POST /api/metadata] Fetching metadata for: ${url}`);
     
@@ -884,33 +886,42 @@ app.post('/api/metadata', (req, res) => {
     }
 
     // Use yt-dlp --dump-json to extract metadata quickly without downloading
-    const args = ['--dump-json', '--no-warnings', '--no-playlist', '--no-update', '--js-runtimes', 'node', '--remote-components', 'ejs:github'];
-    if (cookiesPath) {
-        args.push('--cookies', cookiesPath);
-    }
+    const args = ['--dump-json', '--no-playlist', '--no-update', '--extractor-args', 'youtube:player-client=android,web'];
     
     args.push(url);
+    console.log(`[YT-DLP COMMAND EXECUTING] ${ytDlpPath} ${args.join(' ')}`);
     
-    const process = spawn(ytDlpPath, args);
     let output = '';
     let errorOutput = '';
+    let code = 0;
+    let parseError = null;
 
-    process.on('error', (err) => {
-        console.error(`[Daemon] Failed to start yt-dlp process:`, err);
-        errorOutput += `Failed to start: ${err.message}`;
-        // Manually trigger fallback by calling the logic inside close
-        // But since we can't easily jump, we can just let it timeout or return an error directly.
-        return res.status(500).json({ error: 'Internal Server Error', details: `Extraction engine failed to start: ${err.message}` });
-    });
+    try {
+        const result = await ytDlpService.fetchWithRetryAndFallback(ytDlpPath, args);
+        output = result.stdout;
+        errorOutput = result.stderr;
+    } catch (err) {
+        code = err.code || -1;
+        output = err.stdout || '';
+        errorOutput = err.stderr || err.message;
+        
+        console.log(`[YT-DLP COMMAND] ${ytDlpPath} ${args.join(' ')}`);
+        console.log(`[STDOUT LENGTH]`, output.length);
+        console.log(`[STDERR]`, errorOutput);
+        console.log(`[EXIT CODE]`, code);
 
-    process.stdout.on('data', (data) => { output += data.toString(); });
-    process.stderr.on('data', (data) => { errorOutput += data.toString(); });
+        return res.status(500).json({
+            success: false,
+            actual_error: errorOutput || 'Extraction failed with no output',
+            stdout: output,
+            stderr: errorOutput,
+            exit_code: code,
+            yt_dlp_command: `${ytDlpPath} ${args.join(' ')}`
+        });
+    }
 
-    process.on('close', async (code) => {
-      let parseError = null;
-      if (code === 0) {
-        try {
-          const metadata = JSON.parse(output);
+    try {
+        const metadata = JSON.parse(output);
           // ... (keep the rest the same)
 
           
@@ -1140,78 +1151,23 @@ app.post('/api/metadata', (req, res) => {
           });
         } catch (e) {
           parseError = e.stack || e.message;
-          console.error("JSON parse failed, falling back. Output:", output.substring(0, 200));
-        }
-      }
+          console.error("JSON parse failed. Output:", output.substring(0, 200));
+          
+          console.log(`[YT-DLP COMMAND] ${ytDlpPath} ${args.join(' ')}`);
+          console.log(`[STDOUT LENGTH]`, output.length);
+          console.log(`[STDERR]`, errorOutput);
+          console.log(`[EXIT CODE]`, code);
 
-      // Instead of falling back silently, return the exact failure details to the frontend
-      console.log(`[YT-DLP COMMAND] ${ytDlpPath} ${args.join(' ')}`);
-      
-      // Do not log huge stdout payload to console
-      console.log(`[STDOUT LENGTH]`, output.length);
-      console.log(`[STDERR]`, errorOutput);
-      console.log(`[EXIT CODE]`, code);
-
-      return res.status(500).json({
-          success: false,
-          parse_error: parseError,
-          actual_error: errorOutput || output || 'Extraction failed with no output',
-          stdout: output,
-          stderr: errorOutput,
-          exit_code: code,
-          yt_dlp_command: `${ytDlpPath} ${args.join(' ')}`
-      });
-
-      // Dead code: Fallback logic removed as requested by the user to prevent hiding errors
-      /*
-      if (url.includes('facebook') || url.includes('fb.watch')) {
-          try {
-              const fb = require('@xaviabot/fb-downloader');
-              const result = await fb(url);
-              if (result && (result.sd || result.hd)) {
-              return sendResponse({
-                      title: result.title || "Facebook Video",
-                      thumbnail: result.thumbnail || "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80&w=400",
-                      duration: null,
-                      platform: 'Facebook',
-                      sizes: {
-                          Original: result.hd ? 'Unknown' : null,
-                          v480: result.sd ? 'Unknown' : null
-                      }
-                  });
-              }
-          } catch(e) {
-              console.log("[Daemon] Xaviabot fallback failed:", e.message);
-          }
-      }
-
-      // Final fallback to Open Graph
-      const proto = url.startsWith('https') ? require('https') : require('http');
-      const reqConfig = {
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-          timeout: 5000
-      };
-      
-      proto.get(url, reqConfig, (ogRes) => {
-          let html = '';
-          ogRes.on('data', chunk => html += chunk);
-          ogRes.on('end', () => {
-              const titleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i);
-              const imgMatch = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i);
-              
-              return sendResponse({
-                  title: titleMatch ? titleMatch[1] : null,
-                  thumbnail: imgMatch ? imgMatch[1].replace(/&amp;/g, '&') : null,
-                  duration: null,
-                  platform: url.includes('facebook') ? 'Facebook' : url.includes('instagram') ? 'Instagram' : 'Web',
-                  sizes: null
-              });
+          return res.status(500).json({
+              success: false,
+              parse_error: parseError,
+              actual_error: errorOutput || output || 'Extraction failed with no output',
+              stdout: output,
+              stderr: errorOutput,
+              exit_code: code,
+              yt_dlp_command: `${ytDlpPath} ${args.join(' ')}`
           });
-      }).on('error', (err) => {
-          return res.status(500).json({ error: 'Failed to extract metadata', details: err.message });
-      });
-      */
-    });
+        }
 
   } catch (err) {
     console.error("[Express] /api/metadata crash:", err);
@@ -1236,7 +1192,22 @@ const checkFeatureAndLimits = (req, res, next) => {
 // 2. Start download
 app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
   try {
-    const { url, filename, id } = req.body;
+    let { url, filename, id } = req.body;
+
+    if (url && url.includes('youtube.com/shorts/')) {
+        url = url.replace('youtube.com/shorts/', 'youtube.com/watch?v=');
+    }
+
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.searchParams.has('list')) parsedUrl.searchParams.delete('list');
+      if (parsedUrl.searchParams.has('index')) parsedUrl.searchParams.delete('index');
+      url = parsedUrl.toString();
+    } catch (e) {
+      // Ignore
+    }
+    
+    req.body.url = url;
     
     console.log(`[Daemon POST /api/download] Input request:`, {
       requestUrl: req.originalUrl,
@@ -1431,10 +1402,10 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
             '-v', // Verbose debugging
             ...platformArgs,
             '--no-playlist',
-            '--no-warnings',
             '--newline',
-            '--no-update', '--js-runtimes', 'node', '--remote-components', 'ejs:github',
-            ...(cookiesPath ? ['--cookies', cookiesPath] : []),
+            '--no-update',
+            '--extractor-args', 'youtube:player-client=android,web',
+            '--cookies-from-browser', 'chrome',
             '--extract-audio',
             '--audio-format', 'mp3',
             '--ffmpeg-location', ffmpegPath,
@@ -1470,10 +1441,9 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
             '-v', // Verbose debugging
             ...platformArgs,
             '--no-playlist',
-            '--no-warnings',
             '--newline',
-            '--no-update', '--js-runtimes', 'node', '--remote-components', 'ejs:github',
-            ...(cookiesPath ? ['--cookies', cookiesPath] : []),
+            '--no-update',
+            '--extractor-args', 'youtube:player-client=android,web',
             '--format', formatStr,
             '--remux-video', 'mp4',
             '--ffmpeg-location', ffmpegPath,
@@ -1482,118 +1452,121 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
           ];
         }
         
-        const ytdlp = spawn(ytDlpPath, ytdlpArgs);
-        
-        downloads[id].debugInfo.commandExecuted = `${ytDlpPath} ${ytdlpArgs.join(' ')}`;
-
-        console.log(`\n====================================`);
-        console.log(`[DOWNLOAD START] Task ID: ${id}`);
-        console.log(`URL: ${url}`);
-        console.log(`Format: ${format}, Quality: ${requestedQuality}`);
-        console.log(`Dest: ${destPath}`);
-        console.log(`[YT-DLP COMMAND] ${ytDlpPath} ${ytdlpArgs.join(' ')}`);
-        console.log(`====================================\n`);
-
         let ytdlpOutputLog = '';
-        ytdlp.stdout.on('data', (data) => {
-           ytdlpOutputLog += data.toString();
-           const lines = data.toString().split('\n');
-           for (const line of lines) {
-              if (!line.trim()) continue;
-              
-              if (line.includes('[download]') && line.includes('%')) {
-                 // Example: [download]   1.0% of    6.13MiB at    1.94MiB/s ETA 00:03
-                 const progressMatch = line.match(/\[download\]\s+([\d\.]+)%\s+of\s+([^\s]+)\s+at\s+([^\s]+)/);
-                 if (progressMatch) {
-                    downloads[id].progress = parseFloat(progressMatch[1]);
-                    downloads[id].speed = progressMatch[3].replace('MiB/s', 'MB/s').replace('KiB/s', 'KB/s');
-                    downloads[id].contentLength = progressMatch[2];
-                 }
-              } else if (line.includes('[Merger]')) {
-                 downloads[id].status = 'saving';
-                 downloads[id].log.push('Download complete. Merging video and audio tracks (4K support)...');
-              }
-           }
-        });
-
         let ytdlpErrorLog = '';
-        ytdlp.stderr.on('data', (data) => {
-           const chunk = data.toString();
-           downloads[id].log.push(`yt-dlp: ${chunk.trim()}`);
-           ytdlpErrorLog += chunk;
-           downloads[id].debugInfo.fullOutput += chunk;
-        });
 
-        ytdlp.on('close', (code) => {
-           if (code === 0 && fs.existsSync(destPath)) {
-              // Final media validation to ensure we didn't just merge a garbage file
-              const fd = fs.openSync(destPath, 'r');
-              const buf = Buffer.alloc(16);
-              fs.readSync(fd, buf, 0, 16, 0);
-              fs.closeSync(fd);
-              const sniff = sniffMediaBytes(buf);
+        try {
+           const result = await ytDlpService.downloadWithRetryAndFallback(ytDlpPath, ytdlpArgs, (ytdlp, attemptArgs) => {
+              downloads[id].debugInfo.commandExecuted = `${ytDlpPath} ${attemptArgs.join(' ')}`;
               
-              if (sniff.isMedia === false) {
-                 downloads[id].status = 'failed';
-                 downloads[id].error = 'Downloaded file failed media validation (HTML/JSON disguised as MP4).';
-                 downloads[id].log.push('Validation Failed! Magic bytes do not match expected media signatures.');
-                 fs.unlinkSync(destPath);
-                 return;
-              }
+              console.log(`\n====================================`);
+              console.log(`[DOWNLOAD START] Task ID: ${id}`);
+              console.log(`URL: ${url}`);
+              console.log(`Format: ${format}, Quality: ${requestedQuality}`);
+              console.log(`Dest: ${destPath}`);
+              console.log(`[YT-DLP COMMAND] ${ytDlpPath} ${attemptArgs.join(' ')}`);
+              console.log(`====================================\n`);
+
+              ytdlpOutputLog = ''; // Reset on new attempt
+              ytdlpErrorLog = ''; // Reset on new attempt
+
+              ytdlp.stdout.on('data', (data) => {
+                 ytdlpOutputLog += data.toString();
+                 const lines = data.toString().split('\n');
+                 for (const line of lines) {
+                    if (!line.trim()) continue;
+                    
+                    if (line.includes('[download]') && line.includes('%')) {
+                       // Example: [download]   1.0% of    6.13MiB at    1.94MiB/s ETA 00:03
+                       const progressMatch = line.match(/\[download\]\s+([\d\.]+)%\s+of\s+([^\s]+)\s+at\s+([^\s]+)/);
+                       if (progressMatch) {
+                          downloads[id].progress = parseFloat(progressMatch[1]);
+                          downloads[id].speed = progressMatch[3].replace('MiB/s', 'MB/s').replace('KiB/s', 'KB/s');
+                          downloads[id].contentLength = progressMatch[2];
+                       }
+                    } else if (line.includes('[Merger]')) {
+                       downloads[id].status = 'saving';
+                       downloads[id].log.push('Download complete. Merging video and audio tracks (4K support)...');
+                    }
+                 }
+              });
+
+              ytdlp.stderr.on('data', (data) => {
+                 const chunk = data.toString();
+                 downloads[id].log.push(`yt-dlp: ${chunk.trim()}`);
+                 ytdlpErrorLog += chunk;
+                 downloads[id].debugInfo.fullOutput += chunk;
+              });
               
+              return {}; // We don't have an abort signal here, but we could add one if we wanted.
+           });
+
+           // Final media validation to ensure we didn't just merge a garbage file
+           const fd = fs.openSync(destPath, 'r');
+           const buf = Buffer.alloc(16);
+           fs.readSync(fd, buf, 0, 16, 0);
+           fs.closeSync(fd);
+           const sniff = sniffMediaBytes(buf);
+           
+           if (sniff.isMedia === false) {
+              downloads[id].status = 'failed';
+              downloads[id].error = 'Downloaded file failed media validation (HTML/JSON disguised as MP4).';
+              downloads[id].log.push('Validation Failed! Magic bytes do not match expected media signatures.');
+              fs.unlinkSync(destPath);
+           } else {
               const stats = fs.statSync(destPath);
               if (stats.size === 0) {
                  downloads[id].status = 'failed';
                  downloads[id].error = 'Downloaded file is empty (0 bytes).';
                  downloads[id].log.push('Validation Failed! File is empty.');
                  fs.unlinkSync(destPath);
-                 return;
+              } else {
+                 downloads[id].path = destPath;
+                 downloads[id].status = 'completed';
+                 logDownloadIfToken(id);
+                 downloads[id].progress = 100;
+                 downloads[id].speed = '0 MB/s';
+                 console.log(`[Daemon] Download ID ${id} finished successfully via yt-dlp.`);
               }
-              
-              // The file stays in the .temp directory
-              downloads[id].path = destPath;
-              
-              downloads[id].status = 'completed';
-              logDownloadIfToken(id);
-              downloads[id].progress = 100;
-              downloads[id].speed = '0 MB/s';
-              console.log(`[Daemon] Download ID ${id} finished successfully via yt-dlp.`);
-           } else {
-              downloads[id].status = 'failed';
-              if (!downloads[id].error) {
-                 if (ytdlpErrorLog.includes('cookie database') || ytdlpErrorLog.includes('database is locked')) {
-                    downloads[id].error = 'Facebook requires authentication. We tried to read your Microsoft Edge cookies to bypass Chrome locks, but Edge is currently open. Please close Edge or log into Facebook on Edge first.';
-                 } else if (ytdlpErrorLog.includes('No module named yt_dlp')) {
-                    downloads[id].error = 'yt-dlp is not installed. Run installation command: pip install yt-dlp';
-                 } else {
-                    let realError = '';
-                    const errorLines = ytdlpErrorLog.split('\n');
-                    for (const line of errorLines) {
-                        if (line.includes('ERROR:')) {
-                            realError = line.substring(line.indexOf('ERROR:') + 6).trim();
-                            break;
-                        }
-                    }
-                    if (!realError && ytdlpErrorLog.trim().length > 0) {
-                        const nonEmpty = errorLines.filter(l => l.trim().length > 0);
-                        if (nonEmpty.length > 0) realError = nonEmpty[nonEmpty.length - 1].trim();
-                    }
-                    if (realError) {
-                        downloads[id].error = `yt-dlp error: ${realError}`;
-                    } else {
-                        downloads[id].error = `Extraction/Download failed (yt-dlp exited with code ${code})`;
-                    }
-                 }
-              }
-              console.log(`\n====================================`);
-              console.log(`[DOWNLOAD FAILED] Task ID: ${id}`);
-              console.log(`Exit Code: ${code}`);
-              console.log(`[YT-DLP STDERR]\n${ytdlpErrorLog.trim()}`);
-              console.log(`[YT-DLP STDOUT]\n${ytdlpOutputLog.trim()}`);
-              console.log(`UI Error Exposed: ${downloads[id].error}`);
-              console.log(`====================================\n`);
            }
-        });
+        } catch (err) {
+           downloads[id].status = 'failed';
+           ytdlpErrorLog = err.stderr || err.error || ytdlpErrorLog;
+           
+           if (ytdlpErrorLog.includes('cookie database') || ytdlpErrorLog.includes('database is locked')) {
+              downloads[id].error = 'Facebook requires authentication. We tried to read your Microsoft Edge cookies to bypass Chrome locks, but Edge is currently open. Please close Edge or log into Facebook on Edge first.';
+           } else if (ytdlpErrorLog.includes('No module named yt_dlp')) {
+              downloads[id].error = 'yt-dlp is not installed. Run installation command: pip install yt-dlp';
+           } else if (err.knownError) {
+              downloads[id].error = err.knownError;
+           } else {
+              let realError = '';
+              const errorLines = ytdlpErrorLog.split('\n');
+              for (const line of errorLines) {
+                  if (line.includes('ERROR:')) {
+                      realError = line.substring(line.indexOf('ERROR:') + 6).trim();
+                      break;
+                  }
+              }
+              if (!realError && ytdlpErrorLog.trim().length > 0) {
+                  const nonEmpty = errorLines.filter(l => l.trim().length > 0);
+                  if (nonEmpty.length > 0) realError = nonEmpty[nonEmpty.length - 1].trim();
+              }
+              if (realError) {
+                  downloads[id].error = `yt-dlp error: ${realError}`;
+              } else {
+                  downloads[id].error = `Extraction/Download failed (yt-dlp exited with code ${err.code})`;
+              }
+           }
+           
+           console.log(`\n====================================`);
+           console.log(`[DOWNLOAD FAILED] Task ID: ${id}`);
+           console.log(`Exit Code: ${err.code}`);
+           console.log(`[YT-DLP STDERR]\n${ytdlpErrorLog.trim()}`);
+           console.log(`[YT-DLP STDOUT]\n${ytdlpOutputLog.trim()}`);
+           console.log(`UI Error Exposed: ${downloads[id].error}`);
+           console.log(`====================================\n`);
+        }
       } else {
         downloads[id].log.push('Direct media stream confirmed by pre-flight check.');
         console.log(`[Daemon] Pre-flight checks complete. Launching task ID ${id}: ${url} -> ${destPath}`);
@@ -1701,67 +1674,70 @@ app.post('/api/social/metadata', async (req, res) => {
         } 
         
         if (type === 'instagram') {
-            const args = ['--dump-json', '--no-warnings', '--no-playlist', url];
-            const child = spawn(ytDlpPath, args);
+            const args = ['--dump-json', '--no-playlist', url];
             let output = '';
             let errorOutput = '';
+            let code = 0;
 
-            child.stdout.on('data', (data) => { output += data.toString(); });
-            child.stderr.on('data', (data) => { errorOutput += data.toString(); });
+            try {
+                const result = await ytDlpService.fetchWithRetryAndFallback(ytDlpPath, args);
+                output = result.stdout;
+            } catch (err) {
+                errorOutput = err.stderr || err.message;
+                code = err.code || -1;
+            }
 
-            child.on('close', (code) => {
-                if (code === 0) {
-                    try {
-                        const lines = output.split('\n');
-                        let metadata = null;
-                        for (let line of lines) {
-                            try {
-                                metadata = JSON.parse(line.trim());
-                                if (metadata) break;
-                            } catch(e) {}
-                        }
-                        if (!metadata) throw new Error("No valid JSON found in output");
-                        
-                        let vFormats = [];
-                        if (metadata.formats) {
-                            const vids = metadata.formats.filter(f => f.vcodec !== 'none' && f.url);
-                            if (vids.length > 0) {
-                                vids.sort((a,b) => (b.height || 0) - (a.height || 0));
-                                vFormats.push({
-                                    format_id: vids[0].format_id,
-                                    resolution: vids[0].height ? vids[0].height + 'p' : 'Original',
-                                    qualityLabel: vids[0].height ? vids[0].height + 'p Original' : 'Original Quality',
-                                    filesize: 'Unknown',
-                                    isAudio: false,
-                                    url: vids[0].url
-                                });
-                            }
-                        }
-                        
-                        if (vFormats.length === 0 && metadata.url) {
-                            vFormats.push({ format_id: 'best', resolution: 'Original', qualityLabel: 'Original Quality', filesize: 'Unknown', isAudio: false, url: metadata.url });
-                        }
-
-                        return res.json({
-                            title: metadata.title || 'Instagram Media',
-                            thumbnail: metadata.thumbnail || null,
-                            duration: metadata.duration || null,
-                            videoFormats: vFormats,
-                            audioFormats: []
-                        });
-                    } catch (parseErr) {
-                        return res.status(500).json({ error: 'Failed to parse JSON from yt-dlp' });
+            if (code === 0) {
+                try {
+                    const lines = output.split('\n');
+                    let metadata = null;
+                    for (let line of lines) {
+                        try {
+                            metadata = JSON.parse(line.trim());
+                            if (metadata) break;
+                        } catch(e) {}
                     }
-                } else {
-                    console.error("[Daemon] yt-dlp social failed:", errorOutput);
-                    let displayErr = 'Extraction Failed';
-                    if (errorOutput.includes('empty media response') || errorOutput.includes('logged-in')) displayErr = 'Login Required';
-                    if (errorOutput.includes('Unsupported URL')) displayErr = 'Unsupported URL';
-                    if (errorOutput.includes('Video unavailable')) displayErr = 'Video Unavailable';
+                    if (!metadata) throw new Error("No valid JSON found in output");
                     
-                    return res.status(400).json({ error: displayErr, details: errorOutput });
+                    let vFormats = [];
+                    if (metadata.formats) {
+                        const vids = metadata.formats.filter(f => f.vcodec !== 'none' && f.url);
+                        if (vids.length > 0) {
+                            vids.sort((a,b) => (b.height || 0) - (a.height || 0));
+                            vFormats.push({
+                                format_id: vids[0].format_id,
+                                resolution: vids[0].height ? vids[0].height + 'p' : 'Original',
+                                qualityLabel: vids[0].height ? vids[0].height + 'p Original' : 'Original Quality',
+                                filesize: 'Unknown',
+                                isAudio: false,
+                                url: vids[0].url
+                            });
+                        }
+                    }
+                    
+                    if (vFormats.length === 0 && metadata.url) {
+                        vFormats.push({ format_id: 'best', resolution: 'Original', qualityLabel: 'Original Quality', filesize: 'Unknown', isAudio: false, url: metadata.url });
+                    }
+
+                    return res.json({
+                        title: metadata.title || 'Instagram Media',
+                        thumbnail: metadata.thumbnail || null,
+                        duration: metadata.duration || null,
+                        videoFormats: vFormats,
+                        audioFormats: []
+                    });
+                } catch (parseErr) {
+                    return res.status(500).json({ error: 'Failed to parse JSON from yt-dlp' });
                 }
-            });
+            } else {
+                console.error("[Daemon] yt-dlp social failed:", errorOutput);
+                let displayErr = 'Extraction Failed';
+                if (errorOutput.includes('empty media response') || errorOutput.includes('logged-in')) displayErr = 'Login Required';
+                if (errorOutput.includes('Unsupported URL')) displayErr = 'Unsupported URL';
+                if (errorOutput.includes('Video unavailable')) displayErr = 'Video Unavailable';
+                
+                return res.status(400).json({ error: displayErr, details: errorOutput });
+            }
         }
     } catch (err) {
         console.error("[Express] /api/social/metadata crash:", err);
@@ -1849,37 +1825,43 @@ app.post('/api/social/download', checkFeatureAndLimits, async (req, res) => {
             }
         } else {
             const spawnArgs = ['--newline', '--no-playlist', '--ffmpeg-location', globalFfmpegPath, '-o', destPath, url];
-            const ytchild = spawn(ytDlpPath, spawnArgs);
             downloads[id].status = 'downloading';
             
-            console.log(`\n====================================`);
-            console.log(`[DOWNLOAD START] Fallback Task ID: ${id}`);
-            console.log(`URL: ${url}`);
-            console.log(`Dest: ${destPath}`);
-            console.log(`[YT-DLP COMMAND] yt-dlp ${spawnArgs.join(' ')}`);
-            console.log(`====================================\n`);
-            
-            let ytchildErrorLog = '';
-            ytchild.stderr.on('data', (data) => {
-                ytchildErrorLog += data.toString();
-            });
-
             let ytchildOutputLog = '';
-            ytchild.stdout.on('data', (data) => {
-                ytchildOutputLog += data.toString();
-                const lines = data.toString().split('\n');
-                lines.forEach(line => {
-                    if (line.includes('%')) {
-                        const match = line.match(/(\d+\.?\d*)%/);
-                        if (match) downloads[id].progress = parseFloat(match[1]);
-                        const speedMatch = line.match(/at\s+(\d+\.?\d*[KMG]iB\/s)/);
-                        if (speedMatch) downloads[id].speed = speedMatch[1].replace('iB', 'B');
-                    }
+            let ytchildErrorLog = '';
+
+            try {
+                await ytDlpService.downloadWithRetryAndFallback(ytDlpPath, spawnArgs, (ytchild, attemptArgs) => {
+                    console.log(`\n====================================`);
+                    console.log(`[DOWNLOAD START] Fallback Task ID: ${id}`);
+                    console.log(`URL: ${url}`);
+                    console.log(`Dest: ${destPath}`);
+                    console.log(`[YT-DLP COMMAND] yt-dlp ${attemptArgs.join(' ')}`);
+                    console.log(`====================================\n`);
+                    
+                    ytchildErrorLog = '';
+                    ytchild.stderr.on('data', (data) => {
+                        ytchildErrorLog += data.toString();
+                    });
+
+                    ytchildOutputLog = '';
+                    ytchild.stdout.on('data', (data) => {
+                        ytchildOutputLog += data.toString();
+                        const lines = data.toString().split('\n');
+                        lines.forEach(line => {
+                            if (line.includes('%')) {
+                                const match = line.match(/(\d+\.?\d*)%/);
+                                if (match) downloads[id].progress = parseFloat(match[1]);
+                                const speedMatch = line.match(/at\s+(\d+\.?\d*[KMG]iB\/s)/);
+                                if (speedMatch) downloads[id].speed = speedMatch[1].replace('iB', 'B');
+                            }
+                        });
+                    });
+                    
+                    return {};
                 });
-            });
-            
-            ytchild.on('close', (code) => {
-                if (code === 0 && fs.existsSync(destPath)) {
+
+                if (fs.existsSync(destPath)) {
                     const stats = fs.statSync(destPath);
                     if (stats.size > 0) {
                         // The file stays in the .temp directory
@@ -1887,6 +1869,7 @@ app.post('/api/social/download', checkFeatureAndLimits, async (req, res) => {
                         downloads[id].status = 'completed';
                         logDownloadIfToken(id);
                         downloads[id].progress = 100;
+                        console.log(`[Daemon] Social Download ID ${id} fallback finished successfully.`);
                     } else {
                         downloads[id].status = 'failed';
                         downloads[id].error = 'Download failed (file is empty)';
@@ -1894,6 +1877,15 @@ app.post('/api/social/download', checkFeatureAndLimits, async (req, res) => {
                     }
                 } else {
                     downloads[id].status = 'failed';
+                    downloads[id].error = 'Download failed (file not found)';
+                }
+            } catch (err) {
+                downloads[id].status = 'failed';
+                ytchildErrorLog = err.stderr || err.error || ytchildErrorLog;
+                
+                if (err.knownError) {
+                    downloads[id].error = err.knownError;
+                } else {
                     let realError = '';
                     const errorLines = ytchildErrorLog.split('\n');
                     for (const line of errorLines) {
@@ -1909,20 +1901,18 @@ app.post('/api/social/download', checkFeatureAndLimits, async (req, res) => {
                     if (realError) {
                         downloads[id].error = `yt-dlp error: ${realError}`;
                     } else {
-                        downloads[id].error = `Download failed (Code ${code})`;
+                        downloads[id].error = `Download failed (Code ${err.code})`;
                     }
                 }
-                
-                if (downloads[id].status === 'failed') {
-                    console.log(`\n====================================`);
-                    console.log(`[DOWNLOAD FAILED] Fallback Task ID: ${id}`);
-                    console.log(`Exit Code: ${code}`);
-                    console.log(`[YT-DLP STDERR]\n${ytchildErrorLog.trim()}`);
-                    console.log(`[YT-DLP STDOUT]\n${ytchildOutputLog.trim()}`);
-                    console.log(`UI Error Exposed: ${downloads[id].error}`);
-                    console.log(`====================================\n`);
-                }
-            });
+
+                console.log(`\n====================================`);
+                console.log(`[DOWNLOAD FAILED] Fallback Task ID: ${id}`);
+                console.log(`Exit Code: ${err.code}`);
+                console.log(`[YT-DLP STDERR]\n${ytchildErrorLog.trim()}`);
+                console.log(`[YT-DLP STDOUT]\n${ytchildOutputLog.trim()}`);
+                console.log(`UI Error Exposed: ${downloads[id].error}`);
+                console.log(`====================================\n`);
+            }
             return res.json({ success: true, message: 'Social fallback download started', id });
         }
     } catch (err) {
@@ -2398,8 +2388,8 @@ app.get('/api/system-check', (req, res) => {
     const { execSync } = require('child_process');
     let pyVersion = 'Not installed', ytdlpVersion = 'Not installed', ffmpegVersion = 'Not installed';
     
-    try { pyVersion = execSync('python --version', {stdio: 'pipe'}).toString().trim(); } catch(e){}
-    try { ytdlpVersion = execSync('python -m yt_dlp --version', {stdio: 'pipe'}).toString().trim(); } catch(e){}
+    try { pyVersion = execSync('python3 --version', {stdio: 'pipe'}).toString().trim(); } catch(e){}
+    try { ytdlpVersion = ytDlpService.execYtDlpSync(ytDlpPath, ['--version']).toString().trim(); } catch(e){}
     try { ffmpegVersion = execSync('"' + require('@ffmpeg-installer/ffmpeg').path + '" -version', {stdio: 'pipe'}).toString().split('\n')[0].trim(); } catch(e){}
 
     const status = (pyVersion !== 'Not installed' && ytdlpVersion !== 'Not installed' && ffmpegVersion !== 'Not installed') ? 'OK' : 'DEGRADED';
@@ -2416,15 +2406,18 @@ app.listen(PORT, () => {
   console.log('\n[STARTUP CHECK] Verifying Python Environment...');
   
   try {
-      execSync('python --version', {stdio: 'pipe'});
+      execSync('python3 --version', {stdio: 'pipe'});
       console.log('✓ Python is installed.');
   } catch(e) {
       console.error('❌ ERROR: Python is not installed or not in PATH.');
   }
   
   try {
-      execSync('python -c "import yt_dlp"', {stdio: 'pipe'});
+      ytDlpService.execYtDlpSync(ytDlpPath, ['--version']);
       console.log('✓ yt-dlp module is installed.');
+      
+      const systemService = require('./services/systemService');
+      systemService.updateYtDlp(ytDlpPath).catch(err => console.error('Failed to update yt-dlp:', err));
   } catch(e) {
       console.error('❌ ERROR: yt-dlp is not installed. Run installation command: pip install yt-dlp');
   }

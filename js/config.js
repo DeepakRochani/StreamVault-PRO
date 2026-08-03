@@ -12,7 +12,7 @@ window.SUPABASE_PROJECT_REF = 'xphhazisatxmlulhqxvi';
 
 // ── Supabase Auth configuration ──────────────────────────────
 window.SUPABASE_URL     = 'https://xphhazisatxmlulhqxvi.supabase.co';
-window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwaGhhemlzYXR4bWx1bGhxeHZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MjE3MDgsImV4cCI6MjA5NzQ5NzcwOH0.AXKS6RQjzGJYCig5mzWoCwKQ6e27TWLX2GAlvTsInwM';
+window.SUPABASE_ANON_KEY = 'sb_publishable_t2N8YtpcPHjVFJzrMlLr5Q_pL9ppUiP';
 
 // ── API base URL ──────────────────────────────────────────────
 // Edge Function URLs: https://<project-ref>.supabase.co/functions/v1/<name>
