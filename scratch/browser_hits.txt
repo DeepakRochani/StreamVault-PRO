@@ -1,0 +1,35 @@
+auth.js:42:        let browser = 'Unknown Browser';
+auth.js:43:        if (ua.includes('Edg')) browser = 'Edge';
+auth.js:44:        else if (ua.includes('Chrome')) browser = 'Chrome';
+auth.js:45:        else if (ua.includes('Firefox')) browser = 'Firefox';
+auth.js:46:        else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari';
+auth.js:48:        const deviceId = crypto.createHash('md5').update(`${userId}-${os}-${browser}`).digest('hex');
+auth.js:52:            INSERT INTO user_devices (id, user_id, device_type, os, browser, last_active) 
+auth.js:55:        `).run(deviceId, userId, deviceType, os, browser);
+database.js:105:            browser TEXT,
+server.js:814:        // Automatically clean up the .temp file after 1 hour to allow browser download manager to make multiple requests
+server.js:1408:            '--cookies-from-browser', 'chrome',
+server.js:2241:                // Automatically clean up the .temp file after it has been fully transmitted to the browser
+temp2.js:1319:            // Create a hidden anchor tag to trigger the browser's native download manager
+temp2.js:1340:            statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> File Ready for Download<br><span class="text-xs text-on-surface-variant break-all">Check your browser's download manager.</span>`;
+temp2.js:1385:            // We check the manual save path from the input (although it's mainly for backend saves if implemented, here it triggers browser save)
+temp2.js:1407:            statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> File Ready for Download<br><span class="text-xs text-on-surface-variant break-all">Check your browser's download manager.</span>`;
+temp3.js:1318:            // Create a hidden anchor tag to trigger the browser's native download manager
+temp3.js:1339:            statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> File Ready for Download<br><span class="text-xs text-on-surface-variant break-all">Check your browser's download manager.</span>`;
+temp3.js:1384:            // We check the manual save path from the input (although it's mainly for backend saves if implemented, here it triggers browser save)
+temp3.js:1406:            statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> File Ready for Download<br><span class="text-xs text-on-surface-variant break-all">Check your browser's download manager.</span>`;
+update_frontend.js:79:                    // Trigger browser download by hitting the new delivery endpoint
+update_frontend.js:94:                                // Automatically trigger the browser download stream
+services/cookieValidator.js:49:        // If expiration is 0, it's a session cookie and doesn't expire until browser closes,
+services/ytDlpService.js:14:    return 'YouTube requires sign-in to confirm you are not a bot. Please use browser cookies.';
+services/ytDlpService.js:17:    return 'YouTube page reloaded error. This is usually caused by outdated cookies. Try updating them or using a different browser for cookies.';
+services/ytDlpService.js:125:    installedBrowsers.forEach(b => cookieStrategies.push({ type: 'browser', value: b }));
+services/ytDlpService.js:139:      a !== '--cookies-from-browser' && a !== '--cookies' && 
+services/ytDlpService.js:140:      (idx === 0 || (arr[idx-1] !== '--cookies-from-browser' && arr[idx-1] !== '--cookies'))
+services/ytDlpService.js:145:    } else if (strategy.type === 'browser') {
+services/ytDlpService.js:146:      attemptArgs.push('--cookies-from-browser', strategy.value);
+services/ytDlpService.js:186:    installedBrowsers.forEach(b => cookieStrategies.push({ type: 'browser', value: b }));
+services/ytDlpService.js:200:      a !== '--cookies-from-browser' && a !== '--cookies' && 
+services/ytDlpService.js:201:      (idx === 0 || (arr[idx-1] !== '--cookies-from-browser' && arr[idx-1] !== '--cookies'))
+services/ytDlpService.js:206:    } else if (strategy.type === 'browser') {
+services/ytDlpService.js:207:      attemptArgs.push('--cookies-from-browser', strategy.value);

@@ -5,6 +5,9 @@ const { spawn } = require('child_process');
 let mainWindow;
 let serverProcess;
 
+const DEFAULT_PORT = process.env.PORT || '10000';
+const API_BASE_URL = process.env.API_BASE_URL || process.env.VITE_API_URL || `http://127.0.0.1:${DEFAULT_PORT}`;
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -24,7 +27,6 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false);
 
   // Load the Express server address
-  const API_BASE_URL = process.env.API_BASE_URL || process.env.VITE_API_URL || 'http://127.0.0.1:10000';
   mainWindow.loadURL(API_BASE_URL);
   
   mainWindow.on('closed', function () {
@@ -38,8 +40,8 @@ function startExpressServer() {
   const env = { 
     ...process.env, 
     NODE_ENV: 'production', 
-    PORT: '3000',
-    JWT_SECRET: 'streamvault_desktop_local_secret_2026',
+    PORT: String(DEFAULT_PORT),
+    JWT_SECRET: process.env.JWT_SECRET || 'streamvault_desktop_local_secret_2026',
     ELECTRON_RUN_AS_NODE: '1'
   };
   

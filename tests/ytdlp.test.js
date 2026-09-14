@@ -37,7 +37,7 @@ const runTests = async () => {
       ytDlpPath = ytDlpPath.replace('app.asar', 'app.asar.unpacked');
   }
   if (!fs.existsSync(ytDlpPath)) {
-      ytDlpPath = '/Users/drfilms/Library/Python/3.9/bin/yt-dlp'; // Fallback
+      ytDlpPath = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
   }
 
   for (const testCase of testUrls) {

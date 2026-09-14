@@ -1,0 +1,45 @@
+{
+  "id": "vb0ofn",
+  "formats": [
+    {
+      "format_id": "mp4-360p",
+      "ext": "mp4",
+      "vcodec": null,
+      "acodec": null,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "format_id": "webm-480p",
+      "ext": "webm",
+      "vcodec": null,
+      "acodec": null,
+      "width": 854,
+      "height": 480
+    },
+    {
+      "format_id": "mp4-480p",
+      "ext": "mp4",
+      "vcodec": null,
+      "acodec": null,
+      "width": 854,
+      "height": 480
+    },
+    {
+      "format_id": "mp4-720p",
+      "ext": "mp4",
+      "vcodec": null,
+      "acodec": null,
+      "width": 1280,
+      "height": 720
+    },
+    {
+      "format_id": "mp4-1080p",
+      "ext": "mp4",
+      "vcodec": null,
+      "acodec": null,
+      "width": 1920,
+      "height": 1080
+    }
+  ]
+}

@@ -1237,7 +1237,7 @@
                         return; // Exit silently
                     }
                     console.warn("[StreamVault] Failed to fetch metadata", e);
-                    throw new Error("Backend Offline. Please check your backend deployment URL.");
+                    throw new Error(e.message && e.message !== 'Failed to fetch' ? e.message : "Backend Offline. Please check your backend deployment URL.");
                 }
             } else {
                 try {
@@ -1346,11 +1346,11 @@
                 if (currentBtn) currentBtn.disabled = !ready;
             }
 
-            function createQualityChip(type, name, value, sizeStr, isRecommended = false, extraDetails = '') {
+            function createQualityChip(type, name, value, sizeStr, isRecommended = false, extraDetails = '', isLocked = false) {
                 return `
-                    <label class="relative cursor-pointer group">
-                        <input class="sr-only quality-radio" name="${type}_quality" type="radio" value="${value}" data-size="${sizeStr}"/>
-                        <div class="glass-panel rounded-xl p-4 min-h-[88px] flex items-center justify-between transition-all duration-200 border-2 border-transparent group-hover:border-white/20 quality-card relative overflow-hidden bg-surface-container-high/50">
+                    <label class="relative ${isLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer group'}">
+                        <input class="sr-only quality-radio" name="${type}_quality" type="radio" value="${value}" data-size="${sizeStr}" ${isLocked ? 'disabled' : ''}/>
+                        <div class="glass-panel rounded-xl p-4 min-h-[88px] flex items-center justify-between transition-all duration-200 border-2 border-transparent ${isLocked ? '' : 'group-hover:border-white/20'} quality-card relative overflow-hidden bg-surface-container-high/50">
                             <div class="flex items-center gap-4">
                                 <div class="w-5 h-5 rounded-full border-2 border-outline-variant flex items-center justify-center radio-border">
                                     <div class="w-2.5 h-2.5 rounded-full bg-transparent transform scale-0 transition-transform duration-200 radio-inner"></div>
@@ -1358,14 +1358,15 @@
                                 <div>
                                     <div class="flex items-center flex-wrap gap-y-1 mb-1">
                                         <span class="font-title-md text-title-md text-on-surface">${name}</span>
-                                        ${isRecommended ? '<span class="bg-primary/20 text-primary px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ml-2 border border-primary/30 shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.2)]">Recommended</span>' : ''}
+                                        ${isRecommended && !isLocked ? '<span class="bg-primary/20 text-primary px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ml-2 border border-primary/30 shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.2)]">Recommended</span>' : ''}
+                                        ${isLocked ? '<span class="bg-warning/20 text-warning px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ml-2 border border-warning/30 shadow-[0_0_8px_rgba(var(--md-sys-color-warning),0.2)] flex items-center gap-1"><span class="material-symbols-outlined text-[12px] leading-none">lock</span> PRO</span>' : ''}
                                     </div>
                                     ${extraDetails ? `<div class="text-xs text-on-surface-variant/70 font-medium tracking-wide mt-1">${extraDetails}</div>` : ''}
                                 </div>
                             </div>
                             <div class="flex items-center gap-4">
                                 <span class="font-title-md text-title-md text-on-surface">~ ${sizeStr}</span>
-                                <span class="material-symbols-outlined text-primary opacity-0 check-icon transition-opacity">check_circle</span>
+                                ${!isLocked ? '<span class="material-symbols-outlined text-primary opacity-0 check-icon transition-opacity">check_circle</span>' : ''}
                             </div>
                         </div>
                     </label>
@@ -1384,7 +1385,9 @@
                             if (f.fps) details.push(f.fps);
                             if (f.codec && f.codec !== 'Unknown') details.push(f.codec);
                             
-                            html += createQualityChip('video', f.quality, f.id, f.sizeStr, f.recommended, details.join(' • '));
+                            let isLocked = false;
+                            
+                            html += createQualityChip('video', f.quality, f.id, f.sizeStr, f.recommended && !isLocked, details.join(' • '), isLocked);
                             count++;
                         });
                     }
@@ -1576,13 +1579,29 @@
 
             const isAudio = format === 'mp3';
             let filename  = (videoData.title || 'download').replace(/[/\\?%*:|"<>]/g, '-');
+            
+            if (selectedQuality && selectedQuality !== 'best' && selectedQuality !== 'Original') {
+                // Append quality to filename to ensure unique files for different formats
+                filename += `_${selectedQuality}`;
+            }
+            
             if (!filename.toLowerCase().endsWith('.mp4') && !filename.toLowerCase().endsWith('.mp3')) {
                 filename += isAudio ? '.mp3' : '.mp4';
             }
 
             try {
-                // ── Call Local /api/download Function ─────
-                const targetUrl = (window.API_BASE_URL || '') + '/api/download';
+                const parsedUrl = URLParser.detectPlatform(videoData.url);
+                const isSocial = parsedUrl.type === 'facebook' || parsedUrl.type === 'instagram' || parsedUrl.type === 'twitter' || parsedUrl.type === 'tiktok';
+                const dlEndpoint = isSocial ? '/api/social/download' : '/api/download';
+                const targetUrl = (window.API_BASE_URL || '') + dlEndpoint;
+                
+                let formatUrl = null;
+                let formatId = selectedQuality;
+                if (isSocial && videoData.videoFormats) {
+                    const matchedFormat = videoData.videoFormats.find(f => (f.id || f.format_id) === selectedQuality);
+                    if (matchedFormat && matchedFormat.url) formatUrl = matchedFormat.url;
+                }
+
                 console.log("=== DOWNLOAD REQUEST TRACE ===");
                 console.log("Request URL:", targetUrl);
                 console.log("Request Method:", "POST");
@@ -1590,9 +1609,11 @@
                 const reqBody = {
                     url:     videoData.url,
                     quality: selectedQuality,
-                    format:  format,
+                    format:  isAudio ? 'audio' : 'video',
                     filename: filename,
-                    id:      'dl-' + Date.now()
+                    id:      'dl-' + Date.now(),
+                    format_url: formatUrl,
+                    format_id: formatId
                 };
 
                 const dlRes = await fetch(targetUrl, {

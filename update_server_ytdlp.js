@@ -20,7 +20,7 @@ if (ytDlpPath.includes('app.asar')) {
     ytDlpPath = ytDlpPath.replace('app.asar', 'app.asar.unpacked');
 }
 if (!fs.existsSync(ytDlpPath)) {
-    ytDlpPath = 'yt-dlp'; // fallback
+    ytDlpPath = '/Users/drfilms/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/bin/yt-dlp'; // fallback
 }
 `;
 

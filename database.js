@@ -35,7 +35,7 @@ setInterval(async () => {
     } catch(err) {
         console.error(`[Database] Failed to create daily backup:`, err);
     }
-}, 24 * 60 * 60 * 1000); // 24 hours
+}, 24 * 60 * 60 * 1000).unref(); // 24 hours
 
 function initDB() {
     db.exec(`

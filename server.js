@@ -13,17 +13,23 @@ const { exec, execFile, execSync, spawn } = require('child_process');
 const ytDlpService = require('./services/ytDlpService');
 
 // Resolve local yt-dlp if packaged in Electron or deployed to server
-let ytDlpPath = process.platform === 'win32' 
-    ? path.join(__dirname, 'bin', 'yt-dlp.exe') 
-    : path.join(__dirname, 'bin', 'yt-dlp');
-    
-if (ytDlpPath.includes('app.asar')) {
-    ytDlpPath = ytDlpPath.replace('app.asar', 'app.asar.unpacked');
+function resolveYtDlpBinary() {
+    if (process.env.YTDLP_PATH && fs.existsSync(process.env.YTDLP_PATH)) {
+        return process.env.YTDLP_PATH;
+    }
+    let localBin = process.platform === 'win32' 
+        ? path.join(__dirname, 'bin', 'yt-dlp.exe') 
+        : path.join(__dirname, 'bin', 'yt-dlp');
+        
+    if (localBin.includes('app.asar')) {
+        localBin = localBin.replace('app.asar', 'app.asar.unpacked');
+    }
+    if (fs.existsSync(localBin)) {
+        return localBin;
+    }
+    return process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
 }
-if (!fs.existsSync(ytDlpPath)) {
-    // If not in bin folder, fallback to global PATH
-    ytDlpPath = '/Users/drfilms/Library/Python/3.9/bin/yt-dlp'; // Fallback to absolute path on Mac
-}
+let ytDlpPath = resolveYtDlpBinary();
 
 const app = express();
 
@@ -138,6 +144,210 @@ function logDownloadIfToken(id) {
         }
         
         if (auth && auth.logDownloadWithToken) auth.logDownloadWithToken(job.userToken, platform, job.filename, job.path, size);
+    }
+}
+
+function processTrimming(downloadId, destPath, start, end, callback) {
+    const job = downloads[downloadId];
+    if (!job) return callback(new Error('Job not found'));
+    job.status = 'processing';
+    job.log.push(`Trimming media: start=${start}, end=${end}`);
+    const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+    const { spawn } = require('child_process');
+    
+    const ext = path.extname(destPath);
+    const outputPath = destPath.replace(ext, `_trimmed${ext}`);
+    
+    const args = [];
+    args.push('-i', destPath);
+    if (start) {
+        args.push('-ss', start);
+    }
+    if (end) {
+        args.push('-to', end);
+    }
+    args.push('-c', 'copy');
+    args.push('-y', outputPath);
+    
+    const ffmpeg = spawn(ffmpegPath, args);
+    let ffmpegErr = '';
+    ffmpeg.stderr.on('data', (data) => {
+        ffmpegErr += data.toString();
+    });
+    
+    ffmpeg.on('close', (code) => {
+        if (code === 0 && fs.existsSync(outputPath)) {
+            fs.unlinkSync(destPath);
+            fs.renameSync(outputPath, destPath);
+            job.log.push(`Trimming successful.`);
+            callback(null);
+        } else {
+            console.error(`[FFmpeg Error]: ${ffmpegErr}`);
+            job.log.push(`Trimming failed: FFmpeg exited with code ${code}`);
+            callback(new Error(`Trimming failed with code ${code}`));
+        }
+    });
+}
+
+function postProcessVideo(id, destPath, callback) {
+    const job = downloads[id];
+    if (!job) return callback(new Error('Job not found'));
+    
+    let ffprobePath;
+    let ffmpegPath;
+    try {
+        ffprobePath = require('@ffprobe-installer/ffprobe').path;
+        if (ffprobePath.includes('app.asar')) ffprobePath = ffprobePath.replace('app.asar', 'app.asar.unpacked');
+        
+        ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+        if (ffmpegPath.includes('app.asar')) ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+    } catch (err) {
+        job.log.push('FFprobe/FFmpeg installer missing. Skipping post-processing.');
+        return callback(null, destPath);
+    }
+
+    const fluentFfmpeg = require('fluent-ffmpeg');
+    fluentFfmpeg.setFfmpegPath(ffmpegPath);
+    fluentFfmpeg.setFfprobePath(ffprobePath);
+
+    job.status = 'processing';
+    job.log.push('Inspecting video for compatibility (H.264/AAC)...');
+
+    fluentFfmpeg.ffprobe(destPath, (err, metadata) => {
+        if (err) {
+            job.log.push(`FFprobe error: ${err.message}. Skipping conversion.`);
+            return callback(null, destPath);
+        }
+
+        let hasVideo = false;
+        let needsVideoEncode = false;
+        let needsAudioEncode = false;
+
+        if (metadata && metadata.streams) {
+            for (const stream of metadata.streams) {
+                if (stream.codec_type === 'video') {
+                    hasVideo = true;
+                    if (stream.codec_name !== 'h264') {
+                        needsVideoEncode = true;
+                    }
+                }
+                if (stream.codec_type === 'audio') {
+                    if (stream.codec_name !== 'aac') {
+                        needsAudioEncode = true;
+                    }
+                }
+            }
+        }
+
+        if (!hasVideo) {
+            job.log.push('No video stream found. Skipping post-processing.');
+            return callback(null, destPath);
+        }
+
+        const path = require('path');
+        const ext = path.extname(destPath).toLowerCase();
+        
+        const outputPath = destPath.replace(ext, `_processed.mp4`);
+
+        job.log.push(`Needs Video Encode: ${needsVideoEncode}, Needs Audio Encode: ${needsAudioEncode}`);
+        job.progress = 0;
+        job.speed = 'Processing...';
+
+        const command = fluentFfmpeg(destPath);
+        
+        if (needsVideoEncode) {
+            command.videoCodec('libx264');
+        } else {
+            command.videoCodec('copy');
+        }
+
+        if (needsAudioEncode) {
+            command.audioCodec('aac');
+        } else {
+            command.audioCodec('copy');
+        }
+
+        command.outputOptions(['-movflags +faststart']);
+        
+        command.on('progress', (progress) => {
+            if (progress.percent) {
+                job.progress = Math.min(99, progress.percent);
+                job.speed = `Processing ${progress.percent.toFixed(1)}%`;
+            }
+        });
+
+        command.on('end', () => {
+            job.log.push('Post-processing completed. Validating...');
+            
+            fluentFfmpeg.ffprobe(outputPath, (probeErr, outMeta) => {
+                if (probeErr) {
+                    job.log.push(`Final validation failed: ${probeErr.message}`);
+                    return callback(probeErr);
+                }
+                
+                job.log.push('Final validation passed.');
+                const fs = require('fs');
+                try {
+                    if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
+                    let finalDest = destPath;
+                    if (ext !== '.mp4') {
+                        finalDest = destPath.substring(0, destPath.lastIndexOf('.')) + '.mp4';
+                    }
+                    fs.renameSync(outputPath, finalDest);
+                    callback(null, finalDest);
+                } catch(e) {
+                    job.log.push(`Failed to rename processed file: ${e.message}`);
+                    callback(e);
+                }
+            });
+        });
+
+        command.on('error', (err) => {
+            job.log.push(`Post-processing failed: ${err.message}`);
+            const fs = require('fs');
+            if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+            callback(err);
+        });
+
+        command.save(outputPath);
+    });
+}
+
+function finalizeDownload(id, destPath) {
+    const dl = downloads[id];
+    if (!dl) return;
+
+    const finalize = (finalPath) => {
+        dl.path = finalPath;
+        dl.status = 'completed';
+        logDownloadIfToken(id);
+        dl.progress = 100;
+        dl.speed = '0 MB/s';
+        console.log(`[Daemon] Download ID ${id} finished successfully.`);
+    };
+
+    const processAndFinalize = (currentPath) => {
+        postProcessVideo(id, currentPath, (err, processedPath) => {
+            if (err) {
+                dl.status = 'failed';
+                dl.error = 'Post-processing failed: ' + err.message;
+            } else {
+                finalize(processedPath || currentPath);
+            }
+        });
+    };
+
+    if (dl.trimStart || dl.trimEnd) {
+        processTrimming(id, destPath, dl.trimStart, dl.trimEnd, (err) => {
+            if (err) {
+                dl.status = 'failed';
+                dl.error = 'Trimming failed: ' + err.message;
+            } else {
+                processAndFinalize(destPath);
+            }
+        });
+    } else {
+        processAndFinalize(destPath);
     }
 }
 
@@ -506,12 +716,8 @@ function downloadMedia(url, destPath, downloadId, callback) {
 
               // ── ALL VALIDATIONS PASSED ─────────────────────────────────────
               // The file stays in the .temp directory
-              downloads[downloadId].path = destPath;
+              finalizeDownload(downloadId, destPath);
 
-              downloads[downloadId].status = 'completed';
-              logDownloadIfToken(downloadId);
-              downloads[downloadId].progress = 100;
-              downloads[downloadId].speed = '0 MB/s';
               downloads[downloadId].log.push(
                 `File verification: PASSED — format=${finalSniff.format}, ` +
                 `size=${sizeBytes} bytes, magic=[${magicHex.slice(0,23)}]`
@@ -886,7 +1092,7 @@ app.post('/api/metadata', async (req, res) => {
     }
 
     // Use yt-dlp --dump-json to extract metadata quickly without downloading
-    const args = ['--dump-json', '--no-playlist', '--no-update', '--extractor-args', 'youtube:player-client=android,web'];
+    const args = ['--dump-json', '--no-playlist', '--no-update'];
     
     args.push(url);
     console.log(`[YT-DLP COMMAND EXECUTING] ${ytDlpPath} ${args.join(' ')}`);
@@ -925,7 +1131,7 @@ app.post('/api/metadata', async (req, res) => {
           // ... (keep the rest the same)
 
           
-          let sizes = { v4k: null, v1080: null, v720: null, a320: null, a256: null, a128: null };
+          let sizes = { v8k: null, v4k: null, v1080: null, v720: null, a320: null, a256: null, a128: null };
           let bestAudioSize = 0;
           let videoFormats = [];
           let audioFormats = [];
@@ -954,6 +1160,7 @@ app.post('/api/metadata', async (req, res) => {
                   return s > 0 ? s : null;
               };
 
+              sizes.v8k = getVidSize(4320);
               sizes.v4k = getVidSize(2160);
               sizes.v1080 = getVidSize(1080);
               sizes.v720 = getVidSize(720) || getVidSize(360);
@@ -1023,7 +1230,8 @@ app.post('/api/metadata', async (req, res) => {
                   { minH: 720, label: '720p HD', rec: false },
                   { minH: 1080, label: '1080p Full HD', rec: false },
                   { minH: 1440, label: '1440p 2K', rec: false },
-                  { minH: 2160, label: '2160p 4K', rec: true }
+                  { minH: 2160, label: '2160p 4K', rec: false },
+                  { minH: 4320, label: '4320p 8K', rec: true }
               ];
 
               // Remove duplicate resolution mappings since we stripped the tier logic
@@ -1037,13 +1245,13 @@ app.post('/api/metadata', async (req, res) => {
               }
 
               uniqueResolutionsToFind.forEach(({minH, label, rec}) => {
-                  let maxH = 9999;
+                  let maxH = 99999;
+                  if (minH === 2160) maxH = 4319;
                   if (minH === 1440) maxH = 2159;
                   if (minH === 1080) maxH = 1439;
                   if (minH === 720) maxH = 1079;
                   if (minH === 480) maxH = 719;
                   if (minH === 360) maxH = 479;
-                  if (minH === 2160) maxH = 99999;
                   
                   const vids = allVids.filter(f => f.height >= minH && f.height <= maxH);
                   if (vids.length === 0) return;
@@ -1054,7 +1262,7 @@ app.post('/api/metadata', async (req, res) => {
                   let s = f.filesize || f.filesize_approx || 0;
                   if (s > 0 && f.acodec === 'none') s += bestAudioSize;
                   if (s === 0 && dur > 0) {
-                      let estMbps = minH >= 2160 ? 15 : minH >= 1440 ? 8 : minH >= 1080 ? 4 : minH >= 720 ? 1.5 : minH >= 480 ? 0.8 : 0.4;
+                      let estMbps = minH >= 4320 ? 40 : minH >= 2160 ? 15 : minH >= 1440 ? 8 : minH >= 1080 ? 4 : minH >= 720 ? 1.5 : minH >= 480 ? 0.8 : 0.4;
                       s = dur * (estMbps * 1024 * 1024 / 8);
                   }
                   
@@ -1100,6 +1308,7 @@ app.post('/api/metadata', async (req, res) => {
 
           const dur = metadata.duration || 0;
           if (dur > 0) {
+             if (!sizes.v8k) sizes.v8k = dur * (40 * 1024 * 1024 / 8); 
              if (!sizes.v4k) sizes.v4k = dur * (15 * 1024 * 1024 / 8); 
              if (!sizes.v1080) sizes.v1080 = dur * (4 * 1024 * 1024 / 8); 
              if (!sizes.v720) sizes.v720 = dur * (1.5 * 1024 * 1024 / 8); 
@@ -1135,6 +1344,7 @@ app.post('/api/metadata', async (req, res) => {
             audioFormats: audioFormats,
             sizes: {
                 Original: originalSize > 0 ? formatBytes(originalSize) : 'Unknown',
+                v8k:  formatBytes(sizes.v8k),
                 v4k:  formatBytes(sizes.v4k),
                 v1080: formatBytes(sizes.v1080),
                 v720: formatBytes(sizes.v720),
@@ -1231,7 +1441,9 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
     }
 
     // 2. Sanitize filename strictly for Windows
-    const format = req.body.format || 'video'; // 'video' or 'audio'
+    let format = req.body.format || 'video'; // 'video' or 'audio'
+    if (format === 'mp3') format = 'audio';
+    if (format === 'mp4') format = 'video';
     
     console.log(`Original:`);
     console.log(filename);
@@ -1250,6 +1462,10 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
     if (sanitizedBase.length > 150) {
         sanitizedBase = sanitizedBase.substring(0, 150).replace(/[\s.]+$/, '');
     }
+
+    const requestedQualityForFilename = req.body.quality || 'Original';
+    const safeQuality = requestedQualityForFilename.replace(/[<>:"\/\\|?* ]/g, '_');
+    sanitizedBase = `${sanitizedBase}_${safeQuality}`;
 
     // Preserve/force extension
     if (format === 'audio') {
@@ -1317,6 +1533,8 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
       userToken: req.cookies ? req.cookies.token : null,
       id: id,
       url: url,
+      trimStart: req.body.trim_start || null,
+      trimEnd: req.body.trim_end || null,
       filename: sanitizedFilename,
       path: destPath,
       progress: 0,
@@ -1366,20 +1584,30 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
         // --- PLATFORM DETECTION & SPECIFIC ARGS ---
         const platformArgs = [];
         let targetUrl = url;
+        const isFacebook = url.includes('facebook.com') || url.includes('fb.watch') || url.includes('fb.gg');
         
-        if (url.includes('facebook.com') || url.includes('fb.watch')) {
+        if (isFacebook) {
             downloads[id].log.push(`Platform detected as Facebook. Using Xaviabot bypass to fetch direct CDN link...`);
             try {
                 const fb = require('@xaviabot/fb-downloader');
                 const fbData = await fb(url);
-                if (fbData && fbData.hd) {
-                    targetUrl = fbData.hd;
-                    downloads[id].log.push(`Successfully bypassed Facebook! Extracted HD MP4 link.`);
-                } else if (fbData && fbData.sd) {
-                    targetUrl = fbData.sd;
-                    downloads[id].log.push(`Successfully bypassed Facebook! Extracted SD MP4 link.`);
-                } else {
-                    downloads[id].log.push(`Warning: Xaviabot did not return a valid MP4 link. Falling back to default engine.`);
+                const requestedQuality = req.body.quality || 'hd';
+                if (fbData) {
+                    if (requestedQuality === 'hd' && fbData.hd) {
+                        targetUrl = fbData.hd;
+                        downloads[id].log.push(`Successfully bypassed Facebook! Extracted HD MP4 link.`);
+                    } else if (requestedQuality === 'sd' && fbData.sd) {
+                        targetUrl = fbData.sd;
+                        downloads[id].log.push(`Successfully bypassed Facebook! Extracted SD MP4 link.`);
+                    } else if (fbData.hd) {
+                        targetUrl = fbData.hd;
+                        downloads[id].log.push(`Successfully bypassed Facebook! Extracted HD MP4 link.`);
+                    } else if (fbData.sd) {
+                        targetUrl = fbData.sd;
+                        downloads[id].log.push(`Successfully bypassed Facebook! Extracted SD MP4 link.`);
+                    } else {
+                        downloads[id].log.push(`Warning: Xaviabot did not return a valid MP4 link. Falling back to default engine.`);
+                    }
                 }
             } catch (e) {
                 downloads[id].log.push(`Xaviabot bypass failed: ${e.message}. Falling back to default engine.`);
@@ -1392,7 +1620,7 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
         // Helper to check if string looks like an exact format ID (digits and optionally dashes/alphanumerics, not ending with 'p' or 'k' or 'kbps' unless it's a known format_id)
         // More robust: If it doesn't match our old legacy strings, assume it's a format_id.
         const isLegacyAudio = ['320', '256', '192', '128', 'Original'].some(q => requestedQuality.includes(q));
-        const isLegacyVideo = ['4k', '1080p', '720p', '480p', '360p', 'Original'].includes(requestedQuality.toLowerCase());
+        const isLegacyVideo = ['8k', '4k', '1080p', '720p', '480p', '360p', 'original'].includes(requestedQuality.toLowerCase());
 
         if (format === 'audio') {
           // Audio Quality mapping
@@ -1404,8 +1632,6 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
             '--no-playlist',
             '--newline',
             '--no-update',
-            '--extractor-args', 'youtube:player-client=android,web',
-            '--cookies-from-browser', 'chrome',
             '--extract-audio',
             '--audio-format', 'mp3',
             '--ffmpeg-location', ffmpegPath,
@@ -1428,13 +1654,22 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
           ytdlpArgs.push(targetUrl);
           
         } else {
-          // Video Quality mapping
-          let formatStr = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
+          // Video Quality mapping - strictly prefer AVC/H.264
+          let formatStr = 'bestvideo[height<=4320][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=4320][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=2160][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=2160][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=1440][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=1440][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=1080][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=1080][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=720][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=720][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=480][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=480][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=360][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=360][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[vcodec^=h264]+bestaudio[ext=m4a]/bestvideo+bestaudio/best';
           
-          if (requestedQuality && requestedQuality !== 'Original' && requestedQuality !== 'best') {
-              // Try the exact format_id requested. If it fails, fallback gracefully through resolutions.
-              // Note: We don't enforce [ext=mp4] here so we can grab 4K WebM streams if necessary.
-              formatStr = `${requestedQuality}+bestaudio/bestvideo[height<=2160]+bestaudio/bestvideo[height<=1440]+bestaudio/bestvideo[height<=1080]+bestaudio/bestvideo[height<=720]+bestaudio/bestvideo[height<=480]+bestaudio/bestvideo[height<=360]+bestaudio/bestvideo+bestaudio/best`;
+          if (requestedQuality && requestedQuality !== 'Original' && requestedQuality !== 'best' && requestedQuality !== 'Best') {
+              // If it's a specific format_id from yt-dlp that already contains audio, don't append +bestaudio
+              if (requestedQuality.includes('+')) {
+                  formatStr = `${requestedQuality}/bestvideo+bestaudio/best`;
+              } else if (['hd', 'sd'].includes(requestedQuality) && isFacebook) {
+                  // For Facebook direct URLs, there is no format ID 'hd' or 'sd' in yt-dlp, the URL itself is the video
+                  formatStr = 'best';
+              } else if (!isLegacyVideo && !isLegacyAudio) {
+                  // Assume raw format ID passed by user
+                  formatStr = `${requestedQuality}+bestaudio[ext=m4a]/${requestedQuality}+bestaudio/${requestedQuality}/bestvideo+bestaudio/best`;
+              } else {
+                  formatStr = `${requestedQuality}+bestaudio[ext=m4a]/bestvideo[height<=4320][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=4320][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=2160][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=2160][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=1440][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=1440][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=1080][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=1080][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=720][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=720][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=480][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=480][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=360][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=360][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[vcodec^=h264]+bestaudio[ext=m4a]/bestvideo+bestaudio/best`;
+              }
           }
 
           ytdlpArgs = [
@@ -1443,7 +1678,6 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
             '--no-playlist',
             '--newline',
             '--no-update',
-            '--extractor-args', 'youtube:player-client=android,web',
             '--format', formatStr,
             '--remux-video', 'mp4',
             '--ffmpeg-location', ffmpegPath,
@@ -1705,18 +1939,17 @@ app.post('/api/social/metadata', async (req, res) => {
                         if (vids.length > 0) {
                             vids.sort((a,b) => (b.height || 0) - (a.height || 0));
                             vFormats.push({
-                                format_id: vids[0].format_id,
-                                resolution: vids[0].height ? vids[0].height + 'p' : 'Original',
-                                qualityLabel: vids[0].height ? vids[0].height + 'p Original' : 'Original Quality',
-                                filesize: 'Unknown',
-                                isAudio: false,
+                                id: vids[0].format_id,
+                                quality: vids[0].height ? vids[0].height + 'p' : 'Original',
+                                sizeStr: 'Unknown',
+                                recommended: true,
                                 url: vids[0].url
                             });
                         }
                     }
                     
                     if (vFormats.length === 0 && metadata.url) {
-                        vFormats.push({ format_id: 'best', resolution: 'Original', qualityLabel: 'Original Quality', filesize: 'Unknown', isAudio: false, url: metadata.url });
+                        vFormats.push({ id: 'best', quality: 'Original', sizeStr: 'Unknown', recommended: true, url: metadata.url });
                     }
 
                     return res.json({
@@ -1724,7 +1957,7 @@ app.post('/api/social/metadata', async (req, res) => {
                         thumbnail: metadata.thumbnail || null,
                         duration: metadata.duration || null,
                         videoFormats: vFormats,
-                        audioFormats: []
+                        audioFormats: [{ id: 'best', quality: 'Best Audio', sizeStr: 'Unknown', recommended: true }]
                     });
                 } catch (parseErr) {
                     return res.status(500).json({ error: 'Failed to parse JSON from yt-dlp' });
@@ -1747,7 +1980,7 @@ app.post('/api/social/metadata', async (req, res) => {
 
 app.post('/api/social/download', checkFeatureAndLimits, async (req, res) => {
     try {
-        const { url, filename, id, format_url, format_id, token } = req.body;
+        const { url, filename, id, format_url, format_id, token, format, quality } = req.body;
         if (!url || !filename || !id) return res.status(400).json({ error: 'Missing parameters' });
 
         const tempDir = path.join(DOWNLOADS_DIR, '.temp');
@@ -1764,157 +1997,122 @@ app.post('/api/social/download', checkFeatureAndLimits, async (req, res) => {
 
         downloads[id] = { id, status: 'starting', progress: 0, speed: '0 B/s', path: destPath, url: url };
 
-        if (format_url) {
-            const https = require('https');
-            try {
-                downloads[id].status = 'downloading';
-                const file = fs.createWriteStream(destPath);
-                
-                https.get(format_url, (response) => {
-                    if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-                         // Follow simple redirects manually if needed, or rely on format_url being direct.
-                         // Normally Facebook CDN links do not redirect.
-                    }
-                    const totalLength = response.headers['content-length'];
-                    downloads[id].contentLength = parseInt(totalLength) || 0;
-                    
-                    let downloaded = 0;
-                    let lastTime = Date.now();
-                    let lastDownloaded = 0;
-
-                    response.on('data', (chunk) => {
-                        downloaded += chunk.length;
-                        downloads[id].loaded = downloaded;
-                        if (totalLength) {
-                            downloads[id].progress = (downloaded / totalLength) * 100;
-                        } else {
-                            downloads[id].progress = 50; 
-                        }
-                        
-                        const now = Date.now();
-                        if (now - lastTime >= 1000) {
-                            const speed = ((downloaded - lastDownloaded) / ((now - lastTime) / 1000)) / (1024 * 1024);
-                            downloads[id].speed = `${speed.toFixed(2)} MB/s`;
-                            lastTime = now;
-                            lastDownloaded = downloaded;
-                        }
-                    });
-
-                    response.pipe(file);
-
-                    file.on('finish', () => {
-                        file.close(() => {
-                            downloads[id].status = 'completed';
-                            logDownloadIfToken(id);
-                            downloads[id].progress = 100;
-                            console.log(`[Daemon] Social Download ID ${id} finished successfully.`);
-                        });
-                    });
-                }).on('error', (err) => {
-                    fs.unlink(destPath, () => {});
-                    downloads[id].status = 'failed';
-                    downloads[id].error = err.message;
-                });
-                
-                return res.json({ success: true, message: 'Social download started', id });
-
-            } catch (streamErr) {
-                downloads[id].status = 'failed';
-                downloads[id].error = 'Stream failed: ' + streamErr.message;
-                return res.status(500).json({ error: 'Stream failed' });
-            }
-        } else {
-            const spawnArgs = ['--newline', '--no-playlist', '--ffmpeg-location', globalFfmpegPath, '-o', destPath, url];
-            downloads[id].status = 'downloading';
-            
-            let ytchildOutputLog = '';
-            let ytchildErrorLog = '';
-
-            try {
-                await ytDlpService.downloadWithRetryAndFallback(ytDlpPath, spawnArgs, (ytchild, attemptArgs) => {
-                    console.log(`\n====================================`);
-                    console.log(`[DOWNLOAD START] Fallback Task ID: ${id}`);
-                    console.log(`URL: ${url}`);
-                    console.log(`Dest: ${destPath}`);
-                    console.log(`[YT-DLP COMMAND] yt-dlp ${attemptArgs.join(' ')}`);
-                    console.log(`====================================\n`);
-                    
-                    ytchildErrorLog = '';
-                    ytchild.stderr.on('data', (data) => {
-                        ytchildErrorLog += data.toString();
-                    });
-
-                    ytchildOutputLog = '';
-                    ytchild.stdout.on('data', (data) => {
-                        ytchildOutputLog += data.toString();
-                        const lines = data.toString().split('\n');
-                        lines.forEach(line => {
-                            if (line.includes('%')) {
-                                const match = line.match(/(\d+\.?\d*)%/);
-                                if (match) downloads[id].progress = parseFloat(match[1]);
-                                const speedMatch = line.match(/at\s+(\d+\.?\d*[KMG]iB\/s)/);
-                                if (speedMatch) downloads[id].speed = speedMatch[1].replace('iB', 'B');
-                            }
-                        });
-                    });
-                    
-                    return {};
-                });
-
-                if (fs.existsSync(destPath)) {
-                    const stats = fs.statSync(destPath);
-                    if (stats.size > 0) {
-                        // The file stays in the .temp directory
-                        downloads[id].path = destPath;
-                        downloads[id].status = 'completed';
-                        logDownloadIfToken(id);
-                        downloads[id].progress = 100;
-                        console.log(`[Daemon] Social Download ID ${id} fallback finished successfully.`);
-                    } else {
-                        downloads[id].status = 'failed';
-                        downloads[id].error = 'Download failed (file is empty)';
-                        fs.unlinkSync(destPath);
-                    }
+        const spawnArgs = ['--newline', '--no-playlist', '-o', destPath, url];
+        if (format === 'audio') {
+            spawnArgs.push('-x', '--audio-format', 'mp3');
+            if (quality) {
+                let q = quality;
+                if (q.includes('320') && !q.includes('K')) q = '320K';
+                if (q.includes('256') && !q.includes('K')) q = '256K';
+                if (q.includes('192') && !q.includes('K')) q = '192K';
+                if (q.includes('128') && !q.includes('K')) q = '128K';
+                if (q.includes('64') && !q.includes('K') && !q.includes('640')) q = '64K';
+                if (q !== 'Original' && q !== 'Best') {
+                    spawnArgs.push('--audio-quality', q);
                 } else {
-                    downloads[id].status = 'failed';
-                    downloads[id].error = 'Download failed (file not found)';
+                    spawnArgs.push('--audio-quality', '0');
                 }
-            } catch (err) {
-                downloads[id].status = 'failed';
-                ytchildErrorLog = err.stderr || err.error || ytchildErrorLog;
-                
-                if (err.knownError) {
-                    downloads[id].error = err.knownError;
-                } else {
-                    let realError = '';
-                    const errorLines = ytchildErrorLog.split('\n');
-                    for (const line of errorLines) {
-                        if (line.includes('ERROR:')) {
-                            realError = line.substring(line.indexOf('ERROR:') + 6).trim();
-                            break;
-                        }
-                    }
-                    if (!realError && ytchildErrorLog.trim().length > 0) {
-                        const nonEmpty = errorLines.filter(l => l.trim().length > 0);
-                        if (nonEmpty.length > 0) realError = nonEmpty[nonEmpty.length - 1].trim();
-                    }
-                    if (realError) {
-                        downloads[id].error = `yt-dlp error: ${realError}`;
-                    } else {
-                        downloads[id].error = `Download failed (Code ${err.code})`;
-                    }
-                }
-
-                console.log(`\n====================================`);
-                console.log(`[DOWNLOAD FAILED] Fallback Task ID: ${id}`);
-                console.log(`Exit Code: ${err.code}`);
-                console.log(`[YT-DLP STDERR]\n${ytchildErrorLog.trim()}`);
-                console.log(`[YT-DLP STDOUT]\n${ytchildOutputLog.trim()}`);
-                console.log(`UI Error Exposed: ${downloads[id].error}`);
-                console.log(`====================================\n`);
+            } else {
+                spawnArgs.push('--audio-quality', '0');
             }
-            return res.json({ success: true, message: 'Social fallback download started', id });
+        } else if (format_id && format_id !== 'Original' && format_id !== 'best' && format_id !== 'Best') {
+            const finalFormat = format_id.includes('+') ? format_id : `${format_id}+bestaudio/${format_id}/best`;
+            spawnArgs.push('-f', finalFormat);
+            spawnArgs.push('--merge-output-format', 'mp4');
+            spawnArgs.push('--remux-video', 'mp4');
+        } else if (format !== 'audio') {
+            spawnArgs.push('--merge-output-format', 'mp4');
+            spawnArgs.push('--remux-video', 'mp4');
         }
+        
+        downloads[id].status = 'downloading';
+        
+        let ytchildOutputLog = '';
+        let ytchildErrorLog = '';
+
+        try {
+            await ytDlpService.downloadWithRetryAndFallback(ytDlpPath, spawnArgs, (ytchild, attemptArgs) => {
+                console.log(`\n====================================`);
+                console.log(`[DOWNLOAD START] Social Task ID: ${id}`);
+                console.log(`URL: ${url}`);
+                console.log(`Dest: ${destPath}`);
+                console.log(`[YT-DLP COMMAND] yt-dlp ${attemptArgs.join(' ')}`);
+                console.log(`====================================\n`);
+                
+                ytchildErrorLog = '';
+                ytchild.stderr.on('data', (data) => {
+                    ytchildErrorLog += data.toString();
+                });
+
+                ytchildOutputLog = '';
+                ytchild.stdout.on('data', (data) => {
+                    ytchildOutputLog += data.toString();
+                    const lines = data.toString().split('\n');
+                    lines.forEach(line => {
+                        if (line.includes('%')) {
+                            const match = line.match(/(\d+\.?\d*)%/);
+                            if (match) downloads[id].progress = parseFloat(match[1]);
+                            const speedMatch = line.match(/at\s+(\d+\.?\d*[KMG]iB\/s)/);
+                            if (speedMatch) downloads[id].speed = speedMatch[1].replace('iB', 'B');
+                        }
+                    });
+                });
+                
+                return {};
+            });
+
+            if (fs.existsSync(destPath)) {
+                const stats = fs.statSync(destPath);
+                if (stats.size > 0) {
+                    downloads[id].path = destPath;
+                    downloads[id].status = 'completed';
+                    logDownloadIfToken(id);
+                    downloads[id].progress = 100;
+                    console.log(`[Daemon] Social Download ID ${id} finished successfully.`);
+                } else {
+                    downloads[id].status = 'failed';
+                    downloads[id].error = 'Download failed (file is empty)';
+                    fs.unlinkSync(destPath);
+                }
+            } else {
+                downloads[id].status = 'failed';
+                downloads[id].error = 'Download failed (file not found)';
+            }
+        } catch (err) {
+            downloads[id].status = 'failed';
+            ytchildErrorLog = err.stderr || err.error || ytchildErrorLog;
+            
+            if (err.knownError) {
+                downloads[id].error = err.knownError;
+            } else {
+                let realError = '';
+                const errorLines = ytchildErrorLog.split('\n');
+                for (const line of errorLines) {
+                    if (line.includes('ERROR:')) {
+                        realError = line.substring(line.indexOf('ERROR:') + 6).trim();
+                        break;
+                    }
+                }
+                if (!realError && ytchildErrorLog.trim().length > 0) {
+                    const nonEmpty = errorLines.filter(l => l.trim().length > 0);
+                    if (nonEmpty.length > 0) realError = nonEmpty[nonEmpty.length - 1].trim();
+                }
+                if (realError) {
+                    downloads[id].error = `yt-dlp error: ${realError}`;
+                } else {
+                    downloads[id].error = `Download failed (Code ${err.code})`;
+                }
+            }
+
+            console.log(`\n====================================`);
+            console.log(`[DOWNLOAD FAILED] Social Task ID: ${id}`);
+            console.log(`Exit Code: ${err.code}`);
+            console.log(`[YT-DLP STDERR]\n${ytchildErrorLog.trim()}`);
+            console.log(`[YT-DLP STDOUT]\n${ytchildOutputLog.trim()}`);
+            console.log(`UI Error Exposed: ${downloads[id].error}`);
+            console.log(`====================================\n`);
+        }
+        return res.json({ success: true, message: 'Social download started', id });
     } catch (err) {
         console.error("[Express] /api/social/download crash:", err);
         return res.status(500).json({ error: "Backend Exception Occurred" });
@@ -2138,7 +2336,7 @@ app.post('/api/convert', checkFeatureAndLimits, (req, res) => {
         }
     } else if (type === 'MP4_TO_MP4') {
         if (formatConfig?.resolution) {
-            const resMap = { '4K': '3840x2160', '1080P': '1920x1080', '720P': '1280x720', '480P': '854x480' };
+            const resMap = { '8K': '7680x4320', '4K': '3840x2160', '1080P': '1920x1080', '720P': '1280x720', '480P': '854x480' };
             if (resMap[formatConfig.resolution]) command = command.size(resMap[formatConfig.resolution]);
         }
         if (formatConfig?.compression) {
@@ -2398,9 +2596,9 @@ app.get('/api/system-check', (req, res) => {
 });
 
 // Start listening
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log(`[Daemon] Local service listening on http://127.0.0.1:`);
+  console.log(`[Daemon] Local service listening on http://127.0.0.1:${PORT}`);
   
   const { execSync } = require('child_process');
   console.log('\n[STARTUP CHECK] Verifying Python Environment...');
@@ -2432,37 +2630,9 @@ app.listen(PORT, () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CRON: ORPHAN FILE CLEANUP
+// CRON: ORPHAN FILE & MEMORY CLEANUP
 // ─────────────────────────────────────────────────────────────────────────────
-// Delete temporary files older than 1 hour to prevent disk exhaustion
-setInterval(() => {
-    const tempDir = path.join(DOWNLOADS_DIR, '.temp');
-    if (!fs.existsSync(tempDir)) return;
-    
-    fs.readdir(tempDir, (err, files) => {
-        if (err) return console.error("[Cron] Failed to read temp directory:", err);
-        
-        const now = Date.now();
-        files.forEach(file => {
-            const filePath = path.join(tempDir, file);
-            fs.stat(filePath, (statErr, stats) => {
-                if (statErr) return;
-                
-                // If file is older than 1 hour (3,600,000 ms), delete it
-                if (now - stats.mtimeMs > 3600000) {
-                    fs.unlink(filePath, (unlinkErr) => {
-                        if (!unlinkErr) {
-                            console.log(`[Cron] Deleted orphan temp file: ${file}`);
-                        }
-                    });
-                }
-            });
-        });
-    });
-}, 15 * 60 * 1000); // Runs every 15 minutes
-
-// ─── TEMP DIRECTORY CLEANUP SERVICE ─────────────────────────────────────────
-// Runs every 15 minutes to delete orphan files older than 1 hour
+// Runs every 15 minutes to delete orphan temp files older than 1 hour
 setInterval(() => {
     const tempDir = path.join(DOWNLOADS_DIR, '.temp');
     if (!fs.existsSync(tempDir)) return;
@@ -2491,11 +2661,4 @@ setInterval(() => {
             console.log(`[Cleanup Service] Purged ${deletedCount} orphan files from .temp folder.`);
         }
     });
-    
-    // Also clean up old memory downloads
-    const now = Date.now();
-    for (const [id, data] of Object.entries(downloads)) {
-        // If download is completed/failed/cancelled and older than 2 hours, delete from memory
-        // Wait, we don't store timestamp in downloads object easily, but we can just use size heuristics or ignore for now.
-    }
-}, 15 * 60 * 1000);
+}, 15 * 60 * 1000).unref();

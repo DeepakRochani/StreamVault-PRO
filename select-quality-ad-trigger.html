@@ -360,6 +360,29 @@
         
         <!-- MP4 Quality Options -->
         <div id="mp4-options" class="flex-col gap-3 hidden">
+            <!-- 8K -->
+            <label class="relative cursor-pointer group">
+                <input class="sr-only quality-radio" name="video_quality" type="radio" value="8k" data-size="1.2 GB" data-speed="15.5 MB/s"/>
+                <div class="glass-panel rounded-xl p-4 flex items-center justify-between transition-all duration-200 border-2 border-transparent group-hover:border-white/20 quality-card relative overflow-hidden">
+                    <div class="flex items-center gap-4">
+                        <div class="w-5 h-5 rounded-full border-2 border-outline-variant flex items-center justify-center radio-border">
+                            <div class="w-2.5 h-2.5 rounded-full bg-transparent transform scale-0 transition-transform duration-200 radio-inner"></div>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-title-md text-title-md text-on-surface">8K Ultra HD</span>
+                            </div>
+                            <div class="font-mono-sm text-mono-sm text-on-surface-variant flex gap-3">
+                                <span>7680x4320</span><span>•</span><span>60fps HDR</span><span>•</span><span>HEVC</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="font-title-md text-title-md text-on-surface">~ 1.2 GB</span>
+                        <span class="material-symbols-outlined text-primary opacity-0 check-icon transition-opacity">check_circle</span>
+                    </div>
+                </div>
+            </label>
             <!-- 4K -->
             <label class="relative cursor-pointer group">
                 <input class="sr-only quality-radio" name="video_quality" type="radio" value="4k" data-size="560 MB" data-speed="12.5 MB/s"/>

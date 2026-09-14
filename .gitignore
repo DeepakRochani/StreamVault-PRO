@@ -3,23 +3,31 @@ node_modules/
 
 # Environment Variables
 .env
+.env.*
+!.env.example
 .env.local
 .env.*.local
 
 # Persistent Database & Storage
 database.sqlite
+streamvault.db
 downloads/
+uploads/
 .temp/
+cookies.txt
 
 # Build Output
 dist/
+dist-electron/
 build/
+release/
 *.log
+logs/
 
-# System Files
+# System & Media Files
 .DS_Store
 Thumbs.db
+*.m4a
+*.mp4
+*.mp3
 
-streamvault.db
-
-release/

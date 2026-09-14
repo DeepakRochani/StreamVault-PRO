@@ -6,14 +6,29 @@ const logger = require('./logger');
 
 const getPythonCommand = () => {
   return new Promise((resolve) => {
-    const python3 = spawn('python3', ['--version']);
-    python3.on('close', (code) => {
-      if (code === 0) resolve('python3');
-      else resolve('python');
-    });
-    python3.on('error', () => {
-      resolve('python');
-    });
+    if (process.env.PYTHON_PATH && fs.existsSync(process.env.PYTHON_PATH)) {
+      return resolve(process.env.PYTHON_PATH);
+    }
+    const candidates = process.platform === 'win32' 
+      ? ['python', 'py', 'python3'] 
+      : ['python3', 'python'];
+
+    const tryNext = (index) => {
+      if (index >= candidates.length) {
+        return resolve(process.platform === 'win32' ? 'python' : 'python3');
+      }
+      const candidate = candidates[index];
+      const proc = spawn(candidate, ['--version']);
+      proc.on('close', (code) => {
+        if (code === 0) resolve(candidate);
+        else tryNext(index + 1);
+      });
+      proc.on('error', () => {
+        tryNext(index + 1);
+      });
+    };
+
+    tryNext(0);
   });
 };
 
@@ -47,27 +62,34 @@ const checkPythonVersion = async () => {
 };
 
 const updateYtDlp = async (ytDlpPath) => {
-  const pythonCmd = await getPythonCommand();
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     logger.info('Checking for yt-dlp updates...');
-    const update = spawn(pythonCmd, [ytDlpPath, '-U']);
+    let proc;
+    const isBinary = !ytDlpPath.endsWith('.py');
+
+    if (isBinary) {
+      proc = spawn(ytDlpPath, ['-U']);
+    } else {
+      const pythonCmd = await getPythonCommand();
+      proc = spawn(pythonCmd, [ytDlpPath, '-U']);
+    }
     
     let output = '';
-    update.stdout.on('data', (data) => output += data.toString());
-    update.stderr.on('data', (data) => output += data.toString());
+    proc.stdout.on('data', (data) => output += data.toString());
+    proc.stderr.on('data', (data) => output += data.toString());
     
-    update.on('close', (code) => {
+    proc.on('close', (code) => {
       if (code === 0) {
         logger.info('yt-dlp update check completed.', { output });
         resolve({ success: true, output });
       } else {
-        logger.error(`yt-dlp update failed with code ${code}`, { output });
+        logger.warn(`yt-dlp update exited with code ${code}`, { output });
         resolve({ success: false, output });
       }
     });
-    update.on('error', (err) => {
-       logger.error(`Error updating yt-dlp: ${err.message}`);
-       resolve({ success: false, error: err.message });
+    proc.on('error', (err) => {
+      logger.warn(`Error updating yt-dlp: ${err.message}`);
+      resolve({ success: false, error: err.message });
     });
   });
 };
@@ -181,14 +203,21 @@ const getInstalledBrowsers = () => {
     { name: 'chrome', winPath: process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'User Data') : '', macPath: path.join(os.homedir(), 'Library', 'Application Support', 'Google', 'Chrome') },
     { name: 'brave', winPath: process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'BraveSoftware', 'Brave-Browser', 'User Data') : '', macPath: path.join(os.homedir(), 'Library', 'Application Support', 'BraveSoftware', 'Brave-Browser') },
     { name: 'edge', winPath: process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Microsoft', 'Edge', 'User Data') : '', macPath: path.join(os.homedir(), 'Library', 'Application Support', 'Microsoft Edge') },
-    { name: 'arc', winPath: process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Packages', 'TheBrowserCompany.Arc_') : '', macPath: path.join(os.homedir(), 'Library', 'Application Support', 'Arc', 'User Data') },
     { name: 'firefox', winPath: process.env.APPDATA ? path.join(process.env.APPDATA, 'Mozilla', 'Firefox', 'Profiles') : '', macPath: path.join(os.homedir(), 'Library', 'Application Support', 'Firefox', 'Profiles') }
   ];
 
   for (const b of browsers) {
     const p = isWindows ? b.winPath : (isMac ? b.macPath : null);
     if (p && fs.existsSync(p)) {
-      installed.push(b.name);
+      try {
+        // Use fs.openSync to actually test read access, which triggers TCC checks on macOS.
+        // fs.accessSync often returns true even if macOS blocks access with 'Operation not permitted'.
+        const fd = fs.openSync(p, 'r');
+        fs.closeSync(fd);
+        installed.push(b.name);
+      } catch (e) {
+        logger.warn(`Browser ${b.name} cookie database is not readable: ${e.message}`);
+      }
     }
   }
 

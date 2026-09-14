@@ -17,7 +17,7 @@ services:
       - key: DOWNLOAD_PATH
         value: /opt/render/project/data
       - key: SUPABASE_URL
-        value: https://xphhazisatxmlulhqxvi.supabase.co
+        value: https://sjnamkshicpxtyikzsnp.supabase.co
 
     disk:
       name: streamvault-data
