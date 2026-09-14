@@ -74,9 +74,14 @@ class URLParser {
     }
 }
 
-// Export for module usage, or attach to window for script tag inclusion
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = URLParser;
-} else {
+// Export for module usage, and always attach to window/globalThis
+if (typeof window !== 'undefined') {
     window.URLParser = URLParser;
 }
+if (typeof globalThis !== 'undefined') {
+    globalThis.URLParser = URLParser;
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = URLParser;
+}
+
