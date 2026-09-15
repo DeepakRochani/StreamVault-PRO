@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { Innertube, UniversalCache } from "npm:youtubei.js@latest";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,15 +7,27 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
 
+let innertubeClient: any = null;
+
+async function getInnertube() {
+  if (!innertubeClient) {
+    innertubeClient = await Innertube.create({
+      cache: new UniversalCache(false),
+      generate_session_locally: true,
+      client_type: "ANDROID"
+    });
+  }
+  return innertubeClient;
+}
+
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   const reqUrl = new URL(req.url);
 
-  // GET request: Stream/Proxy the file back to the browser for direct download
+  // ── GET: Stream file to client ────────────────────────────────
   if (req.method === "GET") {
     const videoUrl = reqUrl.searchParams.get("url");
     const formatUrl = reqUrl.searchParams.get("format_url");
@@ -46,53 +59,73 @@ serve(async (req) => {
       return new Response("Missing video URL", { status: 400, headers: corsHeaders });
     }
 
-    // 2. YouTube stream proxying
-    try {
-      const ytMatch = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-      if (ytMatch) {
-        const videoId = ytMatch[1];
-        const pipedInstances = [
-          `https://pipedapi.kavin.rocks/streams/${videoId}`,
-          `https://api.piped.privacydev.net/streams/${videoId}`,
-          `https://piped-api.lunar.icu/streams/${videoId}`
-        ];
+    // 2. YouTube streaming
+    const ytMatch = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (ytMatch) {
+      const videoId = ytMatch[1];
 
-        for (const inst of pipedInstances) {
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 4000);
-            const res = await fetch(inst, { signal: controller.signal });
-            clearTimeout(timeoutId);
-            if (res.ok) {
-              const data = await res.json();
-              const streams = isAudio ? (data.audioStreams || []) : (data.videoStreams || data.audioStreams || []);
-              if (streams && streams.length > 0) {
-                const chosen = streams[0]?.url;
-                if (chosen) {
-                  const mediaRes = await fetch(chosen);
-                  if (mediaRes.ok) {
-                    const headers = new Headers(corsHeaders);
-                    headers.set("Content-Type", isAudio ? "audio/mpeg" : "video/mp4");
-                    headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"`);
-                    return new Response(mediaRes.body, { headers });
-                  }
-                }
-              }
-            }
-          } catch (_) { /* try next */ }
+      try {
+        const yt = await getInnertube();
+        const info = await yt.getInfo(videoId);
+        
+        let chosenFormat = null;
+        if (isAudio) {
+          chosenFormat = info.streaming_data?.adaptive_formats?.find((f: any) => f.mime_type?.startsWith("audio/mp4")) ||
+                         info.streaming_data?.adaptive_formats?.find((f: any) => f.mime_type?.startsWith("audio/")) ||
+                         info.chooseFormat({ type: "audio", quality: "best" });
+        } else {
+          chosenFormat = info.chooseFormat({ type: "video+audio", quality: "best" }) ||
+                         info.streaming_data?.formats?.[0];
         }
+
+        if (chosenFormat) {
+          const directUrl = typeof chosenFormat.decipher === 'function' 
+            ? chosenFormat.decipher(yt.session.player) 
+            : (chosenFormat.url || yt.session.player.decipher(chosenFormat.signature_cipher || chosenFormat.cipher));
+
+          if (directUrl) {
+            const mediaRes = await fetch(directUrl, {
+              headers: {
+                "User-Agent": "com.google.android.youtube/19.29.37 (Linux; U; Android 11; en_US) gzip"
+              }
+            });
+            if (mediaRes.ok && mediaRes.body) {
+              const headers = new Headers(corsHeaders);
+              headers.set("Content-Type", isAudio ? "audio/mpeg" : "video/mp4");
+              headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"`);
+              return new Response(mediaRes.body, { headers });
+            }
+          }
+        }
+      } catch (innertubeErr) {
+        console.warn("Innertube format deciphering failed:", innertubeErr);
       }
 
-      return new Response(JSON.stringify({ error: "Stream unavailable on serverless edge. Please use desktop version." }), { 
-        status: 502, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      });
-    } catch (err: any) {
-      return new Response(`Stream Error: ${err.message}`, { status: 500, headers: corsHeaders });
+      try {
+        const yt = await getInnertube();
+        const stream = await yt.download(videoId, {
+          type: isAudio ? "audio" : "video+audio",
+          quality: "best"
+        });
+
+        const headers = new Headers(corsHeaders);
+        headers.set("Content-Type", isAudio ? "audio/mpeg" : "video/mp4");
+        headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"`);
+        return new Response(stream, { headers });
+      } catch (downloadErr) {
+        console.warn("Innertube yt.download failed:", downloadErr);
+      }
     }
+
+    return new Response(JSON.stringify({ 
+      error: "Online serverless streaming could not fetch this video. Please download using the StreamVault Desktop App for unrestricted 4K/1080p downloads." 
+    }), { 
+      status: 502, 
+      headers: { ...corsHeaders, "Content-Type": "application/json" } 
+    });
   }
 
-  // POST request: Resolve download URL
+  // ── POST: Generate Stream Download URL ─────────────────────────
   if (req.method === "POST") {
     try {
       const body = await req.json();
@@ -111,11 +144,9 @@ serve(async (req) => {
         });
       }
 
-      // Determine correct project reference domain
       const projectRef = "sjnamkshicpxtyikzsnp";
       const edgeBase = `https://${projectRef}.supabase.co/functions/v1/download`;
 
-      // 1. Direct format URL provided (e.g. social platforms or direct media)
       if (formatUrl) {
         const proxyUrl = `${edgeBase}?format_url=${encodeURIComponent(formatUrl)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}`;
         return new Response(JSON.stringify({
@@ -127,50 +158,12 @@ serve(async (req) => {
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // 2. YouTube URL
-      const ytMatch = (url || "").match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-      if (ytMatch) {
-        const videoId = ytMatch[1];
-        const proxyUrl = `${edgeBase}?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}`;
-
-        let directMediaUrl = null;
-        const pipedInstances = [
-          `https://pipedapi.kavin.rocks/streams/${videoId}`,
-          `https://api.piped.privacydev.net/streams/${videoId}`
-        ];
-
-        for (const inst of pipedInstances) {
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3000);
-            const res = await fetch(inst, { signal: controller.signal });
-            clearTimeout(timeoutId);
-            if (res.ok) {
-              const data = await res.json();
-              const streams = isAudio ? (data.audioStreams || []) : (data.videoStreams || []);
-              if (streams && streams.length > 0) {
-                directMediaUrl = streams[0]?.url;
-                if (directMediaUrl) break;
-              }
-            }
-          } catch (_) {}
-        }
-
-        return new Response(JSON.stringify({
-          success: true,
-          downloadUrl: directMediaUrl || proxyUrl,
-          filename: filename,
-          via: directMediaUrl ? "piped-stream" : "edge-proxy"
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      // 3. Default fallback proxy
       const proxyUrl = `${edgeBase}?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}`;
       return new Response(JSON.stringify({
         success: true,
         downloadUrl: proxyUrl,
         filename: filename,
-        via: "edge-proxy"
+        via: "innertube-stream"
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     } catch (err: any) {
