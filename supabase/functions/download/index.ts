@@ -224,6 +224,36 @@ serve(async (req) => {
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      // Check YouTube URLs
+      const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+      if (ytMatch) {
+        const videoId = ytMatch[1];
+        // Pre-check YouTube video availability
+        try {
+          const clients: Array<"TV_EMBEDDED" | "IOS" | "ANDROID" | "WEB"> = ["TV_EMBEDDED", "IOS", "ANDROID", "WEB"];
+          let playableFound = false;
+          let safeTitle = filename.replace(/\.(mp3|mp4|m4a)$/i, '');
+
+          for (const clientType of clients) {
+            try {
+              const yt = await createInnertubeWithClient(clientType);
+              const info = await yt.getBasicInfo(videoId);
+              if (info.basic_info?.title) {
+                safeTitle = info.basic_info.title.replace(/[/\\?%*:|"<>]/g, '-');
+              }
+              if (info.streaming_data?.formats?.length || info.streaming_data?.adaptive_formats?.length) {
+                playableFound = true;
+                break;
+              }
+            } catch (_) {
+              // Try next client
+            }
+          }
+
+          filename = `${safeTitle}.${isAudio ? "m4a" : "mp4"}`;
+        } catch (_) {}
+      }
+
       const proxyUrl = `${edgeBase}?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}`;
       return new Response(JSON.stringify({
         success: true,
