@@ -1658,7 +1658,7 @@
                     
                     progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
                     progressBar.style.width = '100%';
-                    statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Started!';
+                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Ready! <a href="${directUrl}" download="${dlFilename}" class="inline-flex items-center gap-1 underline font-semibold text-white ml-2 bg-primary/20 hover:bg-primary/40 px-2 py-0.5 rounded border border-primary/30 transition-all"><span class="material-symbols-outlined text-[12px]">download</span> Save File</a>`;
                     statusText.classList.replace('text-primary', 'text-green-400');
                     speedText.textContent  = '';
                     sizeInfo.textContent   = '';
@@ -1667,7 +1667,7 @@
                     
                     setTimeout(() => {
                         if (typeof autoResetDownloader === 'function') autoResetDownloader();
-                    }, 4000);
+                    }, 8000);
                     return;
                 }
 
@@ -1722,16 +1722,23 @@
                                 const a = document.createElement('a');
                                 a.style.display = 'none';
                                 a.href = serveUrl;
-                                a.download = dlFilename;
+                                a.setAttribute('download', dlFilename);
                                 document.body.appendChild(a);
                                 a.click();
-                                document.body.removeChild(a);
+                                setTimeout(() => { try { document.body.removeChild(a); } catch(_) {} }, 2000);
+
+                                // Secondary fallback via hidden iframe to ensure download triggers across all browsers
+                                const dlFrame = document.createElement('iframe');
+                                dlFrame.style.display = 'none';
+                                dlFrame.src = serveUrl;
+                                document.body.appendChild(dlFrame);
+                                setTimeout(() => { try { document.body.removeChild(dlFrame); } catch(_) {} }, 60000);
                                 
-                                // Update UI to success after brief delay to verify browser received file intent
+                                // Update UI to success with explicit Save File link
                                 setTimeout(() => {
                                     progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
                                     progressBar.style.width = '100%';
-                                    statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Successful!';
+                                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Complete! <a href="${serveUrl}" download="${dlFilename}" class="inline-flex items-center gap-1 underline font-semibold text-white ml-2 bg-primary/20 hover:bg-primary/40 px-2 py-0.5 rounded border border-primary/30 transition-all"><span class="material-symbols-outlined text-[12px]">download</span> Save File</a>`;
                                     statusText.classList.replace('text-primary', 'text-green-400');
                                     speedText.textContent  = '';
                                     sizeInfo.textContent   = '';
@@ -1741,7 +1748,7 @@
 
                                 setTimeout(() => {
                                     if (typeof autoResetDownloader === 'function') autoResetDownloader();
-                                }, 4000);
+                                }, 8000);
                             } else if (st.status === 'failed') {
                                 clearInterval(pollInterval);
                                 throw new Error(st.error || 'Download failed during extraction');

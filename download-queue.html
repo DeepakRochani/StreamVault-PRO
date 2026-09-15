@@ -786,10 +786,17 @@ document.addEventListener('DOMContentLoaded', () => {
                                 // Automatically trigger the browser download stream
                                 const a = document.createElement('a');
                                 a.href = '/api/fetch-file?id=' + item.id;
+                                a.setAttribute('download', filename);
                                 a.style.display = 'none';
                                 document.body.appendChild(a);
                                 a.click();
-                                document.body.removeChild(a);
+                                setTimeout(() => { try { document.body.removeChild(a); } catch(_) {} }, 2000);
+
+                                const dlFrame = document.createElement('iframe');
+                                dlFrame.style.display = 'none';
+                                dlFrame.src = '/api/fetch-file?id=' + item.id;
+                                document.body.appendChild(dlFrame);
+                                setTimeout(() => { try { document.body.removeChild(dlFrame); } catch(_) {} }, 60000);
                                 
                                 resolve();
 
