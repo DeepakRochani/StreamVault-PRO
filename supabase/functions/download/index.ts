@@ -1,5 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { Innertube, UniversalCache } from "npm:youtubei.js@latest";
+import { Innertube, Platform, UniversalCache } from "npm:youtubei.js@latest";
+
+// Configure JavaScript interpreter shim for YouTube decipher algorithms
+if (Platform && Platform.shim) {
+  Platform.shim.eval = async (data: any) => {
+    return new Function(data.output)();
+  };
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,11 +18,16 @@ let innertubeClient: any = null;
 
 async function getInnertube() {
   if (!innertubeClient) {
-    innertubeClient = await Innertube.create({
-      cache: new UniversalCache(false),
-      generate_session_locally: true,
-      client_type: "ANDROID"
-    });
+    try {
+      innertubeClient = await Innertube.create({
+        cache: new UniversalCache(false),
+        generate_session_locally: true
+      });
+    } catch (err) {
+      console.error("Failed to init Innertube:", err);
+      // Try minimal create
+      innertubeClient = await Innertube.create();
+    }
   }
   return innertubeClient;
 }
@@ -32,9 +44,9 @@ serve(async (req) => {
     const videoUrl = reqUrl.searchParams.get("url");
     const formatUrl = reqUrl.searchParams.get("format_url");
     const isAudio = reqUrl.searchParams.get("audio") === "true";
-    const customFilename = reqUrl.searchParams.get("filename") || "download";
+    let customFilename = reqUrl.searchParams.get("filename") || (isAudio ? "audio.mp3" : "video.mp4");
 
-    // 1. Direct format URL proxy
+    // 1. Direct format URL proxy (e.g. Social media or direct CDN)
     if (formatUrl) {
       try {
         const streamRes = await fetch(formatUrl, {
@@ -63,64 +75,91 @@ serve(async (req) => {
     const ytMatch = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
     if (ytMatch) {
       const videoId = ytMatch[1];
+      let lastErr = "";
 
       try {
         const yt = await getInnertube();
-        const info = await yt.getInfo(videoId);
-        
-        let chosenFormat = null;
-        if (isAudio) {
-          chosenFormat = info.streaming_data?.adaptive_formats?.find((f: any) => f.mime_type?.startsWith("audio/mp4")) ||
-                         info.streaming_data?.adaptive_formats?.find((f: any) => f.mime_type?.startsWith("audio/")) ||
-                         info.chooseFormat({ type: "audio", quality: "best" });
-        } else {
-          chosenFormat = info.chooseFormat({ type: "video+audio", quality: "best" }) ||
-                         info.streaming_data?.formats?.[0];
+        const video = await yt.getInfo(videoId);
+
+        const safeTitle = (video.basic_info?.title || "download").replace(/[/\\?%*:|"<>]/g, '-');
+        let stream: any = null;
+        let mimeType = "video/mp4";
+        customFilename = `${safeTitle}.mp4`;
+
+        // Attempt 1: Innertube download method
+        try {
+          if (isAudio) {
+            try {
+              stream = await video.download({ type: "audio", quality: "best" });
+              mimeType = "audio/mp4";
+              customFilename = `${safeTitle}.m4a`;
+            } catch (aErr: any) {
+              console.warn("Audio download attempt failed:", aErr.message);
+            }
+          }
+
+          if (!stream) {
+            stream = await video.download({ type: "video+audio", quality: "best" });
+            mimeType = "video/mp4";
+            customFilename = `${safeTitle}.mp4`;
+          }
+        } catch (dErr: any) {
+          console.warn("video.download failed, attempting direct format stream:", dErr.message);
         }
 
-        if (chosenFormat) {
-          const directUrl = typeof chosenFormat.decipher === 'function' 
-            ? chosenFormat.decipher(yt.session.player) 
-            : (chosenFormat.url || yt.session.player.decipher(chosenFormat.signature_cipher || chosenFormat.cipher));
+        // Attempt 2: Direct format stream from streaming_data
+        if (!stream && video.streaming_data) {
+          const formatList = [
+            ...(video.streaming_data.formats || []),
+            ...(video.streaming_data.adaptive_formats || [])
+          ];
 
-          if (directUrl) {
-            const mediaRes = await fetch(directUrl, {
-              headers: {
-                "User-Agent": "com.google.android.youtube/19.29.37 (Linux; U; Android 11; en_US) gzip"
+          for (const fmt of formatList) {
+            try {
+              let streamUrl = fmt.url;
+              if (!streamUrl && typeof fmt.decipher === "function") {
+                try { streamUrl = fmt.decipher(yt.session.player); } catch (_) {}
               }
-            });
-            if (mediaRes.ok && mediaRes.body) {
-              const headers = new Headers(corsHeaders);
-              headers.set("Content-Type", isAudio ? "audio/mpeg" : "video/mp4");
-              headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"`);
-              return new Response(mediaRes.body, { headers });
+              if (streamUrl) {
+                const fetched = await fetch(streamUrl, {
+                  headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Referer": "https://www.youtube.com/"
+                  }
+                });
+                if (fetched.ok && fetched.body) {
+                  stream = fetched.body;
+                  mimeType = fmt.mime_type?.split(';')[0] || "video/mp4";
+                  break;
+                }
+              }
+            } catch (fErr: any) {
+              console.warn("Format candidate failed:", fErr.message);
             }
           }
         }
-      } catch (innertubeErr) {
-        console.warn("Innertube format deciphering failed:", innertubeErr);
+
+        if (stream) {
+          const headers = new Headers(corsHeaders);
+          headers.set("Content-Type", mimeType);
+          headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"`);
+          return new Response(stream, { headers });
+        }
+      } catch (e: any) {
+        lastErr = e.message || String(e);
+        console.error("Innertube streaming error:", e);
       }
 
-      try {
-        const yt = await getInnertube();
-        const stream = await yt.download(videoId, {
-          type: isAudio ? "audio" : "video+audio",
-          quality: "best"
-        });
-
-        const headers = new Headers(corsHeaders);
-        headers.set("Content-Type", isAudio ? "audio/mpeg" : "video/mp4");
-        headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"`);
-        return new Response(stream, { headers });
-      } catch (downloadErr) {
-        console.warn("Innertube yt.download failed:", downloadErr);
-      }
+      return new Response(JSON.stringify({ 
+        error: `Edge streaming error: ${lastErr}. Please use the StreamVault Desktop App for full offline downloads.` 
+      }), { 
+        status: 502, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      });
     }
 
-    return new Response(JSON.stringify({ 
-      error: "Online serverless streaming could not fetch this video. Please download using the StreamVault Desktop App for unrestricted 4K/1080p downloads." 
-    }), { 
-      status: 502, 
+    return new Response(JSON.stringify({ error: "Invalid video URL" }), { 
+      status: 400, 
       headers: { ...corsHeaders, "Content-Type": "application/json" } 
     });
   }
