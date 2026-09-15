@@ -23,18 +23,22 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
 
+const defaultCookie = "GPS=1; PREF=hl=en&tz=UTC; SOCS=CAI; VISITOR_INFO1_LIVE=zjW6Y_RzRUI; VISITOR_PRIVACY_METADATA=CgJJThIEGgAgGg%3D%3D; YSC=JNKtOAO-9B4; __Secure-ROLLOUT_TOKEN=CMS3w9CquMO7HBDkkLrOjZiVAxjy_IHdjZiVAw%3D%3D";
+
 let innertubeClient: any = null;
 
 async function getInnertube() {
   if (!innertubeClient) {
+    const cookie = Deno.env.get("YOUTUBE_COOKIE") || defaultCookie;
     try {
       innertubeClient = await Innertube.create({
         cache: new UniversalCache(false),
         generate_session_locally: true,
-        retrieve_player: true
+        retrieve_player: true,
+        cookie: cookie
       });
     } catch (err) {
-      console.error("Failed to init Innertube with local session, falling back:", err);
+      console.error("Failed to init Innertube with cookie, falling back:", err);
       innertubeClient = await Innertube.create();
     }
   }
