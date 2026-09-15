@@ -1634,7 +1634,38 @@
                 const dlId = reqBody.id;
                 const dlFilename = dlData.filename || filename;
 
-                // ── Poll for Local Download Status ───────────
+                // ── Direct / Online Serverless Download ───────────
+                if (dlData.downloadUrl || dlData.url) {
+                    const directUrl = dlData.downloadUrl || dlData.url;
+                    console.log("TRIGGERING ONLINE STREAM DOWNLOAD: ", directUrl);
+                    
+                    saveToQueueHistory(videoData, dlFilename, dlId, format, null, true);
+                    
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = directUrl;
+                    a.download = dlFilename;
+                    a.target = '_blank';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
+                    progressBar.style.width = '100%';
+                    statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Started!';
+                    statusText.classList.replace('text-primary', 'text-green-400');
+                    speedText.textContent  = '';
+                    sizeInfo.textContent   = '';
+                    pctText.textContent    = '';
+                    downloadAnotherBtn.classList.remove('hidden');
+                    
+                    setTimeout(() => {
+                        if (typeof autoResetDownloader === 'function') autoResetDownloader();
+                    }, 4000);
+                    return;
+                }
+
+                // ── Poll for Local Download Status (Desktop Mode) ───────────
                 statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Downloading to PC...';
                 progressBar.style.width = '0%';
                 

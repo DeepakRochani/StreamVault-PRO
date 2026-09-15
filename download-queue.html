@@ -660,7 +660,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 const startData = await startResponse.json();
                 if (startData.filename) filename = startData.filename;
 
-                // ── Step 3: Poll for download progress ─────────────
+                // ── Direct / Online Serverless Download ───────────
+                if (startData.downloadUrl || startData.url) {
+                    const directUrl = startData.downloadUrl || startData.url;
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = directUrl;
+                    a.download = filename;
+                    a.target = '_blank';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+
+                    item.progress = 100;
+                    item.status = 'completed';
+                    localStorage.setItem('download_queue', JSON.stringify(queue));
+                    renderQueue();
+                    return;
+                }
+
+                // ── Step 3: Poll for download progress (Desktop Mode) ─────────────
                 // Returns a promise that resolves on complete or rejects on failure
                 await new Promise((resolve, reject) => {
                     const pollInterval = setInterval(async () => {
