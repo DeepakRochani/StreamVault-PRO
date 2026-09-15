@@ -35,10 +35,11 @@ async function getInnertube() {
         cache: new UniversalCache(false),
         generate_session_locally: true,
         retrieve_player: true,
+        client_type: "ANDROID",
         cookie: cookie
       });
-    } catch (err) {
-      console.error("Failed to init Innertube with cookie, falling back:", err);
+    } catch (err: any) {
+      console.warn("Failed to init Innertube with ANDROID client, falling back:", err.message);
       innertubeClient = await Innertube.create();
     }
   }
@@ -92,23 +93,7 @@ serve(async (req) => {
 
       try {
         const yt = await getInnertube();
-        let video: any = null;
-        let lastInfoErr: any = null;
-
-        const clientList = ['ANDROID', 'IOS', 'TV_EMBEDDED', 'WEB'];
-        for (const cl of clientList) {
-          try {
-            video = await yt.getBasicInfo(videoId, cl as any);
-            if (video && (video.streaming_data || video.basic_info)) break;
-          } catch (clErr: any) {
-            lastInfoErr = clErr;
-            console.warn(`Client ${cl} getBasicInfo failed:`, clErr.message);
-          }
-        }
-
-        if (!video) {
-          video = await yt.getBasicInfo(videoId);
-        }
+        const video = await yt.getBasicInfo(videoId);
 
         const safeTitle = (video.basic_info?.title || "download").replace(/[/\\?%*:|"<>]/g, '-');
         let stream: any = null;
@@ -181,8 +166,13 @@ serve(async (req) => {
       }
 
       let friendlyError = lastErr || "Failed to extract playable stream";
-      if (friendlyError.toLowerCase().includes("login required") || friendlyError.toLowerCase().includes("sign in")) {
-        friendlyError = "This video requires YouTube account login or cookies. Please use the StreamVault Desktop App to download restricted/music videos with full quality.";
+      if (
+        friendlyError.toLowerCase().includes("login required") || 
+        friendlyError.toLowerCase().includes("sign in") ||
+        friendlyError.toLowerCase().includes("403") ||
+        friendlyError.toLowerCase().includes("400")
+      ) {
+        friendlyError = "This video is restricted or requires YouTube account login/cookies. Please use the StreamVault Desktop App for unrestricted 4K/1080p downloads.";
       }
 
       return new Response(JSON.stringify({ 
