@@ -666,11 +666,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     const a = document.createElement('a');
                     a.style.display = 'none';
                     a.href = directUrl;
-                    a.download = filename;
-                    a.target = '_blank';
+                    a.setAttribute('download', filename);
                     document.body.appendChild(a);
                     a.click();
-                    document.body.removeChild(a);
+                    setTimeout(() => { try { document.body.removeChild(a); } catch(_) {} }, 2000);
+
+                    // Iframe fallback guarantees browser Save/Download prompt without popup blocker interference
+                    const dlFrame = document.createElement('iframe');
+                    dlFrame.style.display = 'none';
+                    dlFrame.src = directUrl;
+                    document.body.appendChild(dlFrame);
+                    setTimeout(() => { try { document.body.removeChild(dlFrame); } catch(_) {} }, 60000);
 
                     item.progress = 100;
                     item.status = 'completed';

@@ -1644,11 +1644,17 @@
                     const a = document.createElement('a');
                     a.style.display = 'none';
                     a.href = directUrl;
-                    a.download = dlFilename;
-                    a.target = '_blank';
+                    a.setAttribute('download', dlFilename);
                     document.body.appendChild(a);
                     a.click();
-                    document.body.removeChild(a);
+                    setTimeout(() => { try { document.body.removeChild(a); } catch(_) {} }, 2000);
+
+                    // Iframe fallback guarantees browser Save/Download prompt without popup blocker interference
+                    const dlFrame = document.createElement('iframe');
+                    dlFrame.style.display = 'none';
+                    dlFrame.src = directUrl;
+                    document.body.appendChild(dlFrame);
+                    setTimeout(() => { try { document.body.removeChild(dlFrame); } catch(_) {} }, 60000);
                     
                     progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
                     progressBar.style.width = '100%';
