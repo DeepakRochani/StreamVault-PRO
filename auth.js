@@ -6,16 +6,20 @@ const db = require('./database.js');
 
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-    if (process.env.NODE_ENV === 'production') {
-        console.error('FATAL ERROR: process.env.JWT_SECRET is not set in production. Shutting down.');
-        process.exit(1);
-    } else {
-        console.warn('WARNING: Using insecure fallback JWT_SECRET for development.');
+if (!process.env.JWT_SECRET && process.env.NODE_ENV !== 'test') {
+    try {
+        require('dotenv').config();
+    } catch (_) {
+        // Optional in environments where dotenv is not bundled
     }
 }
-const ACTIVE_JWT_SECRET = JWT_SECRET || 'streamvault_super_secret_key_2026';
+
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || typeof JWT_SECRET !== 'string' || JWT_SECRET.trim() === '') {
+    const errorMsg = 'FATAL ERROR: JWT_SECRET environment variable is missing or empty. Authentication system cannot initialize.';
+    console.error(errorMsg);
+    throw new Error(errorMsg);
+}
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -75,7 +79,7 @@ router.post('/register', authLimiter, async (req, res) => {
 
         recordDevice(req, id);
 
-        const token = jwt.sign({ id, email }, ACTIVE_JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ id, email }, JWT_SECRET, { expiresIn: '7d' });
         res.cookie('token', token, { httpOnly: true, sameSite: 'strict' });
         res.json({ success: true, user: { id, email, name: name || email.split('@')[0] } });
     } catch(e) {
@@ -103,7 +107,7 @@ router.post('/login', authLimiter, async (req, res) => {
         
         recordDevice(req, user.id);
 
-        const token = jwt.sign({ id: user.id, email: user.email }, ACTIVE_JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
         res.cookie('token', token, { httpOnly: true, sameSite: 'strict' });
         res.json({ success: true, user: { id: user.id, email: user.email, name: user.name } });
     } catch(e) {
@@ -137,7 +141,7 @@ router.post('/mock-google', (req, res) => {
         
         recordDevice(req, user.id);
 
-        const token = jwt.sign({ id: user.id, email: user.email }, ACTIVE_JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
         res.cookie('token', token, { httpOnly: true, sameSite: 'strict' });
         res.json({ success: true, user: { id: user.id, email: user.email, name: user.name } });
     } catch(e) {
@@ -189,7 +193,7 @@ router.post('/supabase-sync', async (req, res) => {
         recordDevice(req, localUser.id);
 
         // Generate local session cookie
-        const token = jwt.sign({ id: localUser.id, email: localUser.email }, ACTIVE_JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ id: localUser.id, email: localUser.email }, JWT_SECRET, { expiresIn: '7d' });
         res.cookie('token', token, { httpOnly: true, sameSite: 'strict', path: '/' });
         res.json({ success: true, user: { id: localUser.id, email: localUser.email, name: localUser.name } });
     } catch (e) {
@@ -212,7 +216,7 @@ router.get('/me', (req, res) => {
                 db.prepare('INSERT INTO users (id, email, password_hash, name, role, settings_json) VALUES (?, ?, ?, ?, ?, ?)')
                   .run(id, guestEmail, hash, 'Guest User', 'guest', defaultSettings);
                   
-                token = jwt.sign({ id, email: guestEmail }, ACTIVE_JWT_SECRET, { expiresIn: '30d' });
+                token = jwt.sign({ id, email: guestEmail }, JWT_SECRET, { expiresIn: '30d' });
                 res.cookie('token', token, { httpOnly: true, sameSite: 'strict' });
                 console.log(`[Auth] Auto-generated Guest Session: ${guestEmail}`);
             }
@@ -224,7 +228,7 @@ router.get('/me', (req, res) => {
     if (!token) return res.json({ loggedIn: false });
     
     try {
-        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET);
         const user = db.prepare('SELECT id, email, name, join_date, last_login, settings_json, role, status, plan, auto_update, auto_download_updates FROM users WHERE id = ?').get(decoded.id);
         if (!user || user.status === 'blocked') return res.json({ loggedIn: false });
         
@@ -280,7 +284,7 @@ router.post('/notifications/:id/read', (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET);
         db.prepare(`
             INSERT INTO user_notifications (user_id, notification_id, is_read, read_at)
             VALUES (?, ?, 1, CURRENT_TIMESTAMP)
@@ -296,7 +300,7 @@ router.get('/history/downloads', (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET);
         const history = db.prepare('SELECT * FROM download_history WHERE user_id = ? ORDER BY download_date DESC').all(decoded.id);
         res.json({ success: true, history });
     } catch(e) {
@@ -308,7 +312,7 @@ router.get('/history/conversions', (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET);
         const history = db.prepare('SELECT * FROM conversion_history WHERE user_id = ? ORDER BY conversion_date DESC').all(decoded.id);
         res.json({ success: true, history });
     } catch(e) {
@@ -320,7 +324,7 @@ router.get('/stats', (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET);
         const dlCount = db.prepare('SELECT COUNT(*) as c FROM download_history WHERE user_id = ?').get(decoded.id).c;
         const cvCount = db.prepare('SELECT COUNT(*) as c FROM conversion_history WHERE user_id = ?').get(decoded.id).c;
         const ytCount = db.prepare("SELECT COUNT(*) as c FROM download_history WHERE user_id = ? AND platform = 'YouTube'").get(decoded.id).c;
@@ -334,7 +338,7 @@ router.delete('/history/downloads/:id', (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET);
         db.prepare('DELETE FROM download_history WHERE id = ? AND user_id = ?').run(req.params.id, decoded.id);
         res.json({ success: true });
     } catch(e) { res.status(500).json({ error: e.message }); }
@@ -344,7 +348,7 @@ router.delete('/history/conversions/:id', (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET);
         db.prepare('DELETE FROM conversion_history WHERE id = ? AND user_id = ?').run(req.params.id, decoded.id);
         res.json({ success: true });
     } catch(e) { res.status(500).json({ error: e.message }); }
@@ -354,7 +358,7 @@ router.post('/settings', (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET);
         const newSettings = req.body;
         db.prepare('UPDATE users SET settings_json = ? WHERE id = ?').run(JSON.stringify(newSettings), decoded.id);
         res.json({ success: true });
@@ -365,7 +369,7 @@ router.post('/settings/auto-update', (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET);
         const { key, value } = req.body;
         if (key === 'auto_update') {
             db.prepare('UPDATE users SET auto_update = ? WHERE id = ?').run(value, decoded.id);
@@ -394,7 +398,7 @@ const logConversionHistory = (userId, type, fileName, filePath) => {
 const logDownloadWithToken = (token, platform, fileName, filePath, fileSize) => {
     if (!token) return;
     try {
-        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET);
         logDownloadHistory(decoded.id, platform, fileName, filePath, fileSize);
     } catch(e) {}
 };
@@ -402,9 +406,9 @@ const logDownloadWithToken = (token, platform, fileName, filePath, fileSize) => 
 const logConversionWithToken = (token, type, fileName, filePath) => {
     if (!token) return;
     try {
-        const decoded = jwt.verify(token, ACTIVE_JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET);
         logConversionHistory(decoded.id, type, fileName, filePath);
     } catch(e) {}
 };
 
-module.exports = { router, JWT_SECRET: ACTIVE_JWT_SECRET, ACTIVE_JWT_SECRET, logDownloadHistory, logConversionHistory, logDownloadWithToken, logConversionWithToken, logActivity };
+module.exports = { router, JWT_SECRET, logDownloadHistory, logConversionHistory, logDownloadWithToken, logConversionWithToken, logActivity };
