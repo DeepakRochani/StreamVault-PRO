@@ -156,7 +156,7 @@ router.post('/supabase-sync', async (req, res) => {
         if (!access_token) return res.status(400).json({ error: 'Access token required' });
 
         const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sjnamkshicpxtyikzsnp.supabase.co';
-        const SUPABASE_ANON_KEY = process.env.SUPABASE_SECRET_KEY;
+        const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SECRET_KEY || 'sb_publishable_t2N8YtpcPHjVFJzrMlLr5Q_pL9ppUiP';
 
         // Verify the token by calling Supabase user info endpoint
         const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {

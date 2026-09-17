@@ -333,6 +333,22 @@
 
         async function initDashboard() {
             try {
+                // If returning from Supabase OAuth (e.g. Google Sign-In)
+                if (window.supabaseClient) {
+                    try {
+                        const { data: { session } } = await window.supabaseClient.auth.getSession();
+                        if (session && session.access_token) {
+                            await fetch((window.API_BASE_URL || '') + '/api/auth/supabase-sync', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ access_token: session.access_token })
+                            });
+                        }
+                    } catch (oauthSyncErr) {
+                        console.warn('OAuth session sync notice:', oauthSyncErr);
+                    }
+                }
+
                 const res = await fetch((window.API_BASE_URL || '') + '/api/auth/me');
                 const data = await res.json();
                 if (!data.loggedIn) {
