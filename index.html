@@ -337,9 +337,27 @@
     }
 
     window.isLoggedIn = false;
-    fetch((window.API_BASE_URL || '') + '/api/auth/me').then(r => r.json()).then(data => {
-        window.isLoggedIn = data.loggedIn;
-        if(data.loggedIn) {
+    async function checkAuthSession() {
+        if (window.supabaseClient) {
+            try {
+                const { data: { session } } = await window.supabaseClient.auth.getSession();
+                if (session && session.access_token) {
+                    await fetch((window.API_BASE_URL || '') + '/api/auth/supabase-sync', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ access_token: session.access_token })
+                    });
+                }
+            } catch (err) {
+                console.warn('Supabase OAuth check:', err);
+            }
+        }
+        
+        try {
+            const r = await fetch((window.API_BASE_URL || '') + '/api/auth/me');
+            const data = await r.json();
+            window.isLoggedIn = data.loggedIn;
+            if(data.loggedIn) {
             authBtn.onclick = toggleMenu;
             authBtn.className = "w-10 h-10 rounded-xl bg-primary-container/20 flex items-center justify-center border border-primary/20 text-primary font-bold hover:bg-primary-container/30 transition-colors";
             authBtn.innerHTML = (data.user.name || data.user.email).substring(0, 2).toUpperCase();
@@ -416,7 +434,11 @@
                 }
             }
         }
-    }).catch(e=>{});
+    } catch(e) {
+        console.error("Auth check failed:", e);
+    }
+}
+checkAuthSession();
 </script>
 </header>
 
