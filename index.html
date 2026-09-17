@@ -6,6 +6,7 @@
 <title>StreamVault PRO - Home</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module" src="js/config.js"></script>
+<script src="js/entitlements.js"></script>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="ads.js"></script>
 <script src="js/url-parser.js"></script>
@@ -1369,26 +1370,27 @@ checkAuthSession();
             }
 
             function createQualityChip(type, name, value, sizeStr, isRecommended = false, extraDetails = '', isLocked = false) {
+                const clickAttr = isLocked ? `onclick="event.preventDefault(); showDesktopProModal('${name}')"` : '';
                 return `
-                    <label class="relative ${isLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer group'}">
-                        <input class="sr-only quality-radio" name="${type}_quality" type="radio" value="${value}" data-size="${sizeStr}" ${isLocked ? 'disabled' : ''}/>
-                        <div class="glass-panel rounded-xl p-4 min-h-[88px] flex items-center justify-between transition-all duration-200 border-2 border-transparent ${isLocked ? '' : 'group-hover:border-white/20'} quality-card relative overflow-hidden bg-surface-container-high/50">
+                    <label class="relative cursor-pointer group" ${clickAttr}>
+                        <input class="sr-only quality-radio" name="${type}_quality" type="radio" value="${value}" data-quality-name="${name}" data-size="${sizeStr}" ${isLocked ? 'disabled data-locked="true"' : ''}/>
+                        <div class="glass-panel rounded-xl p-4 min-h-[88px] flex items-center justify-between transition-all duration-200 border-2 ${isLocked ? 'border-amber-500/20 bg-surface-container-high/40 hover:border-amber-500/40' : 'border-transparent group-hover:border-white/20 bg-surface-container-high/50'} quality-card relative overflow-hidden">
                             <div class="flex items-center gap-4">
-                                <div class="w-5 h-5 rounded-full border-2 border-outline-variant flex items-center justify-center radio-border">
+                                <div class="w-5 h-5 rounded-full border-2 ${isLocked ? 'border-amber-500/40' : 'border-outline-variant'} flex items-center justify-center radio-border">
                                     <div class="w-2.5 h-2.5 rounded-full bg-transparent transform scale-0 transition-transform duration-200 radio-inner"></div>
                                 </div>
                                 <div>
                                     <div class="flex items-center flex-wrap gap-y-1 mb-1">
                                         <span class="font-title-md text-title-md text-on-surface">${name}</span>
                                         ${isRecommended && !isLocked ? '<span class="bg-primary/20 text-primary px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ml-2 border border-primary/30 shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.2)]">Recommended</span>' : ''}
-                                        ${isLocked ? '<span class="bg-warning/20 text-warning px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ml-2 border border-warning/30 shadow-[0_0_8px_rgba(var(--md-sys-color-warning),0.2)] flex items-center gap-1"><span class="material-symbols-outlined text-[12px] leading-none">lock</span> PRO</span>' : ''}
+                                        ${isLocked ? '<span class="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ml-2 border border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.2)] flex items-center gap-1"><span class="material-symbols-outlined text-[12px] leading-none">lock</span> Desktop Pro</span>' : ''}
                                     </div>
                                     ${extraDetails ? `<div class="text-xs text-on-surface-variant/70 font-medium tracking-wide mt-1">${extraDetails}</div>` : ''}
                                 </div>
                             </div>
                             <div class="flex items-center gap-4">
-                                <span class="font-title-md text-title-md text-on-surface">~ ${sizeStr}</span>
-                                ${!isLocked ? '<span class="material-symbols-outlined text-primary opacity-0 check-icon transition-opacity">check_circle</span>' : ''}
+                                <span class="font-title-md text-title-md ${isLocked ? 'text-on-surface-variant/80' : 'text-on-surface'}">~ ${sizeStr}</span>
+                                ${!isLocked ? '<span class="material-symbols-outlined text-primary opacity-0 check-icon transition-opacity">check_circle</span>' : '<span class="material-symbols-outlined text-amber-400 text-[20px]">lock</span>'}
                             </div>
                         </div>
                     </label>
@@ -1407,9 +1409,11 @@ checkAuthSession();
                             if (f.fps) details.push(f.fps);
                             if (f.codec && f.codec !== 'Unknown') details.push(f.codec);
                             
-                            let isLocked = false;
+                            const isLocked = window.StreamVaultEntitlements ? window.StreamVaultEntitlements.isDesktopProRequired(f.id || f.quality, 'mp4') : false;
+                            const is1080p = (f.quality || '').toLowerCase().includes('1080') || (f.id || '').toLowerCase().includes('1080');
+                            const isRec = (f.recommended || is1080p) && !isLocked;
                             
-                            html += createQualityChip('video', f.quality, f.id, f.sizeStr, f.recommended && !isLocked, details.join(' • '), isLocked);
+                            html += createQualityChip('video', f.quality, f.id, f.sizeStr, isRec, details.join(' • '), isLocked);
                             count++;
                         });
                     }
@@ -1486,7 +1490,7 @@ checkAuthSession();
 
                 // Re-attach listeners to dynamically generated radios
                 const container = format === 'mp4' ? mp4Options : mp3Options;
-                const newRadios = container.querySelectorAll('.quality-radio');
+                const newRadios = container.querySelectorAll('.quality-radio:not([disabled]):not([data-locked="true"])');
                 newRadios.forEach(radio => {
                     radio.addEventListener('change', (e) => {
                         selectedQuality = e.target.value;
@@ -1495,11 +1499,14 @@ checkAuthSession();
                     });
                 });
                 
-                // Auto-select first quality if available
+                // Auto-select first unlocked quality if available (prefers 1080p for web)
                 setTimeout(() => {
-                    const firstQuality = container.querySelector('.quality-radio');
-                    if (firstQuality && !firstQuality.checked) {
-                        firstQuality.click();
+                    const unlockedRadios = Array.from(container.querySelectorAll('.quality-radio:not([disabled]):not([data-locked="true"])'));
+                    if (unlockedRadios.length > 0) {
+                        const recRadio = unlockedRadios.find(r => (r.getAttribute('data-quality-name') || '').toLowerCase().includes('1080')) || unlockedRadios[0];
+                        if (recRadio && !recRadio.checked) {
+                            recRadio.click();
+                        }
                     }
                 }, 50);
             }
@@ -1572,12 +1579,165 @@ checkAuthSession();
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
 
+        function showDesktopProModal(qualityName) {
+            const modal = document.getElementById('desktop-pro-modal');
+            const desc = document.getElementById('desktop-pro-modal-desc');
+            if (desc && qualityName) {
+                desc.textContent = `${qualityName} downloads require the StreamVault Desktop App.`;
+            }
+            if (modal) {
+                modal.classList.remove('hidden');
+            }
+        }
+
+        function continueWithWeb1080p() {
+            const modal = document.getElementById('desktop-pro-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+
+            // Switch to MP4 and pick 1080p or first unlocked quality
+            const mp4Radio = document.querySelector('input[name="format"][value="mp4"]');
+            if (mp4Radio && !mp4Radio.checked) {
+                mp4Radio.click();
+            }
+
+            setTimeout(() => {
+                const radios = Array.from(document.querySelectorAll('#mp4-options .quality-radio:not([disabled]):not([data-locked="true"])'));
+                const matched1080 = radios.find(r => (r.getAttribute('data-quality-name') || '').toLowerCase().includes('1080')) || radios[0];
+                if (matched1080) {
+                    matched1080.click();
+                }
+            }, 100);
+        }
+
+        function resetToUrlInput() {
+            const workflowSection = document.getElementById('download-workflow-section');
+            if (workflowSection) {
+                workflowSection.classList.add('hidden');
+                workflowSection.classList.remove('flex');
+            }
+            const progressSection = document.getElementById('inline-progress-section');
+            if (progressSection) {
+                progressSection.classList.add('hidden');
+                progressSection.classList.remove('flex');
+            }
+            const stepsContainer = document.getElementById('selection-steps-container');
+            if (stepsContainer) {
+                stepsContainer.classList.remove('hidden');
+            }
+            const urlInput = document.getElementById('url-input');
+            if (urlInput) {
+                urlInput.focus();
+                urlInput.select();
+            }
+            if (typeof updateAnalyzeBtnState === 'function') updateAnalyzeBtnState();
+        }
+
+        function selectQualityAndRetry(targetQuality) {
+            const progressSection = document.getElementById('inline-progress-section');
+            if (progressSection) {
+                progressSection.classList.add('hidden');
+                progressSection.classList.remove('flex');
+            }
+            const stepsContainer = document.getElementById('selection-steps-container');
+            if (stepsContainer) {
+                stepsContainer.classList.remove('hidden');
+            }
+
+            const radios = Array.from(document.querySelectorAll('.quality-radio:not([disabled]):not([data-locked="true"])'));
+            const matched = radios.find(r => {
+                const val = (r.value || '').toLowerCase();
+                const name = (r.getAttribute('data-quality-name') || '').toLowerCase();
+                return val.includes(targetQuality.toLowerCase()) || name.includes(targetQuality.toLowerCase());
+            }) || radios[0];
+
+            if (matched) {
+                matched.click();
+            }
+
+            const startBtn = document.getElementById('btn-start-download');
+            if (startBtn) {
+                startBtn.click();
+            }
+        }
+
+        function renderCloudFallbackUI(err) {
+            const isBotChallenge = err.code === 'YOUTUBE_BOT_CHALLENGE' || 
+                                   (err.message && (err.message.includes('bot') || err.message.includes('verification') || err.message.includes('403')));
+            const isDash = err.code === 'CLOUD_DOWNLOAD_UNSUPPORTED' || 
+                           (err.message && (err.message.includes('separate video') || err.message.includes('audio stream') || err.message.includes('DASH')));
+            
+            if (isBotChallenge) {
+                return `
+                    <div class="bg-surface-container-high/90 border border-amber-500/30 rounded-2xl p-5 text-left max-w-lg mx-auto my-2 shadow-xl backdrop-blur-md">
+                        <div class="flex items-center gap-2 text-amber-300 font-bold text-base mb-2">
+                            <span class="material-symbols-outlined text-amber-400 text-[22px]">cloud_off</span> Cloud Download Unavailable
+                        </div>
+                        <div class="text-xs text-on-surface-variant leading-relaxed mb-4">
+                            <p class="mb-2 text-on-surface">YouTube requires additional verification for this video.</p>
+                            <p class="mb-2">Your selected quality is supported on Web, but this particular video cannot currently be retrieved by the Cloud server.</p>
+                            <p class="text-on-surface-variant/80">Desktop Pro can use the local Desktop download engine.</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-white/10">
+                            <a href="streamvault-home-tall.html" class="px-3.5 py-1.5 bg-primary text-on-primary text-xs font-bold rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5 shadow-md">
+                                <span class="material-symbols-outlined text-[16px]">desktop_windows</span> Open Desktop App
+                            </a>
+                            <button type="button" onclick="resetToUrlInput()" class="px-3.5 py-1.5 bg-surface border border-white/10 text-xs text-on-surface rounded-xl hover:bg-white/10 transition-all">Try Another Video</button>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            if (isDash) {
+                return `
+                    <div class="bg-surface-container-high/90 border border-amber-500/30 rounded-2xl p-5 text-left max-w-lg mx-auto my-2 shadow-xl backdrop-blur-md">
+                        <div class="flex items-center gap-2 text-amber-300 font-bold text-base mb-2">
+                            <span class="material-symbols-outlined text-amber-400 text-[22px]">lock</span> Desktop Pro Required
+                        </div>
+                        <div class="text-xs text-on-surface-variant leading-relaxed mb-4">
+                            This quality requires local video + audio processing with Desktop Pro.
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-white/10">
+                            <a href="streamvault-upgrade.html" class="px-3.5 py-1.5 bg-gradient-to-r from-primary to-orange-500 text-on-primary text-xs font-bold rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5 shadow-md">
+                                <span class="material-symbols-outlined text-[16px]">workspace_premium</span> Upgrade to Desktop Pro
+                            </a>
+                            <button type="button" onclick="selectQualityAndRetry('1080p')" class="px-3.5 py-1.5 bg-surface border border-white/10 text-xs text-on-surface rounded-xl hover:bg-white/10 transition-all">Select 1080p</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="bg-surface-container-high/90 border border-amber-500/30 rounded-2xl p-5 text-left max-w-lg mx-auto my-2 shadow-xl backdrop-blur-md">
+                    <div class="flex items-center gap-2 text-amber-300 font-bold text-base mb-2">
+                        <span class="material-symbols-outlined text-amber-400 text-[22px]">desktop_windows</span> Desktop Pro Recommended
+                    </div>
+                    <div class="text-xs text-on-surface-variant leading-relaxed mb-4">
+                        ${err.message || 'This format requires local stream processing.'}
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-white/10">
+                        <a href="streamvault-upgrade.html" class="px-3.5 py-1.5 bg-primary text-on-primary text-xs font-bold rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5 shadow-md">
+                            <span class="material-symbols-outlined text-[16px]">workspace_premium</span> Get Desktop Pro
+                        </a>
+                        <button type="button" onclick="resetToUrlInput()" class="px-3.5 py-1.5 bg-surface border border-white/10 text-xs text-on-surface rounded-xl hover:bg-white/10 transition-all">Try Another Video</button>
+                    </div>
+                </div>
+            `;
+        }
+
         async function startInlineDownload(videoData, format, selectedQuality) {
             return _executeInlineDownload(videoData, format, selectedQuality);
         }
 
         async function _executeInlineDownload(videoData, format, selectedQuality) {
             if (typeof window.toggleAds === 'function') window.toggleAds(false);
+
+            // Entitlement Gate: Locked quality check before initiating download
+            if (window.StreamVaultEntitlements && window.StreamVaultEntitlements.isDesktopProRequired(selectedQuality, format)) {
+                showDesktopProModal(selectedQuality);
+                return;
+            }
 
             const stepsContainer   = document.getElementById('selection-steps-container');
             const progressSection  = document.getElementById('inline-progress-section');
@@ -1593,17 +1753,20 @@ checkAuthSession();
             progressSection.classList.remove('hidden');
             progressSection.classList.add('flex');
 
-            statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Getting download link...';
+            const isAudio = format === 'mp3';
+            const qualDisplay = (selectedQuality && selectedQuality !== 'best' && selectedQuality !== 'Original') ? `${selectedQuality} • ` : '';
+            const fmtDisplay = isAudio ? 'MP3' : 'MP4';
+
+            statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Downloading <strong class="text-white">${qualDisplay}${fmtDisplay}</strong> securely...`;
             speedText.textContent  = '--';
             sizeInfo.textContent   = '--';
             pctText.textContent    = '';
-            progressBar.style.width = '60%';
+            progressBar.style.width = '50%';
+            progressBar.className = 'h-full rounded-full transition-all duration-300 bg-gradient-to-r from-primary to-orange-500';
 
-            const isAudio = format === 'mp3';
-            let filename  = (videoData.title || 'download').replace(/[/\\?%*:|"<>]/g, '-');
+            let filename = (videoData.title || 'download').replace(/[/\\?%*:|"<>]/g, '-');
             
             if (selectedQuality && selectedQuality !== 'best' && selectedQuality !== 'Original') {
-                // Append quality to filename to ensure unique files for different formats
                 filename += `_${selectedQuality}`;
             }
             
@@ -1665,7 +1828,7 @@ checkAuthSession();
                     console.log("TRIGGERING ONLINE STREAM DOWNLOAD: ", directUrl);
                     
                     statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Validating stream...';
-                    progressBar.style.width = '30%';
+                    progressBar.style.width = '40%';
 
                     try {
                         const streamCheck = await fetch(directUrl);
@@ -1681,7 +1844,7 @@ checkAuthSession();
                         }
 
                         // Stream is verified binary media!
-                        progressBar.style.width = '70%';
+                        progressBar.style.width = '75%';
                         const blob = await streamCheck.blob();
                         const objectUrl = URL.createObjectURL(blob);
                         
@@ -1717,8 +1880,7 @@ checkAuthSession();
                         progressBar.style.width = '100%';
                         
                         if (streamErr.desktopFallback) {
-                            statusText.innerHTML = `<span class="material-symbols-outlined text-[16px] text-amber-400">desktop_windows</span> <span class="text-amber-300 font-semibold">${streamErr.message || 'Stream requires local processing'}</span><br><span class="text-xs text-on-surface-variant">Please use the <strong>StreamVault Desktop App</strong> for unrestricted 4K/1080p downloads.</span>`;
-                            statusText.classList.replace('text-primary', 'text-amber-400');
+                            statusText.innerHTML = renderCloudFallbackUI(streamErr);
                         } else {
                             statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] text-red-400">error</span> ${streamErr.message || 'Cloud download failed'}`;
                             statusText.classList.replace('text-primary', 'text-red-400');
@@ -1768,7 +1930,6 @@ checkAuthSession();
                                         }
                                     }
                                 } catch(ve) {
-                                    // Bubble to outer catch
                                     throw ve;
                                 }
 
@@ -1826,14 +1987,12 @@ checkAuthSession();
             } catch (err) {
                 console.log("=== ERROR TRACE ===");
                 console.log("Stack Trace:", err.stack || err);
-                
                 console.error('[StreamVault] Download Error:', err);
                 
                 if (err.desktopFallback) {
                     progressBar.classList.replace('bg-gradient-to-r', 'bg-amber-500');
                     progressBar.style.width = '100%';
-                    statusText.innerHTML = `<span class="material-symbols-outlined text-[16px] text-amber-400">desktop_windows</span> <span class="text-amber-300 font-semibold">${err.message || 'Format requires local processing'}</span><br><span class="text-xs text-on-surface-variant">Please use the <strong>StreamVault Desktop App</strong> for unrestricted 4K/1080p downloads.</span>`;
-                    statusText.classList.replace('text-primary', 'text-amber-400');
+                    statusText.innerHTML = renderCloudFallbackUI(err);
                 } else {
                     progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
                     progressBar.style.width = '100%';
@@ -2063,6 +2222,35 @@ checkAuthSession();
         }
     </script>
     
+    <!-- Desktop Pro Upgrade Modal -->
+    <div id="desktop-pro-modal" class="hidden fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-surface-container-high border border-white/10 rounded-3xl p-6 w-full max-w-md shadow-2xl relative text-center animate-fade-in-up">
+            <button onclick="document.getElementById('desktop-pro-modal').classList.add('hidden')" class="absolute top-4 right-4 text-on-surface-variant hover:text-white"><span class="material-symbols-outlined">close</span></button>
+            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center mx-auto mb-4 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
+                <span class="material-symbols-outlined text-[36px]">lock</span>
+            </div>
+            <h3 class="text-2xl font-display font-bold text-on-surface mb-2">Desktop Pro Required</h3>
+            <p id="desktop-pro-modal-desc" class="text-on-surface-variant text-sm mb-4">4K downloads require the StreamVault Desktop App.</p>
+            
+            <div class="bg-surface/70 border border-white/10 rounded-2xl p-4 mb-5 text-left text-xs space-y-2.5 text-on-surface-variant">
+                <div class="text-white font-semibold mb-2 flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[16px] text-amber-400">stars</span> Desktop Pro includes:
+                </div>
+                <div class="flex items-center gap-2 text-on-surface"><span class="material-symbols-outlined text-[16px] text-green-400">check_circle</span> 1440p, 4K &amp; 8K resolutions</div>
+                <div class="flex items-center gap-2 text-on-surface"><span class="material-symbols-outlined text-[16px] text-green-400">check_circle</span> High-bitrate audio extraction</div>
+                <div class="flex items-center gap-2 text-on-surface"><span class="material-symbols-outlined text-[16px] text-green-400">check_circle</span> Local FFmpeg multi-stream processing</div>
+                <div class="flex items-center gap-2 text-on-surface"><span class="material-symbols-outlined text-[16px] text-green-400">check_circle</span> Unrestricted local browser session downloads</div>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <a href="streamvault-upgrade.html" class="w-full bg-gradient-to-r from-primary to-orange-500 text-on-primary py-3 rounded-xl font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20">
+                    <span class="material-symbols-outlined text-[18px]">workspace_premium</span> Get Desktop Pro
+                </a>
+                <button type="button" onclick="continueWithWeb1080p()" class="w-full bg-surface border border-white/10 text-on-surface py-2.5 rounded-xl font-medium hover:bg-white/5 transition-colors">Continue with 1080p</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Login Required Modal -->
     <div id="login-required-modal" class="hidden fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-surface-container-high border border-white/10 rounded-2xl p-5 w-full max-w-sm shadow-2xl relative text-center">
