@@ -31,13 +31,19 @@ let cachedInnertube: any = null;
 async function getInnertube() {
   if (!cachedInnertube) {
     const cookie = Deno.env.get("YOUTUBE_COOKIE") || defaultCookie;
-    cachedInnertube = await Innertube.create({
-      cache: new UniversalCache(false),
-      generate_session_locally: true,
-      retrieve_player: true,
-      client_type: "IOS",
-      cookie: cookie
-    });
+    try {
+      cachedInnertube = await Innertube.create({
+        cache: new UniversalCache(false),
+        generate_session_locally: true,
+        cookie: cookie
+      });
+    } catch (err: any) {
+      console.warn("Innertube session creation warning:", err.message);
+      cachedInnertube = await Innertube.create({
+        cache: new UniversalCache(false),
+        generate_session_locally: true
+      });
+    }
   }
   return cachedInnertube;
 }
@@ -81,7 +87,7 @@ serve(async (req) => {
       return new Response("Missing video URL", { status: 400, headers: corsHeaders });
     }
 
-    // 2. YouTube streaming with single lightweight client
+    // 2. YouTube streaming
     const ytMatch = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
     if (ytMatch) {
       const videoId = ytMatch[1];
@@ -95,7 +101,7 @@ serve(async (req) => {
         let mimeType = isAudio ? "audio/mp4" : "video/mp4";
         customFilename = `${safeTitle}.${isAudio ? "m4a" : "mp4"}`;
 
-        // Attempt download
+        // Attempt 1: Innertube video.download()
         try {
           if (isAudio) {
             stream = await video.download({ type: "audio", quality: "best" });
@@ -108,7 +114,7 @@ serve(async (req) => {
           lastErr = dErr.message || String(dErr);
         }
 
-        // Direct format candidate fallback
+        // Attempt 2: Direct format candidate fallback
         if (!stream && video.streaming_data) {
           const formatList = isAudio
             ? [...(video.streaming_data.adaptive_formats || []).filter((f: any) => f.has_audio), ...(video.streaming_data.formats || [])]
