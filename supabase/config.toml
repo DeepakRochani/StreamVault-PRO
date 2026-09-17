@@ -32,13 +32,19 @@ file_size_limit = "50MiB"
 [auth]
 enabled = true
 site_url = "http://127.0.0.1:3000"
-additional_redirect_urls = ["https://localhost:3000"]
+additional_redirect_urls = ["https://localhost:3000", "https://streamvault-pro.vercel.app", "https://streamvault-pro.pages.dev"]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
 enable_signup = true
 enable_anonymous_sign_ins = false
 enable_manual_linking = false
+
+[auth.external.google]
+enabled = true
+client_id = "312739985705-hrn04fo2doa8dsn7573bg6dspt5eabh0.apps.googleusercontent.com"
+secret = "env(GOOGLE_CLIENT_SECRET)"
+redirect_uri = "https://sjnamkshicpxtyikzsnp.supabase.co/auth/v1/callback"
 
 [functions.download]
 verify_jwt = false

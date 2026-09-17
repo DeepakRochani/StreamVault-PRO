@@ -14,6 +14,9 @@ window.SUPABASE_PROJECT_REF = 'sjnamkshicpxtyikzsnp';
 window.SUPABASE_URL     = 'https://sjnamkshicpxtyikzsnp.supabase.co';
 window.SUPABASE_ANON_KEY = 'sb_publishable_t2N8YtpcPHjVFJzrMlLr5Q_pL9ppUiP';
 
+// ── Google OAuth Client Configuration ────────────────────────
+window.GOOGLE_CLIENT_ID = '312739985705-hrn04fo2doa8dsn7573bg6dspt5eabh0.apps.googleusercontent.com';
+
 // ── API base URL & Fetch Interceptor ─────────────────────────
 if (typeof window !== 'undefined' && window.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:')) {
     window.API_BASE_URL = window.ENV_API_URL || 'http://127.0.0.1:10000';
