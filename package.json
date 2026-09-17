@@ -10,7 +10,13 @@
     "build": "vite build",
     "preview": "vite preview",
     "electron": "concurrently \"npm run server\" \"electron .\"",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "desktop:build": "npm run build && electron-builder --config electron-builder.desktop.json",
+    "desktop:mac": "npm run build && electron-builder --config electron-builder.desktop.json --mac",
+    "desktop:mac:arm64": "npm run build && electron-builder --config electron-builder.desktop.json --mac --arm64",
+    "desktop:mac:x64": "npm run build && electron-builder --config electron-builder.desktop.json --mac --x64",
+    "desktop:win": "npm run build && electron-builder --config electron-builder.desktop.json --win --x64",
+    "desktop:all": "npm run build && electron-builder --config electron-builder.desktop.json -mw"
   },
   "devDependencies": {
     "concurrently": "^10.0.3",
