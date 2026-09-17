@@ -670,14 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.body.appendChild(a);
                     a.click();
                     setTimeout(() => { try { document.body.removeChild(a); } catch(_) {} }, 2000);
-
-                    // Iframe fallback guarantees browser Save/Download prompt without popup blocker interference
-                    const dlFrame = document.createElement('iframe');
-                    dlFrame.style.display = 'none';
-                    dlFrame.src = directUrl;
-                    document.body.appendChild(dlFrame);
-                    setTimeout(() => { try { document.body.removeChild(dlFrame); } catch(_) {} }, 60000);
-
+                    
                     item.progress = 100;
                     item.status = 'completed';
                     localStorage.setItem('download_queue', JSON.stringify(queue));
@@ -792,12 +785,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                 a.click();
                                 setTimeout(() => { try { document.body.removeChild(a); } catch(_) {} }, 2000);
 
-                                const dlFrame = document.createElement('iframe');
-                                dlFrame.style.display = 'none';
-                                dlFrame.src = '/api/fetch-file?id=' + item.id;
-                                document.body.appendChild(dlFrame);
-                                setTimeout(() => { try { document.body.removeChild(dlFrame); } catch(_) {} }, 60000);
-                                
                                 resolve();
 
                             } else if (statusData.status === 'failed') {

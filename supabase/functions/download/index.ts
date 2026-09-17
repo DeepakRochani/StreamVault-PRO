@@ -53,63 +53,102 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const reqUrl = new URL(req.url);
+  try {
+    const reqUrl = new URL(req.url);
 
-  // ── GET: Stream file to client ────────────────────────────────
-  if (req.method === "GET") {
-    const videoUrl = reqUrl.searchParams.get("url");
-    const formatUrl = reqUrl.searchParams.get("format_url");
-    const isAudio = reqUrl.searchParams.get("audio") === "true";
-    let customFilename = reqUrl.searchParams.get("filename") || (isAudio ? "audio.mp3" : "video.mp4");
+    // ── GET: Stream file to client ────────────────────────────────
+    if (req.method === "GET") {
+      const videoUrl = reqUrl.searchParams.get("url");
+      const formatUrl = reqUrl.searchParams.get("format_url");
+      const isAudio = reqUrl.searchParams.get("audio") === "true";
+      const quality = reqUrl.searchParams.get("quality") || "";
+      let customFilename = reqUrl.searchParams.get("filename") || (isAudio ? "audio.mp3" : "video.mp4");
 
-    // 1. Direct format URL proxy (e.g. Social media or direct CDN)
-    if (formatUrl) {
-      try {
-        const streamRes = await fetch(formatUrl, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Referer": videoUrl || "https://google.com/"
+      // Check for high-res DASH qualities that cannot be merged without local FFmpeg
+      if (!isAudio && (quality === "1080p" || quality === "1440p" || quality === "2160p" || quality === "4K")) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: {
+            code: "CLOUD_DOWNLOAD_UNSUPPORTED",
+            message: "1080p and 4K downloads require video/audio track merging. Continue in StreamVault Desktop.",
+            retryable: false,
+            desktopFallback: true,
+            stage: "format_selection"
           }
+        }), {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
-        if (!streamRes.ok) {
-          return new Response(`Stream Error: ${streamRes.statusText}`, { status: 502, headers: corsHeaders });
-        }
-        const headers = new Headers(corsHeaders);
-        headers.set("Content-Type", isAudio ? "audio/mpeg" : (streamRes.headers.get("Content-Type") || "video/mp4"));
-        headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"`);
-        return new Response(streamRes.body, { headers });
-      } catch (err: any) {
-        return new Response(`Proxy Stream Error: ${err.message}`, { status: 500, headers: corsHeaders });
       }
-    }
 
-    if (!videoUrl) {
-      return new Response("Missing video URL", { status: 400, headers: corsHeaders });
-    }
+      // 1. Direct format URL proxy (e.g. Social media or direct CDN)
+      if (formatUrl) {
+        try {
+          const streamRes = await fetch(formatUrl, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Referer": videoUrl || "https://google.com/"
+            }
+          });
+          if (!streamRes.ok) {
+            return new Response(JSON.stringify({
+              success: false,
+              error: {
+                code: "PROXY_STREAM_ERROR",
+                message: `Stream Error: ${streamRes.statusText}`,
+                retryable: true,
+                desktopFallback: true
+              }
+            }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
+          const headers = new Headers(corsHeaders);
+          headers.set("Content-Type", isAudio ? "audio/mpeg" : (streamRes.headers.get("Content-Type") || "video/mp4"));
+          headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"`);
+          return new Response(streamRes.body, { headers });
+        } catch (err: any) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: {
+              code: "PROXY_FETCH_FAILED",
+              message: `Proxy Stream Error: ${err.message}`,
+              retryable: true,
+              desktopFallback: true
+            }
+          }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      }
 
-    // 2. YouTube streaming
-    const ytMatch = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-    if (ytMatch) {
-      const videoId = ytMatch[1];
-      let lastErr = "";
+      if (!videoUrl) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: {
+            code: "MISSING_URL",
+            message: "Missing video URL",
+            retryable: false,
+            desktopFallback: false
+          }
+        }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
 
-      try {
-        const yt = await getInnertube();
-        const video = await yt.getBasicInfo(videoId);
-        const safeTitle = (video.basic_info?.title || "download").replace(/[/\\?%*:|"<>]/g, '-');
-        let stream: any = null;
-        let mimeType = isAudio ? "audio/mp4" : "video/mp4";
-        customFilename = `${safeTitle}.${isAudio ? "m4a" : "mp4"}`;
+      // 2. YouTube streaming
+      const ytMatch = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+      if (ytMatch) {
+        const videoId = ytMatch[1];
+        let lastErr = "";
+        let isBotOrAuth = false;
+
+        try {
+          const yt = await getInnertube();
+          const video = await yt.getBasicInfo(videoId);
+          const safeTitle = (video.basic_info?.title || "download").replace(/[/\\?%*:|"<>]/g, '-');
+          let stream: any = null;
+          let mimeType = isAudio ? "audio/mp4" : "video/mp4";
+          customFilename = `${safeTitle}.${isAudio ? "m4a" : "mp4"}`;
 
         // Attempt 1: Innertube video.download()
         try {
-          if (isAudio) {
-            stream = await video.download({ type: "audio", quality: "best" });
-            mimeType = "audio/mp4";
-          } else {
-            stream = await video.download({ type: "video+audio", quality: "best" });
-            mimeType = "video/mp4";
-          }
+          stream = await video.download({ type: "video+audio", quality: "best" });
+          mimeType = isAudio ? "audio/mp4" : "video/mp4";
         } catch (dErr: any) {
           lastErr = dErr.message || String(dErr);
         }
@@ -151,41 +190,57 @@ serve(async (req) => {
           headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"`);
           return new Response(stream, { headers });
         }
-      } catch (e: any) {
-        lastErr = e.message || String(e);
-        console.error("Innertube streaming error:", e);
+        } catch (e: any) {
+          lastErr = e.message || String(e);
+          console.error("Innertube streaming error:", e);
+        }
+
+        const errLower = (lastErr || "").toLowerCase();
+        isBotOrAuth = errLower.includes("login") || 
+                      errLower.includes("sign in") || 
+                      errLower.includes("bot") || 
+                      errLower.includes("403") || 
+                      errLower.includes("400") ||
+                      errLower.includes("private") ||
+                      errLower.includes("restricted");
+
+        return new Response(JSON.stringify({ 
+          success: false,
+          error: {
+            code: isBotOrAuth ? "YOUTUBE_BOT_CHALLENGE" : "CLOUD_EXTRACTION_FAILED",
+            message: isBotOrAuth
+              ? "YouTube requires additional verification for this video from the cloud server. You can continue with StreamVault Desktop using your local connection."
+              : (lastErr || "Failed to extract playable stream from cloud server."),
+            retryable: !isBotOrAuth,
+            desktopFallback: true,
+            httpStatus: isBotOrAuth ? 403 : 502
+          }
+        }), { 
+          status: isBotOrAuth ? 403 : 502, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        });
       }
 
-      let friendlyError = lastErr || "Failed to extract playable stream";
-      if (
-        friendlyError.toLowerCase().includes("login") || 
-        friendlyError.toLowerCase().includes("sign in") ||
-        friendlyError.toLowerCase().includes("bot") ||
-        friendlyError.toLowerCase().includes("403") ||
-        friendlyError.toLowerCase().includes("400")
-      ) {
-        friendlyError = "This video is restricted or requires YouTube account login/cookies. Please use the StreamVault Desktop App for unrestricted 4K/1080p downloads.";
-      }
-
-      return new Response(JSON.stringify({ 
-        error: friendlyError 
+      return new Response(JSON.stringify({
+        success: false,
+        error: {
+          code: "INVALID_URL",
+          message: "Invalid video URL",
+          retryable: false,
+          desktopFallback: false
+        }
       }), { 
-        status: 502, 
+        status: 400, 
         headers: { ...corsHeaders, "Content-Type": "application/json" } 
       });
     }
-
-    return new Response(JSON.stringify({ error: "Invalid video URL" }), { 
-      status: 400, 
-      headers: { ...corsHeaders, "Content-Type": "application/json" } 
-    });
-  }
 
   // ── POST: Generate Stream Download URL ─────────────────────────
   if (req.method === "POST") {
     try {
       const body = await req.json();
       const url = body.url;
+      const quality = body.quality || "";
       const format = body.format;
       const isAudio = format === 'audio' || format === 'mp3';
       const formatUrl = body.format_url;
@@ -195,8 +250,33 @@ serve(async (req) => {
       }
 
       if (!url && !formatUrl) {
-        return new Response(JSON.stringify({ error: "Missing URL" }), { 
+        return new Response(JSON.stringify({
+          success: false,
+          error: {
+            code: "MISSING_URL",
+            message: "Missing URL parameter",
+            retryable: false,
+            desktopFallback: false
+          }
+        }), { 
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        });
+      }
+
+      // Check for high-res DASH qualities that cannot be merged without local FFmpeg
+      if (!isAudio && (quality === "1080p" || quality === "1440p" || quality === "2160p" || quality === "4K")) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: {
+            code: "CLOUD_DOWNLOAD_UNSUPPORTED",
+            message: "1080p and 4K downloads require video/audio track merging. Continue in StreamVault Desktop.",
+            retryable: false,
+            desktopFallback: true,
+            stage: "format_selection"
+          }
+        }), {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
 
@@ -204,7 +284,7 @@ serve(async (req) => {
       const edgeBase = `https://${projectRef}.supabase.co/functions/v1/download`;
 
       if (formatUrl) {
-        const proxyUrl = `${edgeBase}?format_url=${encodeURIComponent(formatUrl)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}`;
+        const proxyUrl = `${edgeBase}?format_url=${encodeURIComponent(formatUrl)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}&quality=${encodeURIComponent(quality)}`;
         return new Response(JSON.stringify({
           success: true,
           downloadUrl: proxyUrl,
@@ -214,7 +294,7 @@ serve(async (req) => {
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      const proxyUrl = `${edgeBase}?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}`;
+      const proxyUrl = `${edgeBase}?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}&quality=${encodeURIComponent(quality)}`;
       return new Response(JSON.stringify({
         success: true,
         downloadUrl: proxyUrl,
@@ -222,12 +302,32 @@ serve(async (req) => {
         via: "innertube-stream"
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    } catch (err: any) {
-      return new Response(JSON.stringify({ error: err.message }), { 
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      });
+      } catch (err: any) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: {
+            code: "SERVER_ERROR",
+            message: err.message,
+            retryable: true,
+            desktopFallback: true
+          }
+        }), { 
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        });
+      }
     }
-  }
 
-  return new Response("Method not allowed", { status: 405, headers: corsHeaders });
+    return new Response("Method not allowed", { status: 405, headers: corsHeaders });
+  } catch (outerErr: any) {
+    console.error("Top-level serve error:", outerErr);
+    return new Response(JSON.stringify({
+      success: false,
+      error: {
+        code: "UNHANDLED_EDGE_ERROR",
+        message: outerErr?.message || "Internal edge function error",
+        retryable: true,
+        desktopFallback: true
+      }
+    }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
 });

@@ -137,6 +137,10 @@ const injectGlobalHeaders = (args) => {
   if (!newArgs.includes('--remote-components')) {
     newArgs.unshift('--remote-components', 'ejs:github');
   }
+
+  if (!newArgs.includes('--extractor-args')) {
+    newArgs.push('--extractor-args', 'youtube:player_client=android,web');
+  }
   
   return newArgs;
 };

@@ -1650,7 +1650,10 @@ checkAuthSession();
                 console.log("Response Body:", dlData);
 
                 if (!dlRes.ok || !dlData.success) {
-                    throw new Error(dlData.error || `Download failed (HTTP ${dlRes.status})`);
+                    const errObj = dlData.error || {};
+                    const errMsg = (typeof errObj === 'object' ? errObj.message : errObj) || `Download failed (HTTP ${dlRes.status})`;
+                    const isFallback = (typeof errObj === 'object' && errObj.desktopFallback) || dlRes.status === 403 || dlRes.status === 422 || dlRes.status === 502;
+                    throw { message: errMsg, desktopFallback: isFallback, code: errObj.code };
                 }
 
                 const dlId = reqBody.id;
@@ -1661,36 +1664,68 @@ checkAuthSession();
                     const directUrl = dlData.downloadUrl || dlData.url;
                     console.log("TRIGGERING ONLINE STREAM DOWNLOAD: ", directUrl);
                     
-                    saveToQueueHistory(videoData, dlFilename, dlId, format, null, true);
-                    
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = directUrl;
-                    a.setAttribute('download', dlFilename);
-                    document.body.appendChild(a);
-                    a.click();
-                    setTimeout(() => { try { document.body.removeChild(a); } catch(_) {} }, 2000);
+                    statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Validating stream...';
+                    progressBar.style.width = '30%';
 
-                    // Iframe fallback guarantees browser Save/Download prompt without popup blocker interference
-                    const dlFrame = document.createElement('iframe');
-                    dlFrame.style.display = 'none';
-                    dlFrame.src = directUrl;
-                    document.body.appendChild(dlFrame);
-                    setTimeout(() => { try { document.body.removeChild(dlFrame); } catch(_) {} }, 60000);
-                    
-                    progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
-                    progressBar.style.width = '100%';
-                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Ready! <a href="${directUrl}" download="${dlFilename}" class="inline-flex items-center gap-1 underline font-semibold text-white ml-2 bg-primary/20 hover:bg-primary/40 px-2 py-0.5 rounded border border-primary/30 transition-all"><span class="material-symbols-outlined text-[12px]">download</span> Save File</a>`;
-                    statusText.classList.replace('text-primary', 'text-green-400');
-                    speedText.textContent  = '';
-                    sizeInfo.textContent   = '';
-                    pctText.textContent    = '';
-                    downloadAnotherBtn.classList.remove('hidden');
-                    
-                    setTimeout(() => {
-                        if (typeof autoResetDownloader === 'function') autoResetDownloader();
-                    }, 8000);
-                    return;
+                    try {
+                        const streamCheck = await fetch(directUrl);
+                        const contentType = streamCheck.headers.get('content-type') || '';
+                        
+                        if (!streamCheck.ok || contentType.includes('application/json')) {
+                            let errJson = null;
+                            try { errJson = await streamCheck.json(); } catch(_) {}
+                            const errPayload = errJson?.error || errJson || {};
+                            const streamErrMsg = (typeof errPayload === 'object' ? errPayload.message : errPayload) || `Cloud stream unavailable (HTTP ${streamCheck.status})`;
+                            const isFallback = (typeof errPayload === 'object' && errPayload.desktopFallback) || streamCheck.status === 403 || streamCheck.status === 422 || streamCheck.status === 502;
+                            throw { message: streamErrMsg, desktopFallback: isFallback, code: errPayload.code };
+                        }
+
+                        // Stream is verified binary media!
+                        progressBar.style.width = '70%';
+                        const blob = await streamCheck.blob();
+                        const objectUrl = URL.createObjectURL(blob);
+                        
+                        saveToQueueHistory(videoData, dlFilename, dlId, format, null, true);
+
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = objectUrl;
+                        a.setAttribute('download', dlFilename);
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => { 
+                            try { document.body.removeChild(a); URL.revokeObjectURL(objectUrl); } catch(_) {} 
+                        }, 2000);
+
+                        progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
+                        progressBar.style.width = '100%';
+                        statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Ready! <a href="${objectUrl}" download="${dlFilename}" class="inline-flex items-center gap-1 underline font-semibold text-white ml-2 bg-primary/20 hover:bg-primary/40 px-2 py-0.5 rounded border border-primary/30 transition-all"><span class="material-symbols-outlined text-[12px]">download</span> Save File</a>`;
+                        statusText.classList.replace('text-primary', 'text-green-400');
+                        speedText.textContent  = '';
+                        sizeInfo.textContent   = '';
+                        pctText.textContent    = '';
+                        downloadAnotherBtn.classList.remove('hidden');
+                        
+                        setTimeout(() => {
+                            if (typeof autoResetDownloader === 'function') autoResetDownloader();
+                        }, 8000);
+                        return;
+
+                    } catch (streamErr) {
+                        console.error('[StreamVault Cloud Download Stream Check Error]', streamErr);
+                        progressBar.classList.replace('bg-gradient-to-r', 'bg-amber-500');
+                        progressBar.style.width = '100%';
+                        
+                        if (streamErr.desktopFallback) {
+                            statusText.innerHTML = `<span class="material-symbols-outlined text-[16px] text-amber-400">desktop_windows</span> <span class="text-amber-300 font-semibold">${streamErr.message || 'Stream requires local processing'}</span><br><span class="text-xs text-on-surface-variant">Please use the <strong>StreamVault Desktop App</strong> for unrestricted 4K/1080p downloads.</span>`;
+                            statusText.classList.replace('text-primary', 'text-amber-400');
+                        } else {
+                            statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] text-red-400">error</span> ${streamErr.message || 'Cloud download failed'}`;
+                            statusText.classList.replace('text-primary', 'text-red-400');
+                        }
+                        downloadAnotherBtn.classList.remove('hidden');
+                        return;
+                    }
                 }
 
                 // ── Poll for Local Download Status (Desktop Mode) ───────────
@@ -1749,13 +1784,6 @@ checkAuthSession();
                                 a.click();
                                 setTimeout(() => { try { document.body.removeChild(a); } catch(_) {} }, 2000);
 
-                                // Secondary fallback via hidden iframe to ensure download triggers across all browsers
-                                const dlFrame = document.createElement('iframe');
-                                dlFrame.style.display = 'none';
-                                dlFrame.src = serveUrl;
-                                document.body.appendChild(dlFrame);
-                                setTimeout(() => { try { document.body.removeChild(dlFrame); } catch(_) {} }, 60000);
-                                
                                 // Update UI to success with explicit Save File link
                                 setTimeout(() => {
                                     progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
@@ -1800,10 +1828,18 @@ checkAuthSession();
                 console.log("Stack Trace:", err.stack || err);
                 
                 console.error('[StreamVault] Download Error:', err);
-                progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
-                progressBar.style.width = '100%';
-                statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">error</span> Download Failed<br><pre class='text-xs mt-2 text-left bg-black/20 p-2 rounded whitespace-pre-wrap'>${err.message}</pre>`;
-                statusText.classList.replace('text-primary', 'text-red-400');
+                
+                if (err.desktopFallback) {
+                    progressBar.classList.replace('bg-gradient-to-r', 'bg-amber-500');
+                    progressBar.style.width = '100%';
+                    statusText.innerHTML = `<span class="material-symbols-outlined text-[16px] text-amber-400">desktop_windows</span> <span class="text-amber-300 font-semibold">${err.message || 'Format requires local processing'}</span><br><span class="text-xs text-on-surface-variant">Please use the <strong>StreamVault Desktop App</strong> for unrestricted 4K/1080p downloads.</span>`;
+                    statusText.classList.replace('text-primary', 'text-amber-400');
+                } else {
+                    progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
+                    progressBar.style.width = '100%';
+                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">error</span> Download Failed<br><pre class='text-xs mt-2 text-left bg-black/20 p-2 rounded whitespace-pre-wrap'>${err.message || err}</pre>`;
+                    statusText.classList.replace('text-primary', 'text-red-400');
+                }
                 downloadAnotherBtn.classList.remove('hidden');
             }
 
