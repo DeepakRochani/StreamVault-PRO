@@ -10,8 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script type="module" src="js/config.js"></script>
-    <script type="module" src="js/config.js"></script>
+    <script src="js/config.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="settings.js"></script>
     <script>
@@ -333,53 +332,74 @@
 
         async function initDashboard() {
             try {
-                // If returning from Supabase OAuth (e.g. Google Sign-In)
+                let user = null;
+
+                // 1. Try Supabase Auth Session (Google OAuth / Supabase Auth)
                 if (window.supabaseClient) {
                     try {
                         const { data: { session } } = await window.supabaseClient.auth.getSession();
-                        if (session && session.access_token) {
-                            await fetch((window.API_BASE_URL || '') + '/api/auth/supabase-sync', {
+                        if (session && session.user) {
+                            user = {
+                                id: session.user.id,
+                                email: session.user.email,
+                                name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email.split('@')[0],
+                                join_date: session.user.created_at,
+                                last_login: session.user.last_sign_in_at || new Date().toISOString()
+                            };
+                            // Attempt background sync to local server
+                            fetch((window.API_BASE_URL || '') + '/api/auth/supabase-sync', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ access_token: session.access_token })
-                            });
+                            }).catch(() => {});
                         }
-                    } catch (oauthSyncErr) {
-                        console.warn('OAuth session sync notice:', oauthSyncErr);
+                    } catch (oauthErr) {
+                        console.warn('Supabase session fetch notice:', oauthErr);
                     }
                 }
 
-                const res = await fetch((window.API_BASE_URL || '') + '/api/auth/me');
-                const data = await res.json();
-                if (!data.loggedIn) {
+                // 2. Try Local Server Session (/api/auth/me)
+                if (!user) {
+                    try {
+                        const res = await fetch((window.API_BASE_URL || '') + '/api/auth/me');
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.loggedIn) user = data.user;
+                        }
+                    } catch (serverErr) {
+                        console.warn('Local session fetch notice:', serverErr);
+                    }
+                }
+
+                // 3. If no session found in either, redirect to login
+                if (!user) {
                     window.location.href = 'streamvault-login.html';
                     return;
                 }
                 
                 // Populate Profile
-                document.getElementById('dash-name').innerText = data.user.name;
-                document.getElementById('dash-email').innerText = data.user.email;
-                document.getElementById('dash-join').innerText = new Date(data.user.join_date).toLocaleDateString();
+                document.getElementById('dash-name').innerText = user.name || 'User';
+                document.getElementById('dash-email').innerText = user.email || '--';
+                document.getElementById('dash-join').innerText = user.join_date ? new Date(user.join_date).toLocaleDateString() : '--';
                 
-                const loginDate = data.user.last_login ? new Date(data.user.last_login + 'Z') : new Date();
+                const loginDate = user.last_login ? new Date(user.last_login) : new Date();
                 document.getElementById('dash-login').innerText = loginDate.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 
                 // Sync Settings UI
                 if(window.StreamVaultSettings) {
-                    document.getElementById('set-theme').value = window.StreamVaultSettings.theme;
-                    document.getElementById('set-quality').value = window.StreamVaultSettings.defaultQuality;
-                    document.getElementById('set-auto-analyze').checked = window.StreamVaultSettings.autoAnalyze;
-                    document.getElementById('set-auto-clear').checked = window.StreamVaultSettings.autoClear;
-                    document.getElementById('set-folder').value = window.StreamVaultSettings.defaultFolder;
+                    document.getElementById('set-theme').value = window.StreamVaultSettings.theme || 'dark';
+                    document.getElementById('set-quality').value = window.StreamVaultSettings.defaultQuality || 'Best';
+                    document.getElementById('set-auto-analyze').checked = !!window.StreamVaultSettings.autoAnalyze;
+                    document.getElementById('set-auto-clear').checked = !!window.StreamVaultSettings.autoClear;
+                    document.getElementById('set-folder').value = window.StreamVaultSettings.defaultFolder || '';
                 }
 
-                // Load Stats & History
-                await Promise.all([
-                    loadStats(),
-                    loadHistory()
-                ]);
+                // Load Stats & History (fail-safe)
+                loadStats().catch(() => {});
+                loadHistory().catch(() => {});
 
             } catch (e) {
+                console.error("Dashboard error:", e);
                 window.location.href = 'streamvault-login.html';
             }
         }

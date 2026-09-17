@@ -13,8 +13,7 @@
     <!-- Material Symbols -->
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script type="module" src="js/config.js"></script>
-    <script type="module" src="js/config.js"></script>
+    <script src="js/config.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -237,6 +236,20 @@
                 msg.classList.remove('hidden');
             }
         }
+
+        // Auto-redirect if already authenticated (e.g. returning from Google OAuth)
+        window.addEventListener('DOMContentLoaded', async () => {
+            if (window.supabaseClient) {
+                try {
+                    const { data: { session } } = await window.supabaseClient.auth.getSession();
+                    if (session && session.user) {
+                        const redirect = sessionStorage.getItem('redirectUrl') || 'streamvault-dashboard.html';
+                        sessionStorage.removeItem('redirectUrl');
+                        window.location.href = redirect;
+                    }
+                } catch (e) {}
+            }
+        });
     </script>
 
     <!-- BETA WIDGET -->

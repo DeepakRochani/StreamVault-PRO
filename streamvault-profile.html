@@ -9,8 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script type="module" src="js/config.js"></script>
-    <script type="module" src="js/config.js"></script>
+    <script src="js/config.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -374,37 +373,52 @@
     async function initProfile() {
             console.log('USER_PROFILE_LOAD_START');
             try {
-                // If returning from Supabase OAuth (e.g. Google Sign-In)
+                let user = null;
+
+                // 1. Try Supabase Auth Session
                 if (window.supabaseClient) {
                     try {
                         const { data: { session } } = await window.supabaseClient.auth.getSession();
-                        if (session && session.access_token) {
-                            await fetch((window.API_BASE_URL || '') + '/api/auth/supabase-sync', {
+                        if (session && session.user) {
+                            user = {
+                                id: session.user.id,
+                                email: session.user.email,
+                                name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email.split('@')[0],
+                                join_date: session.user.created_at,
+                                last_login: session.user.last_sign_in_at || new Date().toISOString()
+                            };
+                            fetch((window.API_BASE_URL || '') + '/api/auth/supabase-sync', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ access_token: session.access_token })
-                            });
+                            }).catch(() => {});
                         }
                     } catch (oauthSyncErr) {
                         console.warn('OAuth session sync notice:', oauthSyncErr);
                     }
                 }
 
-                const res = await fetch((window.API_BASE_URL || '') + '/api/auth/me');
-                if (!res.ok) throw new Error('Network error');
-                
-                const data = await res.json();
-                if (!data.loggedIn) {
+                // 2. Try Local Server Session
+                if (!user) {
+                    try {
+                        const res = await fetch((window.API_BASE_URL || '') + '/api/auth/me');
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.loggedIn) user = data.user;
+                        }
+                    } catch (e) {}
+                }
+
+                if (!user) {
                     window.location.href = 'streamvault-login.html';
                     return;
                 }
                 
                 console.log('USER_PROFILE_LOAD_SUCCESS');
-                console.log('USER_ID:', data.user.id);
                 
-                const d = new Date(data.user.join_date);
-                document.getElementById('prof-name').innerText = data.user.name;
-                document.getElementById('prof-email').innerText = data.user.email;
+                const d = user.join_date ? new Date(user.join_date) : new Date();
+                document.getElementById('prof-name').innerText = user.name || 'User';
+                document.getElementById('prof-email').innerText = user.email || '--';
                 document.getElementById('prof-date').innerText = d.toLocaleDateString();
             
             // Load Notifications
