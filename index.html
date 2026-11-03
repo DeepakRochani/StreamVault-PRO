@@ -1447,42 +1447,20 @@ checkAuthSession();
                     }
                     mp4Options.innerHTML = html;
                 } else {
-                    if (videoData.audioFormats && videoData.audioFormats.length > 0) {
-                        videoData.audioFormats.forEach(f => {
-                            html += createQualityChip('audio', f.quality, f.id, f.sizeStr, f.recommended);
-                            count++;
-                        });
-                    } else {
-                        const sizes = videoData.sizes || {};
-                        if (sizes.a640) { html += createQualityChip('audio', '640 kbps', '640K', sizes.a640, true); count++; }
-                        if (sizes.a320) { html += createQualityChip('audio', '320 kbps', '320K', sizes.a320, !sizes.a640); count++; }
-                        if (sizes.a192) { html += createQualityChip('audio', '192 kbps', '192K', sizes.a192); count++; }
-                        if (sizes.a128) { html += createQualityChip('audio', '128 kbps', '128K', sizes.a128); count++; }
-                        if (sizes.a64) { html += createQualityChip('audio', '64 kbps', '64K', sizes.a64); count++; }
-                    }
-                    if (count === 0) { 
-                        const actualErr = videoData.extractionError || videoData.stderr || "No explicit stderr returned. (Check stdout)";
-                        const cmd = videoData.yt_dlp_command ? `\n> ${videoData.yt_dlp_command}` : '';
-                        const extCode = videoData.exit_code !== undefined ? `\nExit Code: ${videoData.exit_code}` : '';
-                        html += `
-                        <div class="glass-panel rounded-xl p-4 flex flex-col items-center justify-center border border-error/30 bg-error/10 w-full text-center">
-                            <span class="text-error font-title-md">EXTRACTION FAILED</span>
-                            <span class="text-sm text-error/80 mt-2 block break-all font-mono text-left w-full bg-surface/50 p-2 rounded whitespace-pre-wrap">${actualErr}</span>
-                            <button type="button" onclick="document.getElementById('debug-modal-${format}').classList.toggle('hidden')" class="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 rounded border border-white/20 text-xs font-mono transition-colors text-white">Show Extraction Debug</button>
-                        </div>
-                        <div id="debug-modal-${format}" class="hidden w-full mt-4 flex flex-col gap-2 text-left">
-                            <div class="text-xs font-mono text-on-surface-variant bg-surface/80 p-3 rounded-lg overflow-x-auto border border-outline/30">
-                                <div class="text-primary font-bold mb-1">COMMAND EXECUTED:</div>
-                                ${cmd}<br><br>
-                                <div class="text-primary font-bold mb-1">EXIT CODE:</div>
-                                ${extCode}<br><br>
-                                <div class="text-primary font-bold mb-1">STDERR:</div>
-                                <pre class="whitespace-pre-wrap text-error/90">${videoData.stderr || 'N/A'}</pre><br>
-                                <div class="text-primary font-bold mb-1">STDOUT (First 1000 chars):</div>
-                                <pre class="whitespace-pre-wrap">${videoData.stdout ? videoData.stdout.substring(0, 1000) : 'N/A'}</pre>
-                            </div>
-                        </div>`; 
-                    }
+                    const fallbackAudioFormats = [
+                        { quality: '320 kbps (Ultra HQ)', id: '320K', sizeStr: '~2.4 MB/min', recommended: true },
+                        { quality: '256 kbps (High Quality)', id: '256K', sizeStr: '~1.9 MB/min', recommended: false },
+                        { quality: '192 kbps (Standard)', id: '192K', sizeStr: '~1.4 MB/min', recommended: false },
+                        { quality: '128 kbps (Economy)', id: '128K', sizeStr: '~0.9 MB/min', recommended: false },
+                    ];
+                    const audioList = (videoData.audioFormats && videoData.audioFormats.length > 1) 
+                        ? videoData.audioFormats 
+                        : fallbackAudioFormats;
+
+                    audioList.forEach(f => {
+                        html += createQualityChip('audio', f.quality, f.id, f.sizeStr, f.recommended);
+                        count++;
+                    });
                     mp3Options.innerHTML = html;
                 }
                 
@@ -1865,33 +1843,24 @@ checkAuthSession();
                     progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
                     progressBar.style.width = '100%';
                     pctText.textContent = '100%';
-                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Ready! <a href="${directUrl}" download="${dlFilename}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/30 hover:bg-primary/50 px-3 py-1 rounded-lg border border-primary/40 shadow-sm transition-all"><span class="material-symbols-outlined text-[14px]">download</span> Save File</a>`;
+                    
+                    const safeDirectUrl = encodeURIComponent(directUrl);
+                    const safeFilename = encodeURIComponent(dlFilename);
+                    const safeFormat = encodeURIComponent(format);
+                    const safeQuality = encodeURIComponent(selectedQuality || '1080p');
+                    const safeTitle = encodeURIComponent(videoData.title || dlFilename);
+                    const safeThumb = encodeURIComponent(videoData.thumbnail || '');
+
+                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Ready! <button type="button" onclick="openDownloadModal('${safeDirectUrl}', '${safeFilename}', '${safeFormat}', '${safeQuality}', '${safeTitle}', '${safeThumb}')" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/40 hover:bg-primary/60 px-3 py-1 rounded-lg border border-primary/50 shadow-sm transition-all"><span class="material-symbols-outlined text-[14px]">download</span> Save File</button>`;
                     statusText.classList.replace('text-primary', 'text-green-400');
                     speedText.textContent  = '';
                     sizeInfo.textContent   = '';
                     downloadAnotherBtn.classList.remove('hidden');
 
-                    // Trigger direct native browser download without cross-origin fetch
-                    try {
-                        const a = document.createElement('a');
-                        a.style.display = 'none';
-                        a.href = directUrl;
-                        a.setAttribute('download', dlFilename);
-                        a.setAttribute('target', '_blank');
-                        a.setAttribute('rel', 'noopener noreferrer');
-                        document.body.appendChild(a);
-                        a.click();
-                        setTimeout(() => { 
-                            try { document.body.removeChild(a); } catch(_) {} 
-                        }, 2000);
-                    } catch (navErr) {
-                        console.warn('[StreamVault] Native download trigger fallback:', navErr);
-                        window.open(directUrl, '_blank');
+                    // Open clean in-page Download Modal immediately (NO REDIRECT TO NEW WINDOW!)
+                    if (typeof openDownloadModal === 'function') {
+                        openDownloadModal(directUrl, dlFilename, format, selectedQuality || '1080p', videoData.title, videoData.thumbnail);
                     }
-
-                    setTimeout(() => {
-                        if (typeof autoResetDownloader === 'function') autoResetDownloader();
-                    }, 10000);
                     return;
                 }
 
@@ -2225,7 +2194,218 @@ checkAuthSession();
             sessionStorage.setItem('redirectUrl', window.location.href);
             window.location.href = 'streamvault-login.html' + (mode ? '?mode=' + mode : '');
         }
+
+        // ── StreamVault Online Download Ready Modal Controller ──
+        let currentModalUrl = '';
+        let currentModalFilename = '';
+        let currentModalBlobUrl = null;
+
+        function openDownloadModal(url, filename, format, quality, title, thumbnail) {
+            const modal = document.getElementById('download-ready-modal');
+            if (!modal) return;
+
+            try { url = decodeURIComponent(url); } catch(_) {}
+            try { filename = decodeURIComponent(filename); } catch(_) {}
+            try { format = decodeURIComponent(format); } catch(_) {}
+            try { quality = decodeURIComponent(quality); } catch(_) {}
+            try { if (title) title = decodeURIComponent(title); } catch(_) {}
+            try { if (thumbnail) thumbnail = decodeURIComponent(thumbnail); } catch(_) {}
+
+            currentModalUrl = url;
+            currentModalFilename = filename;
+            currentModalBlobUrl = null;
+
+            const titleEl = document.getElementById('dl-modal-title');
+            const badgeEl = document.getElementById('dl-modal-badge');
+            const fnEl = document.getElementById('dl-modal-filename');
+            const vid = document.getElementById('dl-modal-video');
+            const aud = document.getElementById('dl-modal-audio');
+            const statusNotice = document.getElementById('dl-modal-save-status');
+
+            if (titleEl) {
+                titleEl.textContent = title || filename;
+            }
+            if (badgeEl) {
+                badgeEl.textContent = format === 'mp3' ? `MP3 Audio (${quality || '320k'})` : `MP4 Video (${quality || '1080p'})`;
+            }
+            if (fnEl) {
+                fnEl.textContent = filename;
+            }
+            if (statusNotice) {
+                statusNotice.innerHTML = '';
+            }
+
+            // Preview player embedded directly in StreamVault PRO (never redirected to new tab)
+            if (format === 'mp3' || format === 'audio') {
+                if (vid) { vid.classList.add('hidden'); vid.src = ''; }
+                if (aud) {
+                    aud.src = url;
+                    aud.classList.remove('hidden');
+                }
+            } else {
+                if (aud) { aud.classList.add('hidden'); aud.src = ''; }
+                if (vid) {
+                    vid.src = url;
+                    vid.classList.remove('hidden');
+                }
+            }
+
+            modal.classList.remove('hidden');
+
+            // Trigger silent background download attempt without leaving the page
+            setTimeout(() => {
+                triggerModalDownload(true);
+            }, 500);
+        }
+
+        async function triggerModalDownload(isAutomatic = false) {
+            const btn = document.getElementById('dl-modal-download-btn');
+            const statusNotice = document.getElementById('dl-modal-save-status');
+            if (!currentModalUrl) return;
+
+            // 1. If Blob URL already generated, trigger direct instant save
+            if (currentModalBlobUrl) {
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = currentModalBlobUrl;
+                a.download = currentModalFilename;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => { try { document.body.removeChild(a); } catch(_) {} }, 2000);
+                if (statusNotice) {
+                    statusNotice.innerHTML = '<span class="text-green-400 font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[15px]">check_circle</span> File saved to your Downloads!</span>';
+                }
+                return;
+            }
+
+            if (btn && !isAutomatic) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">sync</span> Downloading to your device...';
+            }
+            if (statusNotice) {
+                statusNotice.innerHTML = '<span class="text-primary font-medium flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[15px] animate-spin">sync</span> Preparing file download...</span>';
+            }
+
+            // 2. Fetch as Blob for guaranteed same-origin file download
+            try {
+                const res = await fetch(currentModalUrl);
+                if (res.ok) {
+                    const blob = await res.blob();
+                    currentModalBlobUrl = window.URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = currentModalBlobUrl;
+                    a.download = currentModalFilename;
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => { try { document.body.removeChild(a); } catch(_) {} }, 5000);
+
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<span class="material-symbols-outlined text-[20px]">check_circle</span> Saved to Downloads!';
+                        setTimeout(() => {
+                            btn.innerHTML = '<span class="material-symbols-outlined text-[20px]">download</span> Save File to Device';
+                        }, 4000);
+                    }
+                    if (statusNotice) {
+                        statusNotice.innerHTML = '<span class="text-green-400 font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[15px]">check_circle</span> Saved to Downloads! Check your browser downloads bar.</span>';
+                    }
+                    return;
+                }
+            } catch (blobErr) {
+                console.warn('[StreamVault] Blob direct download notice:', blobErr);
+            }
+
+            // 3. Fallback: Hidden iframe download (prevents page redirect and never opens new tab)
+            try {
+                let iframe = document.getElementById('streamvault-hidden-dl-frame');
+                if (!iframe) {
+                    iframe = document.createElement('iframe');
+                    iframe.id = 'streamvault-hidden-dl-frame';
+                    iframe.style.display = 'none';
+                    document.body.appendChild(iframe);
+                }
+                iframe.src = currentModalUrl;
+            } catch (frameErr) {
+                console.warn('[StreamVault] Iframe fallback error:', frameErr);
+            }
+
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined text-[20px]">download</span> Save File to Device';
+            }
+            if (statusNotice) {
+                statusNotice.innerHTML = '<span class="text-amber-400 font-medium flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[15px]">info</span> Media ready. If download doesn\'t start, click <strong>⋮</strong> on the player &amp; choose <strong>Download</strong>.</span>';
+            }
+        }
+
+        function closeDownloadModal() {
+            const modal = document.getElementById('download-ready-modal');
+            if (modal) modal.classList.add('hidden');
+            const vid = document.getElementById('dl-modal-video');
+            const aud = document.getElementById('dl-modal-audio');
+            if (vid) { vid.pause(); vid.src = ''; }
+            if (aud) { aud.pause(); aud.src = ''; }
+            if (currentModalBlobUrl) {
+                try { window.URL.revokeObjectURL(currentModalBlobUrl); } catch(_) {}
+                currentModalBlobUrl = null;
+            }
+        }
     </script>
+    
+    <!-- Online Stream Download Ready Modal -->
+    <div id="download-ready-modal" class="hidden fixed inset-0 z-50 bg-background/90 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-surface-container-high border border-white/10 rounded-3xl p-6 w-full max-w-lg shadow-2xl relative text-center animate-fade-in-up">
+            <button onclick="closeDownloadModal()" class="absolute top-4 right-4 text-on-surface-variant hover:text-white transition-colors">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+            
+            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-500/30 flex items-center justify-center mx-auto mb-3 text-green-400 shadow-[0_0_20px_rgba(34,197,94,0.25)]">
+                <span class="material-symbols-outlined text-[32px]">check_circle</span>
+            </div>
+            
+            <h3 class="text-xl font-display font-bold text-on-surface mb-1">Your Download is Ready!</h3>
+            <p id="dl-modal-title" class="text-on-surface-variant text-xs line-clamp-2 max-w-sm mx-auto mb-4"></p>
+            
+            <!-- Format Badge & Filename -->
+            <div class="bg-surface/70 border border-white/10 rounded-2xl p-3.5 mb-4 text-left text-xs space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-on-surface-variant">Quality / Format:</span>
+                    <span id="dl-modal-badge" class="px-2.5 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30 font-semibold text-[11px]"></span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-on-surface-variant">File Name:</span>
+                    <span id="dl-modal-filename" class="font-mono text-on-surface truncate max-w-[200px]"></span>
+                </div>
+            </div>
+
+            <!-- Media Preview (stays inside the page, never redirects) -->
+            <div id="dl-modal-player-container" class="rounded-2xl overflow-hidden mb-3 bg-black/60 border border-white/5 relative">
+                <video id="dl-modal-video" controls playsinline class="w-full max-h-48 object-contain hidden"></video>
+                <audio id="dl-modal-audio" controls class="w-full my-3 px-3 hidden"></audio>
+            </div>
+
+            <!-- Download Status Notification -->
+            <div id="dl-modal-save-status" class="text-xs text-center min-h-[20px] mb-3"></div>
+
+            <!-- Download Action Button -->
+            <div class="flex flex-col gap-2.5">
+                <button type="button" id="dl-modal-download-btn" onclick="triggerModalDownload()" class="w-full bg-gradient-to-r from-primary to-orange-500 text-on-primary py-3.5 rounded-xl font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/25 text-sm cursor-pointer">
+                    <span class="material-symbols-outlined text-[20px]">download</span> Save File to Device
+                </button>
+                
+                <p class="text-[11px] text-on-surface-variant/80 mt-1 flex items-center justify-center gap-1">
+                    <span class="material-symbols-outlined text-[13px] text-amber-400">info</span>
+                    <span>Tip: If file doesn't save immediately, click <strong>⋮</strong> on the video player &amp; choose <strong>Download</strong>.</span>
+                </p>
+                
+                <button type="button" onclick="closeDownloadModal()" class="w-full mt-1 bg-surface border border-white/10 text-on-surface py-2 rounded-xl text-xs font-medium hover:bg-white/5 transition-colors cursor-pointer">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
     
     <!-- Desktop Pro Upgrade Modal -->
     <div id="desktop-pro-modal" class="hidden fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center p-4">

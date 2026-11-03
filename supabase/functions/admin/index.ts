@@ -87,7 +87,7 @@ serve(async (req: Request) => {
 
   try {
     // ── 1. Admin Login ───────────────────────────────────────────
-    if (pathname === "/login" || pathname === "/api/admin/login" || pathname === "") {
+    if (pathname === "/login" || pathname.endsWith("/login") || pathname === "/api/admin/login" || pathname === "" || pathname === "/") {
       if (req.method === "POST") {
         const body = await req.json().catch(() => ({}));
         const { email, password } = body;

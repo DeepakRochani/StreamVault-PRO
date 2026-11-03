@@ -208,60 +208,104 @@ serve(async (req: Request) => {
     const reqUrl = new URL(req.url);
 
     // ─────────────────────────────────────────────────────────────
-    // ── GET: Direct Binary Streaming or 302 Redirect ─────────────
+    // ── GET / HEAD: Binary Stream Proxy with Attachment Headers ──
     // ─────────────────────────────────────────────────────────────
-    if (req.method === "GET") {
+    if (req.method === "GET" || req.method === "HEAD") {
       const videoUrl = reqUrl.searchParams.get("url") || "";
       const formatUrl = reqUrl.searchParams.get("format_url");
       const isAudio = reqUrl.searchParams.get("audio") === "true";
       const quality = reqUrl.searchParams.get("quality") || "1080p";
       let customFilename = reqUrl.searchParams.get("filename") || (isAudio ? "audio.mp3" : "video.mp4");
 
-      if (formatUrl) {
+      if (!customFilename.toLowerCase().endsWith(".mp3") && !customFilename.toLowerCase().endsWith(".mp4")) {
+        customFilename += isAudio ? ".mp3" : ".mp4";
+      }
+
+      let streamUrl = formatUrl;
+      let mimeType = isAudio ? "audio/mpeg" : "video/mp4";
+
+      const ytMatch = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+      const videoId = ytMatch ? ytMatch[1] : "";
+
+      if (!streamUrl && videoId) {
+        const resolved = await resolveStreamUrl(videoId, isAudio, quality);
+        if (resolved?.streamUrl) {
+          streamUrl = resolved.streamUrl;
+          mimeType = resolved.mimeType;
+        }
+      }
+
+      if (streamUrl) {
+        if (req.method === "HEAD") {
+          return new Response(null, {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": isAudio ? "audio/mpeg" : mimeType,
+              "Content-Disposition": `attachment; filename="${encodeURIComponent(customFilename)}"; filename*=UTF-8''${encodeURIComponent(customFilename)}`,
+            },
+          });
+        }
+
+        try {
+          const upstreamHeaders: Record<string, string> = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "*/*",
+          };
+          if (req.headers.has("range")) {
+            upstreamHeaders["Range"] = req.headers.get("range")!;
+          }
+
+          const mediaRes = await fetch(streamUrl, {
+            headers: upstreamHeaders,
+            redirect: "follow",
+          });
+
+          if (mediaRes.ok || mediaRes.status === 206) {
+            const respHeaders = new Headers(corsHeaders);
+            respHeaders.set("Content-Type", isAudio ? "audio/mpeg" : (mediaRes.headers.get("content-type") || mimeType || "video/mp4"));
+            respHeaders.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"; filename*=UTF-8''${encodeURIComponent(customFilename)}`);
+            respHeaders.set("Cache-Control", "public, max-age=3600");
+
+            if (mediaRes.headers.has("content-length")) {
+              respHeaders.set("Content-Length", mediaRes.headers.get("content-length")!);
+            }
+            if (mediaRes.headers.has("accept-ranges")) {
+              respHeaders.set("Accept-Ranges", mediaRes.headers.get("accept-ranges")!);
+            }
+            if (mediaRes.headers.has("content-range")) {
+              respHeaders.set("Content-Range", mediaRes.headers.get("content-range")!);
+            }
+
+            return new Response(mediaRes.body, {
+              status: mediaRes.status,
+              headers: respHeaders,
+            });
+          } else {
+            console.warn(`[Stream Proxy] Upstream returned status ${mediaRes.status}`);
+          }
+        } catch (streamErr: any) {
+          console.error("[Stream Proxy Fetch Error]:", streamErr?.message || streamErr);
+        }
+
+        // Fallback: 302 redirect with attachment headers if upstream proxy fetch failed
         return new Response(null, {
           status: 302,
           headers: {
             ...corsHeaders,
-            "Location": formatUrl,
+            "Location": streamUrl,
             "Content-Disposition": `attachment; filename="${encodeURIComponent(customFilename)}"`,
           },
         });
       }
 
-      if (!videoUrl) {
-        return new Response(JSON.stringify({
-          success: false,
-          error: { code: "MISSING_URL", message: "Missing video URL parameter", desktopFallback: false },
-        }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      const ytMatch = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-      const videoId = ytMatch ? ytMatch[1] : "";
-
-      if (videoId) {
-        const resolved = await resolveStreamUrl(videoId, isAudio, quality);
-        if (resolved && resolved.streamUrl) {
-          // Direct 302 redirect sends the browser straight to the content stream
-          return new Response(null, {
-            status: 302,
-            headers: {
-              ...corsHeaders,
-              "Location": resolved.streamUrl,
-              "Content-Disposition": `attachment; filename="${encodeURIComponent(customFilename)}"`,
-              "Content-Type": resolved.mimeType,
-            },
-          });
-        }
-      }
-
-      // If all attempts failed
       return new Response(JSON.stringify({
         success: false,
         error: {
           code: "CLOUD_EXTRACTION_UNAVAILABLE",
           message: "Could not retrieve direct media stream from cloud server. Please try another quality or check YouTube availability.",
           retryable: true,
-          desktopFallback: true,
+          desktopFallback: false,
         },
       }), {
         status: 502,
@@ -308,13 +352,17 @@ serve(async (req: Request) => {
         } catch (_) {}
       }
 
-      // Provide both the direct stream URL and the Edge Function stream URL
-      const proxyUrl = directStream || `${edgeBase}?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}&quality=${encodeURIComponent(quality)}`;
+      // Generate clean download endpoints
+      // 1. Same-origin proxy endpoint on Vercel: /api/download?...
+      const downloadProxyUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}&quality=${encodeURIComponent(quality)}${directStream ? `&format_url=${encodeURIComponent(directStream)}` : ''}`;
+      // 2. Direct Supabase Edge Function download endpoint (with Content-Disposition: attachment)
+      const fullDownloadUrl = `${edgeBase}?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}&quality=${encodeURIComponent(quality)}${directStream ? `&format_url=${encodeURIComponent(directStream)}` : ''}`;
 
       return new Response(JSON.stringify({
         success: true,
-        downloadUrl: proxyUrl,
-        streamUrl: directStream || proxyUrl,
+        downloadUrl: downloadProxyUrl,
+        fullDownloadUrl: fullDownloadUrl,
+        streamUrl: directStream || fullDownloadUrl,
         filename: filename,
         quality: quality,
         format: isAudio ? "mp3" : "mp4",
@@ -329,7 +377,7 @@ serve(async (req: Request) => {
     console.error("[Download Fatal Error]:", err?.message || err);
     return new Response(JSON.stringify({
       success: false,
-      error: { code: "INTERNAL_ERROR", message: err?.message || "Internal server error", desktopFallback: true },
+      error: { code: "INTERNAL_ERROR", message: err?.message || "Internal server error", desktopFallback: false },
     }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

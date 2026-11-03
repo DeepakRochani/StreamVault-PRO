@@ -12,7 +12,8 @@ window.SUPABASE_PROJECT_REF = 'sjnamkshicpxtyikzsnp';
 
 // ── Supabase Auth configuration ──────────────────────────────
 window.SUPABASE_URL     = 'https://sjnamkshicpxtyikzsnp.supabase.co';
-window.SUPABASE_ANON_KEY = 'sb_publishable_t2N8YtpcPHjVFJzrMlLr5Q_pL9ppUiP';
+window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNqbmFta3NoaWNweHR5aWt6c25wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3MzEzOTYsImV4cCI6MjEwMTMwNzM5Nn0.pZG7nQhnuzxc19umXyztJ-CLhFYe5p527IGxlI_9hNc';
+window.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_t2N8YtpcPHjVFJzrMlLr5Q_pL9ppUiP';
 
 // ── Google OAuth Client Configuration ────────────────────────
 window.GOOGLE_CLIENT_ID = '312739985705-hrn04fo2doa8dsn7573bg6dspt5eabh0.apps.googleusercontent.com';
