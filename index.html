@@ -1783,7 +1783,6 @@ checkAuthSession();
                 const parsedUrl = URLParser.detectPlatform(videoData.url);
                 const isSocial = parsedUrl.type === 'facebook' || parsedUrl.type === 'instagram' || parsedUrl.type === 'twitter' || parsedUrl.type === 'tiktok';
                 const dlEndpoint = isSocial ? '/api/social/download' : '/api/download';
-                const targetUrl = (window.API_BASE_URL || '') + dlEndpoint;
                 
                 let formatUrl = null;
                 let formatId = selectedQuality;
@@ -1791,10 +1790,6 @@ checkAuthSession();
                     const matchedFormat = videoData.videoFormats.find(f => (f.id || f.format_id) === selectedQuality);
                     if (matchedFormat && matchedFormat.url) formatUrl = matchedFormat.url;
                 }
-
-                console.log("=== DOWNLOAD REQUEST TRACE ===");
-                console.log("Request URL:", targetUrl);
-                console.log("Request Method:", "POST");
 
                 const reqBody = {
                     url:     videoData.url,
@@ -1806,21 +1801,54 @@ checkAuthSession();
                     format_id: formatId
                 };
 
-                const dlRes = await fetch(targetUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(reqBody)
-                });
+                // Dual-endpoint resiliency: try same-origin relative endpoint first, then direct Supabase fallback
+                const endpointsToTry = [
+                    dlEndpoint,
+                    'https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1/download'
+                ];
 
-                console.log("Response Status:", dlRes.status, dlRes.statusText);
+                let dlRes = null;
+                let lastErr = null;
+
+                for (const targetUrl of endpointsToTry) {
+                    try {
+                        console.log("=== DOWNLOAD REQUEST ATTEMPT ===", targetUrl);
+                        const res = await fetch(targetUrl, {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                ...(window.SUPABASE_ANON_KEY && targetUrl.includes('supabase.co') ? {
+                                    'apikey': window.SUPABASE_ANON_KEY,
+                                    'Authorization': 'Bearer ' + window.SUPABASE_ANON_KEY
+                                } : {})
+                            },
+                            body: JSON.stringify(reqBody)
+                        });
+                        if (res.ok) {
+                            dlRes = res;
+                            break;
+                        } else {
+                            const errBody = await res.json().catch(() => null);
+                            lastErr = errBody?.error || `HTTP ${res.status}`;
+                        }
+                    } catch (netErr) {
+                        console.warn(`[StreamVault] Endpoint attempt failed for ${targetUrl}:`, netErr);
+                        lastErr = netErr;
+                    }
+                }
+
+                if (!dlRes) {
+                    const errMsg = (typeof lastErr === 'object' ? lastErr.message : lastErr) || 'Download service unavailable';
+                    throw { message: errMsg, desktopFallback: false };
+                }
 
                 const dlData = await dlRes.json();
                 console.log("Response Body:", dlData);
 
-                if (!dlRes.ok || !dlData.success) {
+                if (!dlData.success) {
                     const errObj = dlData.error || {};
-                    const errMsg = (typeof errObj === 'object' ? errObj.message : errObj) || `Download failed (HTTP ${dlRes.status})`;
-                    const isFallback = (typeof errObj === 'object' && errObj.desktopFallback) || dlRes.status === 403 || dlRes.status === 422 || dlRes.status === 502;
+                    const errMsg = (typeof errObj === 'object' ? errObj.message : errObj) || 'Download failed';
+                    const isFallback = (typeof errObj === 'object' && errObj.desktopFallback);
                     throw { message: errMsg, desktopFallback: isFallback, code: errObj.code };
                 }
 
