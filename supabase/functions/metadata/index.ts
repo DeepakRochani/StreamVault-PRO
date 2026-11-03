@@ -2,17 +2,31 @@
 // SUPABASE EDGE FUNCTION: metadata
 // Route: POST /functions/v1/metadata
 //
-// Gets YouTube/social video info using:
-//  - YouTube oEmbed API (no key needed) for title
-//  - Direct YouTube thumbnail URLs
-//  - YouTube Data API v3 if YOUTUBE_API_KEY env var is set (for duration)
-//  - cobalt.tools API availability check
-//
-// Returns the same response shape as the old /api/metadata route
-// so the frontend needs zero changes to the data-rendering code.
+// Gets YouTube & social video metadata using:
+//  - Innertube (youtubei.js) with accurate multi-client format resolution
+//  - YouTube oEmbed API fallback
+//  - YouTube Data API v3 fallback (if YOUTUBE_API_KEY is set)
 // ============================================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { Innertube, Platform, UniversalCache } from "npm:youtubei.js@latest";
+
+// ── Configure JavaScript interpreter shim for YouTube decipher algorithms ──
+if (Platform && Platform.shim) {
+  Platform.load({
+    ...Platform.shim,
+    eval: async (data: any, env: any = {}) => {
+      try {
+        const code = typeof data === "string" ? data : (data?.output || data?.code || String(data));
+        const fn = new Function("env", code + '; return typeof result !== "undefined" ? result : (typeof module !== "undefined" && module.exports ? module.exports : globalThis.result);');
+        return fn(env);
+      } catch (evalErr) {
+        console.error("[Metadata Shim Eval Error]:", evalErr);
+        throw evalErr;
+      }
+    },
+  });
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,8 +34,106 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// ── helpers ──────────────────────────────────────────────────
+// ── Cookie Normalizer ─────────────────────────────────────────
+function normalizeYouTubeCookies(rawCookie?: string | null): { cookieHeader: string; count: number; valid: boolean } {
+  if (!rawCookie || typeof rawCookie !== "string" || !rawCookie.trim()) {
+    return { cookieHeader: "", count: 0, valid: false };
+  }
+  const trimmed = rawCookie.trim();
+  const cookiesMap = new Map<string, string>();
 
+  if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (item && typeof item.name === "string" && typeof item.value === "string") {
+            cookiesMap.set(item.name.trim(), item.value.trim());
+          }
+        }
+      } else if (typeof parsed === "object" && parsed !== null) {
+        for (const [k, v] of Object.entries(parsed)) {
+          if (typeof v === "string") cookiesMap.set(k.trim(), v.trim());
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (cookiesMap.size === 0 && (trimmed.includes("# Netscape") || trimmed.includes("\t") || trimmed.includes(".youtube.com"))) {
+    const lines = trimmed.split(/\r?\n/);
+    for (const line of lines) {
+      const lineTrim = line.trim();
+      if (!lineTrim || lineTrim.startsWith("#")) continue;
+      const parts = lineTrim.split(/\t+|\s+/);
+      if (parts.length >= 7) {
+        const name = parts[5]?.trim();
+        const value = parts[6]?.trim();
+        if (name && value !== undefined) cookiesMap.set(name, value);
+      }
+    }
+  }
+
+  if (cookiesMap.size === 0) {
+    const pairs = trimmed.split(";");
+    for (const pair of pairs) {
+      const idx = pair.indexOf("=");
+      if (idx > 0) {
+        const name = pair.substring(0, idx).trim();
+        const value = pair.substring(idx + 1).trim();
+        if (name && value) cookiesMap.set(name, value);
+      }
+    }
+  }
+
+  if (cookiesMap.size > 0) {
+    const cookieHeader = Array.from(cookiesMap.entries())
+      .map(([k, v]) => `${k}=${v}`)
+      .join("; ");
+    return { cookieHeader, count: cookiesMap.size, valid: true };
+  }
+  return { cookieHeader: "", count: 0, valid: false };
+}
+
+// ── Safe Structured Diagnostic Logging ────────────────────────
+export interface SafeDiagnostic {
+  event: "youtube_metadata_success" | "youtube_metadata_failure";
+  videoId?: string;
+  stage: "initialization" | "metadata_fetch" | "oembed_fallback" | "data_api_fallback";
+  httpStatus?: number;
+  reason?: string;
+  extractor: "youtubei.js";
+  cookieConfigured: boolean;
+  formatsFound?: number;
+}
+
+function logSafeDiagnostic(diag: SafeDiagnostic) {
+  console.log(`[Metadata Diagnostic] ${JSON.stringify(diag)}`);
+}
+
+// ── Innertube Session ─────────────────────────────────────────
+let cachedInnertube: any = null;
+async function getInnertube() {
+  if (!cachedInnertube) {
+    const rawCookie = Deno.env.get("YOUTUBE_COOKIE");
+    const normalized = normalizeYouTubeCookies(rawCookie);
+    try {
+      cachedInnertube = await Innertube.create({
+        cache: new UniversalCache(false),
+        generate_session_locally: true,
+        ...(normalized.valid ? { cookie: normalized.cookieHeader } : {}),
+      });
+    } catch (err: any) {
+      console.warn("[Metadata Innertube Warning]:", err.message);
+      cachedInnertube = await Innertube.create({
+        cache: new UniversalCache(false),
+        generate_session_locally: true,
+      });
+    }
+  }
+  return cachedInnertube;
+}
+
+// ── Helpers ──────────────────────────────────────────────────
 function extractVideoId(url: string): string | null {
   const patterns = [
     /(?:youtube\.com\/watch\?(?:.*&)?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
@@ -31,6 +143,15 @@ function extractVideoId(url: string): string | null {
     if (m) return m[1];
   }
   return null;
+}
+
+function formatDurationSeconds(sec: number): string {
+  if (!sec || isNaN(sec)) return "--:--";
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.floor(sec % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 function parseIsoDuration(iso: string): string {
@@ -43,54 +164,161 @@ function parseIsoDuration(iso: string): string {
   return `${min}:${String(s).padStart(2, "0")}`;
 }
 
-// ── main handler ─────────────────────────────────────────────
-
+// ── Main Handler ─────────────────────────────────────────────
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const { url, type } = await req.json();
+    const body = await req.json();
+    const url = body.url;
+    const isDiagnostics = body.diagnostics === true;
+
     if (!url) {
-      return new Response(JSON.stringify({ error: "url is required" }), {
+      return new Response(JSON.stringify({
+        success: false,
+        error: {
+          code: "INVALID_URL",
+          message: "url is required",
+          retryable: false,
+          desktopFallback: false,
+          stage: "initialization",
+        },
+      }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // ── YouTube ───────────────────────────────────────────────
     const videoId = extractVideoId(url);
     if (!videoId) {
-      return new Response(
-        JSON.stringify({ error: "Could not extract a YouTube video ID from the provided URL." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({
+        success: false,
+        error: {
+          code: "INVALID_URL",
+          message: "Could not extract a YouTube video ID from the provided URL.",
+          retryable: false,
+          desktopFallback: false,
+          stage: "initialization",
+        },
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     let title = "Unknown Title";
     let channelName = "";
     let duration = "--:--";
-
-    // Best-quality thumbnail directly from YouTube CDN (no API key)
     let thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+    let isRestricted = false;
+    let authRequired = false;
+    let availableHeights = new Set<number>();
+    let totalFormatsCount = 0;
+    let adaptiveFormatsCount = 0;
+    let matchedClient = "MWEB";
 
-    // 1. YouTube oEmbed — free, no key, gives title + author
-    try {
-      const oembedRes = await fetch(
-        `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
-        { headers: { "User-Agent": "StreamVault/1.0" } }
-      );
-      if (oembedRes.ok) {
-        const d = await oembedRes.json();
-        title = d.title ?? title;
-        channelName = d.author_name ?? "";
+    // 1. Try Innertube across multi-client strategy (MWEB -> ANDROID -> IOS -> WEB)
+    const yt = await getInnertube();
+    let videoInfo: any = null;
+
+    for (const client of ["MWEB", "ANDROID", "IOS", "WEB"] as const) {
+      try {
+        videoInfo = await yt.getBasicInfo(videoId, { client });
+        if (videoInfo?.basic_info?.title) {
+          matchedClient = client;
+          break;
+        }
+      } catch (err: any) {
+        const msg = err?.message || String(err);
+        const lower = msg.toLowerCase();
+        if (
+          lower.includes("login required") ||
+          lower.includes("login_required") ||
+          lower.includes("sign in with a google account") ||
+          lower.includes("requires authentication")
+        ) {
+          authRequired = true;
+          isRestricted = true;
+        } else if (
+          lower.includes("confirm your age") ||
+          lower.includes("age-restricted") ||
+          lower.includes("age_verification_required")
+        ) {
+          isRestricted = true;
+        }
       }
-    } catch (_) { /* non-fatal */ }
+    }
 
-    // 2. YouTube Data API v3 — gives duration + better thumbnails (optional)
+    if (videoInfo && videoInfo.basic_info) {
+      title = videoInfo.basic_info.title || title;
+      channelName = videoInfo.basic_info.author || channelName;
+      if (videoInfo.basic_info.duration) {
+        duration = formatDurationSeconds(videoInfo.basic_info.duration);
+      }
+      if (videoInfo.basic_info.thumbnail && videoInfo.basic_info.thumbnail.length > 0) {
+        const lastThumb = videoInfo.basic_info.thumbnail[videoInfo.basic_info.thumbnail.length - 1];
+        if (lastThumb?.url) thumbnail = lastThumb.url;
+      }
+
+      // Check formats
+      const progFormats = videoInfo.streaming_data?.formats || [];
+      const adaptFormats = videoInfo.streaming_data?.adaptive_formats || [];
+      const allFormats = [...progFormats, ...adaptFormats];
+      totalFormatsCount = allFormats.length;
+      adaptiveFormatsCount = adaptFormats.length;
+
+      for (const f of allFormats) {
+        if (f.height) availableHeights.add(f.height);
+      }
+
+      logSafeDiagnostic({
+        event: "youtube_metadata_success",
+        videoId,
+        stage: "metadata_fetch",
+        extractor: "youtubei.js",
+        cookieConfigured: !!Deno.env.get("YOUTUBE_COOKIE"),
+        formatsFound: allFormats.length,
+      });
+    }
+
+    // Diagnostic Request Return
+    if (isDiagnostics) {
+      const rawCookie = Deno.env.get("YOUTUBE_COOKIE");
+      const normalized = normalizeYouTubeCookies(rawCookie);
+      return new Response(JSON.stringify({
+        videoId,
+        extractor: "youtubei.js",
+        client: matchedClient,
+        cookieConfigured: !!rawCookie,
+        cookieCount: normalized.count,
+        playabilityStatus: videoInfo?.playability_status?.status || (authRequired ? "LOGIN_REQUIRED" : "OK"),
+        playabilityReason: videoInfo?.playability_status?.reason || "",
+        hasStreamingData: !!videoInfo?.streaming_data,
+        formatCount: totalFormatsCount,
+        adaptiveFormatCount: adaptiveFormatsCount,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // 2. Fallback: YouTube oEmbed
+    if (title === "Unknown Title") {
+      try {
+        const oembedRes = await fetch(
+          `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+          { headers: { "User-Agent": "StreamVault/1.0" } }
+        );
+        if (oembedRes.ok) {
+          const d = await oembedRes.json();
+          title = d.title ?? title;
+          channelName = d.author_name ?? channelName;
+        }
+      } catch (_) {}
+    }
+
+    // 3. Fallback: YouTube Data API v3
     const YT_KEY = Deno.env.get("YOUTUBE_API_KEY");
-    if (YT_KEY) {
+    if (YT_KEY && duration === "--:--") {
       try {
         const ytRes = await fetch(
           `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&key=${YT_KEY}&part=snippet,contentDetails`
@@ -102,34 +330,55 @@ serve(async (req: Request) => {
             title = item.snippet?.title ?? title;
             channelName = item.snippet?.channelTitle ?? channelName;
             const thumbs = item.snippet?.thumbnails;
-            thumbnail =
-              thumbs?.maxres?.url ??
-              thumbs?.high?.url ??
-              thumbs?.medium?.url ??
-              thumbnail;
+            thumbnail = thumbs?.maxres?.url ?? thumbs?.high?.url ?? thumbs?.medium?.url ?? thumbnail;
             duration = parseIsoDuration(item.contentDetails?.duration ?? "");
           }
         }
-      } catch (_) { /* non-fatal */ }
+      } catch (_) {}
     }
 
-    // 3. Build standard format list
-    //    cobalt.tools supports these qualities — we list them all;
-    //    if a quality isn't available, cobalt will return the best it has.
-    const videoFormats = [
-      { quality: "4K (2160p)", id: "2160p", sizeStr: "~1.5 GB",  recommended: false },
-      { quality: "1440p",      id: "1440p", sizeStr: "~700 MB",  recommended: false },
-      { quality: "1080p HD",   id: "1080p", sizeStr: "~350 MB",  recommended: true  },
-      { quality: "720p HD",    id: "720p",  sizeStr: "~180 MB",  recommended: false },
-      { quality: "480p",       id: "480p",  sizeStr: "~80 MB",   recommended: false },
-      { quality: "360p",       id: "360p",  sizeStr: "~50 MB",   recommended: false },
+    // If all providers failed to resolve metadata (e.g. invalid ID or deleted video)
+    if (title === "Unknown Title" && availableHeights.size === 0) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: {
+          code: "YOUTUBE_UNAVAILABLE",
+          message: "This video is unavailable or has been removed from YouTube.",
+          retryable: false,
+          desktopFallback: false,
+          stage: "metadata_fetch",
+        },
+      }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 4. Construct format list matching actual video capabilities
+    const standardQualities = [
+      { height: 2160, quality: "4K (2160p)", id: "2160p", sizeStr: "~1.5 GB", recommended: false },
+      { height: 1440, quality: "1440p", id: "1440p", sizeStr: "~700 MB", recommended: false },
+      { height: 1080, quality: "1080p HD", id: "1080p", sizeStr: "~350 MB", recommended: true },
+      { height: 720, quality: "720p HD", id: "720p", sizeStr: "~180 MB", recommended: false },
+      { height: 480, quality: "480p", id: "480p", sizeStr: "~80 MB", recommended: false },
+      { height: 360, quality: "360p", id: "360p", sizeStr: "~50 MB", recommended: false },
     ];
 
+    let videoFormats = standardQualities;
+    if (availableHeights.size > 0) {
+      videoFormats = standardQualities.filter(q => availableHeights.has(q.height) || q.height <= Math.max(...Array.from(availableHeights)));
+      if (videoFormats.length === 0) videoFormats = standardQualities;
+    }
+
     const audioFormats = [
-      { quality: "MP3 Best Quality", id: "128K", sizeStr: "~8 MB/min", recommended: true },
+      { quality: "320 kbps (Ultra HQ)", id: "320K", sizeStr: "~2.4 MB/min", recommended: true },
+      { quality: "256 kbps (High Quality)", id: "256K", sizeStr: "~1.9 MB/min", recommended: false },
+      { quality: "192 kbps (Standard)", id: "192K", sizeStr: "~1.4 MB/min", recommended: false },
+      { quality: "128 kbps (Economy)", id: "128K", sizeStr: "~0.9 MB/min", recommended: false },
     ];
 
     const payload = {
+      success: true,
       title,
       thumbnail,
       duration,
@@ -137,6 +386,9 @@ serve(async (req: Request) => {
       channel: channelName,
       videoId,
       url,
+      restricted: isRestricted,
+      authRequired,
+      desktopFallback: isRestricted || authRequired,
       videoFormats,
       audioFormats,
     };
@@ -147,7 +399,16 @@ serve(async (req: Request) => {
 
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    return new Response(JSON.stringify({ error: message }), {
+    return new Response(JSON.stringify({
+      success: false,
+      error: {
+        code: "METADATA_EXTRACTION_FAILED",
+        message: message,
+        retryable: true,
+        desktopFallback: true,
+        stage: "metadata_fetch",
+      },
+    }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
