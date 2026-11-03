@@ -1,8 +1,9 @@
 // ============================================================
 // SUPABASE EDGE FUNCTION: admin
 // Route: /functions/v1/admin/*
-// Handles admin authentication and administrative dashboard APIs
-// for StreamVault PRO online production deployment on Vercel.
+// Comprehensive admin portal bridge for StreamVault PRO
+// Matches all frontend expectations (data.config, data.revenueToday,
+// data.placements, data.logs with created_at, users with counts)
 // ============================================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -14,7 +15,6 @@ const corsHeaders = {
   "Access-Control-Allow-Credentials": "true",
 };
 
-// Seed administrative data
 const ADMIN_EMAIL = "admin@streamvault.com";
 const ADMIN_PASS = "streamvault2026";
 
@@ -33,17 +33,26 @@ let plans = [
 ];
 
 let adPlacements = [
-  { id: "ad_banner_1", location: "bottom_banner", code: "<!-- Google AdSense Banner -->", is_enabled: 1, provider: "AdSense" },
-  { id: "ad_popup_1", location: "download_interstitial", code: "<!-- Download Interstitial -->", is_enabled: 1, provider: "AdSense" },
+  { id: "banner_bottom", name: "Bottom Banner", location: "bottom_banner", code: "<!-- Google AdSense Banner -->", is_enabled: 1, provider: "Google AdSense" },
+  { id: "interstitial", name: "Download Popup", location: "download_interstitial", code: "<!-- Interstitial Modal -->", is_enabled: 1, provider: "Google AdSense" },
 ];
 
-let systemSettings = {
-  site_name: "StreamVault PRO",
-  maintenance_mode: false,
-  ads_enabled: true,
-  max_concurrent_downloads: 5,
-  max_cloud_duration_seconds: 7200,
-  default_download_provider: "streamvault-cloud",
+let systemConfig = {
+  youtube_enabled: "true",
+  instagram_enabled: "true",
+  facebook_enabled: "true",
+  converter_enabled: "true",
+  maintenance_mode: "false",
+  ads_enabled: "true",
+  playlist_enabled: "true",
+  batch_enabled: "true",
+  "4k_enabled": "true",
+  history_enabled: "true",
+  login_enabled: "true",
+  subscription_enabled: "true",
+  plan_premium_enabled: "true",
+  plan_pro_enabled: "true",
+  plan_lifetime_enabled: "true",
 };
 
 let notifications = [
@@ -57,8 +66,15 @@ let promoCodes = [
 ];
 
 let activityLogs = [
-  { id: 1, action: "Admin Portal Initialized", details: "Online cloud admin bridge connected successfully.", user_email: ADMIN_EMAIL, timestamp: new Date().toISOString() },
-  { id: 2, action: "Cloud Download Botguard Bypass", details: "Mobile Innertube & Cloud Mux engine active.", user_email: "system@streamvault.pro", timestamp: new Date().toISOString() },
+  { id: 1, action: "Admin Session Verified", details: "Admin accessed dashboard.", user_email: ADMIN_EMAIL, ip_address: "Cloud Edge", created_at: "2026-11-03 10:35:00" },
+  { id: 2, action: "Video Download (1080p)", details: "Completed 1080p MP4 cloud stream successfully.", user_email: "vip@example.com", ip_address: "Cloud Edge", created_at: "2026-11-03 10:30:00" },
+  { id: 3, action: "Audio Extraction (320K)", details: "Completed high-fidelity MP3 extraction.", user_email: "alex@creative.io", ip_address: "Cloud Edge", created_at: "2026-11-03 10:15:00" },
+];
+
+let usersList = [
+  { id: "admin_master_1", name: "Master Administrator", email: ADMIN_EMAIL, role: "super_admin", status: "active", plan: "Lifetime", join_date: "2026-01-01", last_login: "2026-11-03 10:37:00", dlCount: 184, cvCount: 42 },
+  { id: "usr_1", name: "VIP Member", email: "vip@example.com", role: "user", status: "active", plan: "Pro", join_date: "2026-10-01", last_login: "2026-11-03 09:12:00", dlCount: 76, cvCount: 19 },
+  { id: "usr_2", name: "Alex Reed", email: "alex@creative.io", role: "user", status: "active", plan: "Lifetime", join_date: "2026-10-15", last_login: "2026-11-02 18:20:00", dlCount: 112, cvCount: 31 },
 ];
 
 serve(async (req: Request) => {
@@ -76,14 +92,14 @@ serve(async (req: Request) => {
         const body = await req.json().catch(() => ({}));
         const { email, password } = body;
 
-        // Verify credentials
         if ((email === ADMIN_EMAIL || email?.toLowerCase().includes("admin")) && password === ADMIN_PASS) {
           activityLogs.unshift({
             id: Date.now(),
             action: "Admin Login Succeeded",
             details: `Logged in from IP ${req.headers.get("x-forwarded-for") || "online"}`,
             user_email: email,
-            timestamp: new Date().toISOString(),
+            ip_address: req.headers.get("x-forwarded-for") || "Online Cloud",
+            created_at: new Date().toISOString().replace("T", " ").substring(0, 19),
           });
 
           return new Response(JSON.stringify({
@@ -102,7 +118,7 @@ serve(async (req: Request) => {
 
         return new Response(JSON.stringify({
           success: false,
-          error: "Invalid admin email or password. Default is admin@streamvault.com / streamvault2026",
+          error: "Invalid admin credentials. Default: admin@streamvault.com / streamvault2026",
         }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -110,7 +126,7 @@ serve(async (req: Request) => {
       }
     }
 
-    // ── 2. Auth Session Check (/api/auth/me) ─────────────────────
+    // ── 2. Auth Session Check ────────────────────────────────────
     if (pathname === "/auth/me" || pathname === "/me") {
       return new Response(JSON.stringify({
         success: true,
@@ -120,7 +136,7 @@ serve(async (req: Request) => {
       });
     }
 
-    // ── 3. Platform Analytics ────────────────────────────────────
+    // ── 3. Platform Analytics (Dashboard Overview) ───────────────
     if (pathname === "/analytics") {
       return new Response(JSON.stringify({
         success: true,
@@ -145,7 +161,55 @@ serve(async (req: Request) => {
       });
     }
 
-    // ── 4. Subscriptions Stats ───────────────────────────────────
+    // ── 4. Settings & Feature Flags (Requires data.config) ──────
+    if (pathname === "/settings") {
+      if (req.method === "POST") {
+        const body = await req.json().catch(() => ({}));
+        systemConfig = { ...systemConfig, ...body };
+        return new Response(JSON.stringify({ success: true, config: systemConfig, settings: systemConfig }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ success: true, config: systemConfig, settings: systemConfig }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── 5. Revenue Stats (Requires revenueToday, revenueMonth) ───
+    if (pathname === "/revenue") {
+      return new Response(JSON.stringify({
+        success: true,
+        revenueToday: 185.50,
+        revenueMonth: 4850.00,
+        activeSubscribers: 388,
+        expiredSubscribers: 15,
+        totalRevenue: 18450.00,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── 6. Activity Logs (Requires data.logs with created_at) ────
+    if (pathname === "/activity") {
+      return new Response(JSON.stringify({
+        success: true,
+        logs: activityLogs,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── 7. Users List ────────────────────────────────────────────
+    if (pathname === "/users") {
+      return new Response(JSON.stringify({
+        success: true,
+        users: usersList,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── 8. Subscriptions Stats ───────────────────────────────────
     if (pathname === "/subscriptions/stats") {
       return new Response(JSON.stringify({
         success: true,
@@ -166,7 +230,7 @@ serve(async (req: Request) => {
       });
     }
 
-    // ── 5. Plans ─────────────────────────────────────────────────
+    // ── 9. Plans ─────────────────────────────────────────────────
     if (pathname === "/plans") {
       return new Response(JSON.stringify({
         success: true,
@@ -176,7 +240,7 @@ serve(async (req: Request) => {
       });
     }
 
-    // ── 6. Subscriptions List ────────────────────────────────────
+    // ── 10. Subscriptions List ───────────────────────────────────
     if (pathname === "/subscriptions/list") {
       return new Response(JSON.stringify({
         success: true,
@@ -216,7 +280,7 @@ serve(async (req: Request) => {
       });
     }
 
-    // ── 7. Payments ──────────────────────────────────────────────
+    // ── 11. Payments List ────────────────────────────────────────
     if (pathname === "/payments") {
       return new Response(JSON.stringify({
         success: true,
@@ -232,87 +296,31 @@ serve(async (req: Request) => {
       });
     }
 
-    // ── 8. Notifications ─────────────────────────────────────────
-    if (pathname === "/notifications") {
-      if (req.method === "POST") {
-        const body = await req.json().catch(() => ({}));
-        const newNotif = {
-          id: "notif_" + Date.now(),
-          title: body.title || "Notification",
-          message: body.message || "",
-          type: body.type || "info",
-          created_at: new Date().toISOString(),
-        };
-        notifications.unshift(newNotif);
-        return new Response(JSON.stringify({ success: true, notification: newNotif }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify({ success: true, notifications }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // ── 9. Promo Codes ───────────────────────────────────────────
-    if (pathname === "/promo") {
-      return new Response(JSON.stringify({ success: true, codes: promoCodes }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // ── 10. Users ────────────────────────────────────────────────
-    if (pathname === "/users") {
+    // ── 12. Ads Management (Requires p.name) ─────────────────────
+    if (pathname === "/ads") {
       return new Response(JSON.stringify({
         success: true,
-        users: [
-          { id: "admin_master_1", name: "Master Administrator", email: ADMIN_EMAIL, role: "super_admin", status: "active", plan: "lifetime", join_date: "2026-01-01" },
-          { id: "usr_1", name: "VIP Member", email: "vip@example.com", role: "user", status: "active", plan: "pro", join_date: "2026-10-01" },
-          { id: "usr_2", name: "Alex Reed", email: "alex@creative.io", role: "user", status: "active", plan: "lifetime", join_date: "2026-10-15" },
-        ],
+        placements: adPlacements,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // ── 11. Activity Logs ────────────────────────────────────────
-    if (pathname === "/activity") {
-      return new Response(JSON.stringify({ success: true, logs: activityLogs }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // ── 12. Settings ─────────────────────────────────────────────
-    if (pathname === "/settings") {
-      if (req.method === "POST") {
-        const body = await req.json().catch(() => ({}));
-        systemSettings = { ...systemSettings, ...body };
-        return new Response(JSON.stringify({ success: true, settings: systemSettings }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify({ success: true, settings: systemSettings }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // ── 13. Ads Management ───────────────────────────────────────
-    if (pathname === "/ads") {
-      return new Response(JSON.stringify({ success: true, placements: adPlacements }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // ── 14. Revenue ──────────────────────────────────────────────
-    if (pathname === "/revenue") {
+    // ── 13. Notifications ────────────────────────────────────────
+    if (pathname === "/notifications") {
       return new Response(JSON.stringify({
         success: true,
-        revenue: {
-          total: 18450.00,
-          monthly: 4850.00,
-          yearly: 9200.00,
-          lifetime: 4400.00,
-          growth_percent: 24.5,
-        },
+        notifications: notifications,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── 14. Promo Codes ──────────────────────────────────────────
+    if (pathname === "/promo") {
+      return new Response(JSON.stringify({
+        success: true,
+        codes: promoCodes,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -336,8 +344,8 @@ serve(async (req: Request) => {
       });
     }
 
-    // Default fallback: return success for any other unhandled admin subroute
-    return new Response(JSON.stringify({ success: true, path: pathname }), {
+    // Fallback response for any subroute
+    return new Response(JSON.stringify({ success: true, path: pathname, config: systemConfig }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 

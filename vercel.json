@@ -3,6 +3,36 @@
   "outputDirectory": "dist",
   "cleanUrls": true,
   "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/api/admin/:match*",
+      "destination": "https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1/admin/:match*"
+    },
+    {
+      "source": "/api/auth/:match*",
+      "destination": "https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1/auth/:match*"
+    },
+    {
+      "source": "/api/download/:match*",
+      "destination": "https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1/download/:match*"
+    },
+    {
+      "source": "/api/download",
+      "destination": "https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1/download"
+    },
+    {
+      "source": "/api/metadata/:match*",
+      "destination": "https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1/metadata/:match*"
+    },
+    {
+      "source": "/api/metadata",
+      "destination": "https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1/metadata"
+    },
+    {
+      "source": "/api/:match*",
+      "destination": "https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1/:match*"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

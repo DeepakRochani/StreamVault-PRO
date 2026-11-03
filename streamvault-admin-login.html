@@ -91,10 +91,12 @@
     </div>
 
     <script>
+        window.API_BASE_URL = window.API_BASE_URL || 'https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1';
+
         document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
             const btn = document.getElementById('submit-btn');
             const errBox = document.getElementById('error-msg');
             const errText = document.getElementById('error-text');
@@ -103,23 +105,53 @@
             btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[20px]">sync</span><span>Authenticating...</span>';
             errBox.classList.add('hidden');
 
-            try {
-                const res = await fetch((window.API_BASE_URL || '') + '/api/admin/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
-                });
-                const data = await res.json();
-                
-                if (data.success) {
-                    window.location.href = 'streamvault-admin.html';
-                } else {
-                    throw new Error(data.error || 'Authentication failed');
+            const loginEndpoints = [
+                (window.API_BASE_URL ? (window.API_BASE_URL.replace(/\/api\/?$/, '') + '/admin/login') : null),
+                '/api/admin/login',
+                'https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1/admin/login'
+            ].filter(Boolean);
+
+            let success = false;
+            let lastError = 'Authentication failed';
+
+            for (const endpoint of loginEndpoints) {
+                try {
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            ...(window.SUPABASE_ANON_KEY ? {
+                                'apikey': window.SUPABASE_ANON_KEY,
+                                'Authorization': 'Bearer ' + window.SUPABASE_ANON_KEY
+                            } : {})
+                        },
+                        body: JSON.stringify({ email, password })
+                    });
+                    
+                    if (!res.ok && res.status >= 500) continue;
+                    
+                    const data = await res.json();
+                    if (data.success) {
+                        if (data.user) {
+                            try { localStorage.setItem('streamvault_admin_user', JSON.stringify(data.user)); } catch(_) {}
+                        }
+                        if (data.token) {
+                            try { localStorage.setItem('streamvault_admin_token', data.token); } catch(_) {}
+                        }
+                        success = true;
+                        window.location.href = 'streamvault-admin.html';
+                        break;
+                    } else {
+                        lastError = data.error || 'Authentication failed';
+                    }
+                } catch (err) {
+                    lastError = err.message || 'Network connection failed';
                 }
-            } catch (err) {
+            }
+
+            if (!success) {
                 errBox.classList.remove('hidden');
-                errText.innerText = err.message;
-            } finally {
+                errText.innerText = lastError;
                 btn.disabled = false;
                 btn.innerHTML = '<span>Access Dashboard</span><span class="material-symbols-outlined text-[20px]">arrow_forward</span>';
             }

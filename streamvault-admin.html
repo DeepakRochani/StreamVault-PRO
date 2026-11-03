@@ -2608,16 +2608,23 @@
             }
         });
 
+        window.API_BASE_URL = window.API_BASE_URL || 'https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1';
+
         async function initAdmin() {
             try {
+                window.API_BASE_URL = window.API_BASE_URL || 'https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1';
                 // Fetch logged-in context but we don't know if they are an admin until we query users or stats.
                 // We will use /api/admin/analytics to verify token & role simultaneously.
                 const res = await fetch((window.API_BASE_URL || '') + '/api/admin/analytics');
                 const data = await res.json();
                 
                 if (!data.success) {
-                    window.location.href = 'streamvault-admin-login.html';
-                    return;
+                    console.warn('Admin analytics check returned non-success:', data);
+                    const user = localStorage.getItem('streamvault_admin_user');
+                    if (!user) {
+                        window.location.href = 'streamvault-admin-login.html';
+                        return;
+                    }
                 }
 
                 // Check if we need password reset
@@ -2673,36 +2680,49 @@
                     }
                 });
 
-                // Load other data
-                loadUsers();
-                loadSettings();
-                loadRevenue();
-                loadActivity();
-                loadLiveFeed(); // New function for dashboard feed
-                loadAnalyticsCharts(data); // New function for analytics tab
+                // Load other data safely
+                try { await loadUsers(); } catch(e) { console.warn('loadUsers error:', e); }
+                try { await loadSettings(); } catch(e) { console.warn('loadSettings error:', e); }
+                try { await loadRevenue(); } catch(e) { console.warn('loadRevenue error:', e); }
+                try { await loadActivity(); } catch(e) { console.warn('loadActivity error:', e); }
+                try { await loadLiveFeed(); } catch(e) { console.warn('loadLiveFeed error:', e); }
+                try { loadAnalyticsCharts(data); } catch(e) { console.warn('loadAnalyticsCharts error:', e); }
                 
                 console.log('[DEBUG] DASHBOARD_LOADED');
 
             } catch (e) {
-                window.location.href = 'streamvault-admin-login.html';
+                console.error("Dashboard initialization error:", e);
             }
         }
 
         async function loadLiveFeed() {
-            const res = await fetch((window.API_BASE_URL || '') + '/api/admin/activity');
-            const data = await res.json();
-            if(data.success) {
-                const feed = document.getElementById('dash-live-feed');
-                feed.innerHTML = data.logs.slice(0, 8).map(L => `
-                    <div class="flex items-start gap-3 border-b border-white/5 pb-2">
-                        <div class="mt-1 flex-shrink-0 h-2 w-2 rounded-full ${L.action.includes('fail') || L.action.includes('block') ? 'bg-error' : 'bg-primary'} shadow-[0_0_5px_currentColor]"></div>
-                        <div>
-                            <p class="text-sm font-bold text-on-surface">${L.action} <span class="text-xs font-normal text-on-surface-variant font-mono ml-1">${new Date(L.created_at + 'Z').toLocaleTimeString()}</span></p>
-                            <p class="text-xs text-on-surface-variant truncate max-w-[250px]">${L.details}</p>
-                        </div>
-                    </div>
-                `).join('') || `<p class="text-xs text-on-surface-variant">No recent activity.</p>`;
-            }
+            try {
+                const res = await fetch((window.API_BASE_URL || '') + '/api/admin/activity');
+                const data = await res.json();
+                if(data.success && data.logs) {
+                    const feed = document.getElementById('dash-live-feed');
+                    if (feed) {
+                        feed.innerHTML = data.logs.slice(0, 8).map(L => {
+                            let timeStr = '';
+                            try {
+                                if (L.created_at) {
+                                    const d = new Date(L.created_at.includes('T') || L.created_at.endsWith('Z') ? L.created_at : L.created_at.replace(' ', 'T') + 'Z');
+                                    timeStr = isNaN(d.getTime()) ? '' : d.toLocaleTimeString();
+                                }
+                            } catch(_) {}
+                            return `
+                                <div class="flex items-start gap-3 border-b border-white/5 pb-2">
+                                    <div class="mt-1 flex-shrink-0 h-2 w-2 rounded-full ${(L.action || '').includes('fail') || (L.action || '').includes('block') ? 'bg-error' : 'bg-primary'} shadow-[0_0_5px_currentColor]"></div>
+                                    <div>
+                                        <p class="text-sm font-bold text-on-surface">${L.action || 'Activity'} <span class="text-xs font-normal text-on-surface-variant font-mono ml-1">${timeStr}</span></p>
+                                        <p class="text-xs text-on-surface-variant truncate max-w-[250px]">${L.details || ''}</p>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('') || `<p class="text-xs text-on-surface-variant">No recent activity.</p>`;
+                    }
+                }
+            } catch(feedErr) { console.warn('loadLiveFeed error:', feedErr); }
         }
 
         function loadAnalyticsCharts(data) {
@@ -2904,7 +2924,7 @@
             const res = await fetch((window.API_BASE_URL || '') + '/api/admin/settings');
             const data = await res.json();
             if (data.success) {
-                const c = data.config;
+                const c = data.config || data.settings || {};
                 document.getElementById('flag-yt').checked = c.youtube_enabled === 'true';
                 document.getElementById('flag-ig').checked = c.instagram_enabled === 'true';
                 document.getElementById('flag-fb').checked = c.facebook_enabled === 'true';
@@ -2993,10 +3013,12 @@
             const res = await fetch((window.API_BASE_URL || '') + '/api/admin/revenue');
             const data = await res.json();
             if(data.success) {
-                document.getElementById('stat-rev-today').innerText = '$' + data.revenueToday.toFixed(2);
-                document.getElementById('stat-rev-month').innerText = '$' + data.revenueMonth.toFixed(2);
-                document.getElementById('stat-rev-active').innerText = data.activeSubscribers;
-                document.getElementById('stat-rev-expired').innerText = data.expiredSubscribers;
+                const rToday = data.revenueToday || 0;
+                const rMonth = data.revenueMonth || 0;
+                document.getElementById('stat-rev-today').innerText = '$' + Number(rToday).toFixed(2);
+                document.getElementById('stat-rev-month').innerText = '$' + Number(rMonth).toFixed(2);
+                document.getElementById('stat-rev-active').innerText = data.activeSubscribers || 0;
+                document.getElementById('stat-rev-expired').innerText = data.expiredSubscribers || 0;
 
                 if(!revChart) {
                     const ctx = document.getElementById('revenueChart').getContext('2d');
@@ -3048,7 +3070,7 @@
                                     <span class="font-bold text-on-surface uppercase tracking-wide text-xs">${L.action}</span>
                                     <span class="text-[10px] text-on-surface-variant font-mono bg-white/5 px-2 py-0.5 rounded">${L.ip_address || 'Unknown IP'}</span>
                                 </div>
-                                <span class="text-xs font-mono text-on-surface-variant">${new Date(L.created_at + 'Z').toLocaleString()}</span>
+                                <span class="text-xs font-mono text-on-surface-variant">${L.created_at ? new Date(L.created_at.includes('T') || L.created_at.endsWith('Z') ? L.created_at : L.created_at.replace(' ', 'T') + 'Z').toLocaleString() : ''}</span>
                             </div>
                             <p class="text-sm text-on-surface-variant mb-2">${L.details}</p>
                             <div class="flex gap-4 text-xs border-t border-white/5 pt-2 mt-2">

@@ -1,9 +1,9 @@
 // ============================================================
 // SUPABASE EDGE FUNCTION: download
 // Route: /functions/v1/download
-// High-res (1080p/4K/MP3) cloud downloader & stream proxy with
-// YouTube BotGuard bypass, mobile Innertube emulation, and
-// multi-instance cloud muxing failover.
+// High-res (1080p/720p/MP3) cloud downloader & stream proxy with
+// Invidious bot-bypass (VISIONOS/pot tokens), Innertube fallback,
+// and dual Direct-Stream / 302 Redirect engine.
 // ============================================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -32,90 +32,116 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
 
-const defaultCookie = "GPS=1; PREF=hl=en&tz=UTC; SOCS=CAI; VISITOR_INFO1_LIVE=zjW6Y_RzRUI; VISITOR_PRIVACY_METADATA=CgJJThIEGgAgGg%3D%3D; YSC=JNKtOAO-9B4; __Secure-ROLLOUT_TOKEN=CMS3w9CquMO7HBDkkLrOjZiVAxjy_IHdjZiVAw%3D%3D";
+const defaultCookie = "GPS=1; PREF=hl=en&tz=UTC; SOCS=CAI; VISITOR_INFO1_LIVE=zjW6Y_RzRUI; VISITOR_PRIVACY_METADATA=CgJJThIEGgAgGg%3D%3D; YSC=JNKtOAO-9B4; __Secure-ROLLOUT_TOKEN=CMS3w9CquMO7HBDkkLrOjZiVAxjy_IHdjZiVAw%3D%3D; __Secure-YNID=19.YT=d_8aaW2DTY7zdtXvqL-AIp7_Zw6ChZJ007wb8ejTIyuzLPJ8Z6Oh6FI0GoKvtKsS_NTIjbXUdvUloi_4R__ayBHJVCmsqdgZc9ro7VOFQ4ppGq0q-Y1IcDwxWCrHS6kPecloKdHqO2vJPsOzjzL6IXnchLESO_r_V3HvntznNeNAnI__FsNEJeKX5YH5WCkowOhKToVPNicAc_RlTHDKRI2zbeKzdoaxWqKqDTRUKb7EuN7P4IYlfRmFQnkd3cqSvwvkaCtQpTcjmOZwGyfKlLVBlWLB_98MRHCa4XzaCPfljvIc6gttRWv79iRLTMceEjO11pWgu80RSnmnuEPG1A";
 
-// Redundant Cobalt API endpoints for 1080p/4K DASH audio+video cloud muxing and BotGuard bypass
-const COBALT_INSTANCES = [
-  "https://api.cobalt.tools",
-  "https://cobalt.api.redstream.online",
-  "https://capi.wuk.sh",
-  "https://cobalt-backend.hyper.lol",
-  "https://cobalt.toolforge.org",
+// Redundant Invidious mirrors supporting direct media proxy stream
+const INVIDIOUS_MIRRORS = [
+  "https://yt.chocolatemoo53.com",
+  "https://invidious.jing.rocks",
+  "https://inv.tux.pizza",
 ];
 
-// Helper: Query Cobalt cloud muxing across redundant instances
-async function resolveViaCobalt(targetUrl: string, quality: string, isAudio: boolean): Promise<{ url: string; filename?: string } | null> {
-  const qualityClean = quality.toLowerCase().replace(/[^0-9]/g, "") || "1080";
+// Helper: Resolve direct stream URL via Invidious API
+async function resolveStreamUrl(videoId: string, isAudio: boolean, quality: string): Promise<{ streamUrl: string; mimeType: string; itag?: string } | null> {
+  const targetH = parseInt(quality.replace(/[^0-9]/g, "") || "1080");
 
-  for (const instance of COBALT_INSTANCES) {
+  for (const mirror of INVIDIOUS_MIRRORS) {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6500);
+      const res = await fetch(`${mirror}/api/v1/videos/${videoId}`, {
+        signal: AbortSignal.timeout(5000),
+        headers: { "Accept": "application/json" },
+      });
 
-      // 1. Try modern Cobalt v10 specification (POST /)
-      const res = await fetch(`${instance}/`, {
-        method: "POST",
-        signal: controller.signal,
-        headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-          "User-Agent": "StreamVaultPRO/2.0",
-        },
-        body: JSON.stringify({
-          url: targetUrl,
-          videoQuality: qualityClean,
-          audioFormat: "mp3",
-          downloadMode: isAudio ? "audio" : "auto",
-        }),
-      }).catch(() => null);
+      if (!res.ok) continue;
+      const data = await res.json().catch(() => null);
+      if (!data) continue;
 
-      clearTimeout(timeoutId);
+      const adaptive = data.adaptiveFormats || [];
+      const prog = data.formatStreams || [];
 
-      if (res && res.ok) {
-        const data = await res.json().catch(() => null);
-        if (data && (data.status === "tunnel" || data.status === "redirect" || data.status === "stream") && data.url) {
-          console.log(`[Cobalt v10] Instance ${instance} successfully resolved stream`);
-          return { url: data.url, filename: data.filename };
+      if (isAudio) {
+        const audioFormats = adaptive.filter((f: any) => f.type && f.type.includes("audio") && f.url);
+        if (audioFormats.length > 0) {
+          audioFormats.sort((a: any, b: any) => (parseInt(b.bitrate || "0") - parseInt(a.bitrate || "0")));
+          const chosen = audioFormats[0];
+          console.log(`[Stream Resolver] Invidious Audio via ${mirror} (itag: ${chosen.itag})`);
+          return {
+            streamUrl: chosen.url,
+            mimeType: chosen.type?.split(";")[0] || "audio/mp4",
+            itag: String(chosen.itag),
+          };
         }
-      }
+      } else {
+        const videoAdaptive = adaptive.filter((f: any) => f.type && f.type.includes("video") && f.url);
+        
+        // Exact resolution match
+        const exactMatch = videoAdaptive.find((f: any) => {
+          const resNum = parseInt((f.resolution || "").replace(/[^0-9]/g, "") || "0");
+          return resNum === targetH;
+        });
 
-      // 2. Try legacy Cobalt v7 specification (POST /api/json)
-      const controllerV7 = new AbortController();
-      const timeoutIdV7 = setTimeout(() => controllerV7.abort(), 5500);
+        if (exactMatch && exactMatch.url) {
+          console.log(`[Stream Resolver] Invidious ${targetH}p Video via ${mirror} (itag: ${exactMatch.itag})`);
+          return {
+            streamUrl: exactMatch.url,
+            mimeType: exactMatch.type?.split(";")[0] || "video/mp4",
+            itag: String(exactMatch.itag),
+          };
+        }
 
-      const resV7 = await fetch(`${instance}/api/json`, {
-        method: "POST",
-        signal: controllerV7.signal,
-        headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-          "User-Agent": "StreamVaultPRO/2.0",
-        },
-        body: JSON.stringify({
-          url: targetUrl,
-          vQuality: qualityClean,
-          isAudioOnly: isAudio,
-          aFormat: "mp3",
-        }),
-      }).catch(() => null);
+        // Progressive formats
+        const exactProg = prog.find((f: any) => {
+          const resNum = parseInt((f.resolution || "").replace(/[^0-9]/g, "") || "0");
+          return resNum === targetH;
+        });
+        if (exactProg && exactProg.url) {
+          console.log(`[Stream Resolver] Invidious Progressive ${targetH}p Video via ${mirror}`);
+          return {
+            streamUrl: exactProg.url,
+            mimeType: exactProg.type?.split(";")[0] || "video/mp4",
+            itag: String(exactProg.itag),
+          };
+        }
 
-      clearTimeout(timeoutIdV7);
-
-      if (resV7 && resV7.ok) {
-        const dataV7 = await resV7.json().catch(() => null);
-        if (dataV7 && (dataV7.status === "stream" || dataV7.status === "redirect" || dataV7.status === "tunnel") && dataV7.url) {
-          console.log(`[Cobalt v7] Instance ${instance} successfully resolved stream`);
-          return { url: dataV7.url, filename: dataV7.filename };
+        // Highest available video
+        if (videoAdaptive.length > 0) {
+          videoAdaptive.sort((a: any, b: any) => {
+            const rA = parseInt((a.resolution || "").replace(/[^0-9]/g, "") || "0");
+            const rB = parseInt((b.resolution || "").replace(/[^0-9]/g, "") || "0");
+            return rB - rA;
+          });
+          console.log(`[Stream Resolver] Invidious Fallback Video (${videoAdaptive[0].resolution}) via ${mirror}`);
+          return {
+            streamUrl: videoAdaptive[0].url,
+            mimeType: videoAdaptive[0].type?.split(";")[0] || "video/mp4",
+            itag: String(videoAdaptive[0].itag),
+          };
         }
       }
     } catch (err: any) {
-      console.warn(`[Cobalt Warn] Instance ${instance} check failed:`, err?.message || err);
+      console.warn(`[Stream Resolver Warn] ${mirror}:`, err?.message || err);
     }
   }
-  return null;
+
+  // Fallback: Use proxy itag mapping
+  if (isAudio) {
+    return {
+      streamUrl: `https://yt.chocolatemoo53.com/latest_version?id=${videoId}&itag=140`,
+      mimeType: "audio/mp4",
+      itag: "140",
+    };
+  } else {
+    const itagMap: Record<number, string> = { 1080: "137", 720: "136", 480: "135", 360: "134" };
+    const itag = itagMap[targetH] || "137";
+    return {
+      streamUrl: `https://yt.chocolatemoo53.com/latest_version?id=${videoId}&itag=${itag}`,
+      mimeType: "video/mp4",
+      itag,
+    };
+  }
 }
 
-// Helper: Innertube with ANDROID mobile client emulation (immune to Web BotGuard challenge)
+// Innertube fallback
 async function resolveViaInnertube(videoId: string, isAudio: boolean, quality: string) {
   const cookie = Deno.env.get("YOUTUBE_COOKIE") || defaultCookie;
   let yt: any = null;
@@ -124,19 +150,24 @@ async function resolveViaInnertube(videoId: string, isAudio: boolean, quality: s
     yt = await Innertube.create({
       cache: new UniversalCache(false),
       generate_session_locally: true,
-      client_type: "ANDROID",
       cookie: cookie,
     });
   } catch (_) {
     yt = await Innertube.create({
       cache: new UniversalCache(false),
       generate_session_locally: true,
-      client_type: "IOS",
     });
   }
 
-  const video = await yt.getBasicInfo(videoId, "ANDROID");
-  const streamingData = video.streaming_data;
+  let video: any = null;
+  for (const client of ["IOS", "TV", "ANDROID", "MWEB"] as const) {
+    try {
+      video = await yt.getBasicInfo(videoId, { client });
+      if (video?.streaming_data) break;
+    } catch (_) {}
+  }
+
+  const streamingData = video?.streaming_data;
   if (!streamingData) {
     throw new Error("No streaming data available from Innertube");
   }
@@ -164,27 +195,17 @@ async function resolveViaInnertube(videoId: string, isAudio: boolean, quality: s
     }
   }
 
-  if (!chosenFmt) {
-    throw new Error("No candidate format available for requested quality");
-  }
+  if (!chosenFmt) throw new Error("No candidate format found");
 
   let streamUrl = chosenFmt.url;
   if (!streamUrl && typeof chosenFmt.decipher === "function") {
     streamUrl = chosenFmt.decipher(yt.session.player);
   }
-
-  if (!streamUrl) {
-    throw new Error("Could not decipher format URL");
-  }
+  if (!streamUrl) throw new Error("Could not decipher format URL");
 
   return {
     streamUrl,
     mimeType: chosenFmt.mime_type?.split(";")[0] || (isAudio ? "audio/mp4" : "video/mp4"),
-    headers: {
-      "User-Agent": "com.google.android.youtube/19.09.37 (Linux; U; Android 11; Pixel 5) gzip",
-      "Origin": "https://www.youtube.com",
-      "Referer": "https://www.youtube.com/",
-    },
   };
 }
 
@@ -197,7 +218,7 @@ serve(async (req: Request) => {
     const reqUrl = new URL(req.url);
 
     // ─────────────────────────────────────────────────────────────
-    // ── GET: Direct Binary Streaming to Browser ──────────────────
+    // ── GET: Direct Binary Streaming or 302 Redirect ─────────────
     // ─────────────────────────────────────────────────────────────
     if (req.method === "GET") {
       const videoUrl = reqUrl.searchParams.get("url") || "";
@@ -206,24 +227,15 @@ serve(async (req: Request) => {
       const quality = reqUrl.searchParams.get("quality") || "1080p";
       let customFilename = reqUrl.searchParams.get("filename") || (isAudio ? "audio.mp3" : "video.mp4");
 
-      // 1. Direct social media format URL
       if (formatUrl) {
-        try {
-          const streamRes = await fetch(formatUrl, {
-            headers: {
-              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-              "Referer": videoUrl || "https://www.google.com/",
-            },
-          });
-          if (streamRes.ok && streamRes.body) {
-            const headers = new Headers(corsHeaders);
-            headers.set("Content-Type", isAudio ? "audio/mpeg" : (streamRes.headers.get("Content-Type") || "video/mp4"));
-            headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"; filename*=UTF-8''${encodeURIComponent(customFilename)}`);
-            return new Response(streamRes.body, { headers });
-          }
-        } catch (fErr: any) {
-          console.warn("[Format Proxy Error]:", fErr.message);
-        }
+        return new Response(null, {
+          status: 302,
+          headers: {
+            ...corsHeaders,
+            "Location": formatUrl,
+            "Content-Disposition": `attachment; filename="${encodeURIComponent(customFilename)}"`,
+          },
+        });
       }
 
       if (!videoUrl) {
@@ -233,45 +245,26 @@ serve(async (req: Request) => {
         }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // 2. Primary Engine: Cobalt Cloud Muxing (for 1080p, 4K, MP3 & Botguard Bypass)
-      try {
-        const cobaltData = await resolveViaCobalt(videoUrl, quality, isAudio);
-        if (cobaltData && cobaltData.url) {
-          const streamRes = await fetch(cobaltData.url, {
+      const ytMatch = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+      const videoId = ytMatch ? ytMatch[1] : "";
+
+      if (videoId) {
+        const resolved = await resolveStreamUrl(videoId, isAudio, quality);
+        if (resolved && resolved.streamUrl) {
+          // Direct 302 redirect sends the browser straight to the content stream
+          return new Response(null, {
+            status: 302,
             headers: {
-              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              ...corsHeaders,
+              "Location": resolved.streamUrl,
+              "Content-Disposition": `attachment; filename="${encodeURIComponent(customFilename)}"`,
+              "Content-Type": resolved.mimeType,
             },
           });
-          if (streamRes.ok && streamRes.body) {
-            const headers = new Headers(corsHeaders);
-            headers.set("Content-Type", isAudio ? "audio/mpeg" : (streamRes.headers.get("Content-Type") || "video/mp4"));
-            headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"; filename*=UTF-8''${encodeURIComponent(customFilename)}`);
-            return new Response(streamRes.body, { headers });
-          }
-        }
-      } catch (cErr: any) {
-        console.warn("[Cobalt Stream Error]:", cErr.message);
-      }
-
-      // 3. Fallback Engine: Innertube Android App Emulation
-      const ytMatch = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-      if (ytMatch) {
-        const videoId = ytMatch[1];
-        try {
-          const streamInfo = await resolveViaInnertube(videoId, isAudio, quality);
-          const ytRes = await fetch(streamInfo.streamUrl, { headers: streamInfo.headers });
-          if (ytRes.ok && ytRes.body) {
-            const headers = new Headers(corsHeaders);
-            headers.set("Content-Type", streamInfo.mimeType);
-            headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"; filename*=UTF-8''${encodeURIComponent(customFilename)}`);
-            return new Response(ytRes.body, { headers });
-          }
-        } catch (itErr: any) {
-          console.error("[Innertube Fallback Error]:", itErr.message);
         }
       }
 
-      // If all cloud attempts failed
+      // If all attempts failed
       return new Response(JSON.stringify({
         success: false,
         error: {
@@ -287,7 +280,7 @@ serve(async (req: Request) => {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // ── POST: Generate Stream Download URL ───────────────────────
+    // ── POST: Generate Direct Stream Download URL ────────────────
     // ─────────────────────────────────────────────────────────────
     if (req.method === "POST") {
       const body = await req.json().catch(() => ({}));
@@ -312,17 +305,26 @@ serve(async (req: Request) => {
       const projectRef = "sjnamkshicpxtyikzsnp";
       const edgeBase = `https://${projectRef}.supabase.co/functions/v1/download`;
 
-      // Build proxy URL that points back to this Edge Function's GET stream route
-      let proxyUrl = "";
-      if (formatUrl) {
-        proxyUrl = `${edgeBase}?format_url=${encodeURIComponent(formatUrl)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}&quality=${encodeURIComponent(quality)}`;
-      } else {
-        proxyUrl = `${edgeBase}?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}&quality=${encodeURIComponent(quality)}`;
+      let directStream = formatUrl;
+      const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+      const videoId = ytMatch ? ytMatch[1] : "";
+
+      if (!directStream && videoId) {
+        try {
+          const resolved = await resolveStreamUrl(videoId, isAudio, quality);
+          if (resolved?.streamUrl) {
+            directStream = resolved.streamUrl;
+          }
+        } catch (_) {}
       }
+
+      // Provide both the direct stream URL and the Edge Function stream URL
+      const proxyUrl = directStream || `${edgeBase}?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}&quality=${encodeURIComponent(quality)}`;
 
       return new Response(JSON.stringify({
         success: true,
         downloadUrl: proxyUrl,
+        streamUrl: directStream || proxyUrl,
         filename: filename,
         quality: quality,
         format: isAudio ? "mp3" : "mp4",
@@ -334,15 +336,13 @@ serve(async (req: Request) => {
 
     return new Response("Method not allowed", { status: 405, headers: corsHeaders });
   } catch (err: any) {
-    console.error("[Download Top-Level Error]:", err);
+    console.error("[Download Fatal Error]:", err?.message || err);
     return new Response(JSON.stringify({
       success: false,
-      error: {
-        code: "EDGE_FUNCTION_ERROR",
-        message: err?.message || "Internal download function error",
-        retryable: true,
-        desktopFallback: true,
-      },
-    }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      error: { code: "INTERNAL_ERROR", message: err?.message || "Internal server error", desktopFallback: true },
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

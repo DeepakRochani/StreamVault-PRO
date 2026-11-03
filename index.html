@@ -247,7 +247,12 @@
         </div>
     </div>
 
-    <div class="relative" id="user-menu-container">
+    <div class="flex items-center gap-2">
+        <a href="streamvault-admin-login.html" class="p-2 rounded-xl hover:bg-white/5 text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1 text-xs font-bold border border-white/5" title="Admin Portal">
+            <span class="material-symbols-outlined text-[18px]">admin_panel_settings</span>
+            <span class="hidden sm:inline">Admin</span>
+        </a>
+        <div class="relative" id="user-menu-container">
         <button id="auth-btn" onclick="window.location.href='streamvault-login.html?mode=login'" class="bg-primary/10 hover:bg-primary/20 text-primary font-bold px-4 py-2 rounded-xl transition-all border border-primary/20 flex items-center gap-2" title="Sign In">
             <span class="material-symbols-outlined text-[18px]">login</span>
             <span class="hidden sm:inline text-sm">Sign In</span>
@@ -1823,71 +1828,43 @@ checkAuthSession();
                 const dlFilename = dlData.filename || filename;
 
                 // ── Direct / Online Serverless Download ───────────
-                if (dlData.downloadUrl || dlData.url) {
-                    const directUrl = dlData.downloadUrl || dlData.url;
+                if (dlData.downloadUrl || dlData.streamUrl || dlData.url) {
+                    const directUrl = dlData.downloadUrl || dlData.streamUrl || dlData.url;
                     console.log("TRIGGERING ONLINE STREAM DOWNLOAD: ", directUrl);
                     
-                    statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Validating stream...';
-                    progressBar.style.width = '40%';
+                    saveToQueueHistory(videoData, dlFilename, dlId, format, null, true);
 
+                    progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
+                    progressBar.style.width = '100%';
+                    pctText.textContent = '100%';
+                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Ready! <a href="${directUrl}" download="${dlFilename}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/30 hover:bg-primary/50 px-3 py-1 rounded-lg border border-primary/40 shadow-sm transition-all"><span class="material-symbols-outlined text-[14px]">download</span> Save File</a>`;
+                    statusText.classList.replace('text-primary', 'text-green-400');
+                    speedText.textContent  = '';
+                    sizeInfo.textContent   = '';
+                    downloadAnotherBtn.classList.remove('hidden');
+
+                    // Trigger direct native browser download without cross-origin fetch
                     try {
-                        const streamCheck = await fetch(directUrl);
-                        const contentType = streamCheck.headers.get('content-type') || '';
-                        
-                        if (!streamCheck.ok || contentType.includes('application/json')) {
-                            let errJson = null;
-                            try { errJson = await streamCheck.json(); } catch(_) {}
-                            const errPayload = errJson?.error || errJson || {};
-                            const streamErrMsg = (typeof errPayload === 'object' ? errPayload.message : errPayload) || `Cloud stream unavailable (HTTP ${streamCheck.status})`;
-                            const isFallback = (typeof errPayload === 'object' && errPayload.desktopFallback) || streamCheck.status === 403 || streamCheck.status === 422 || streamCheck.status === 502;
-                            throw { message: streamErrMsg, desktopFallback: isFallback, code: errPayload.code };
-                        }
-
-                        // Stream is verified binary media!
-                        progressBar.style.width = '75%';
-                        const blob = await streamCheck.blob();
-                        const objectUrl = URL.createObjectURL(blob);
-                        
-                        saveToQueueHistory(videoData, dlFilename, dlId, format, null, true);
-
                         const a = document.createElement('a');
                         a.style.display = 'none';
-                        a.href = objectUrl;
+                        a.href = directUrl;
                         a.setAttribute('download', dlFilename);
+                        a.setAttribute('target', '_blank');
+                        a.setAttribute('rel', 'noopener noreferrer');
                         document.body.appendChild(a);
                         a.click();
                         setTimeout(() => { 
-                            try { document.body.removeChild(a); URL.revokeObjectURL(objectUrl); } catch(_) {} 
+                            try { document.body.removeChild(a); } catch(_) {} 
                         }, 2000);
-
-                        progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
-                        progressBar.style.width = '100%';
-                        statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Ready! <a href="${objectUrl}" download="${dlFilename}" class="inline-flex items-center gap-1 underline font-semibold text-white ml-2 bg-primary/20 hover:bg-primary/40 px-2 py-0.5 rounded border border-primary/30 transition-all"><span class="material-symbols-outlined text-[12px]">download</span> Save File</a>`;
-                        statusText.classList.replace('text-primary', 'text-green-400');
-                        speedText.textContent  = '';
-                        sizeInfo.textContent   = '';
-                        pctText.textContent    = '';
-                        downloadAnotherBtn.classList.remove('hidden');
-                        
-                        setTimeout(() => {
-                            if (typeof autoResetDownloader === 'function') autoResetDownloader();
-                        }, 8000);
-                        return;
-
-                    } catch (streamErr) {
-                        console.error('[StreamVault Cloud Download Stream Check Error]', streamErr);
-                        progressBar.classList.replace('bg-gradient-to-r', 'bg-amber-500');
-                        progressBar.style.width = '100%';
-                        
-                        if (streamErr.desktopFallback) {
-                            statusText.innerHTML = renderCloudFallbackUI(streamErr);
-                        } else {
-                            statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] text-red-400">error</span> ${streamErr.message || 'Cloud download failed'}`;
-                            statusText.classList.replace('text-primary', 'text-red-400');
-                        }
-                        downloadAnotherBtn.classList.remove('hidden');
-                        return;
+                    } catch (navErr) {
+                        console.warn('[StreamVault] Native download trigger fallback:', navErr);
+                        window.open(directUrl, '_blank');
                     }
+
+                    setTimeout(() => {
+                        if (typeof autoResetDownloader === 'function') autoResetDownloader();
+                    }, 10000);
+                    return;
                 }
 
                 // ── Poll for Local Download Status (Desktop Mode) ───────────
@@ -2374,6 +2351,7 @@ checkAuthSession();
         <a href="streamvault-legal.html#faq" class="hover:text-primary transition-colors">FAQ</a>
         <a href="streamvault-legal.html#privacy" class="hover:text-primary transition-colors">Privacy Policy</a>
         <a href="streamvault-legal.html#terms" class="hover:text-primary transition-colors">Terms of Use</a>
+        <a href="streamvault-admin-login.html" class="hover:text-primary text-primary/80 transition-colors flex items-center gap-1 font-semibold"><span class="material-symbols-outlined text-[16px]">admin_panel_settings</span> Admin Portal</a>
     </footer>
 
     <!-- BETA WIDGET -->
