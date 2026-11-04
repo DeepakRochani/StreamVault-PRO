@@ -1747,12 +1747,15 @@ checkAuthSession();
             progressBar.style.width = '50%';
             progressBar.className = 'h-full rounded-full transition-all duration-300 bg-gradient-to-r from-primary to-orange-500';
 
-            let filename = (videoData.title || 'download').replace(/[/\\?%*:|"<>]/g, '-');
-            
+            let rawTitle = (videoData.title || 'download').trim();
+            let cleanTitle = rawTitle.replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, ' ').trim();
+            if (cleanTitle.length > 50) {
+                cleanTitle = cleanTitle.substring(0, 50).trim();
+            }
+            let filename = cleanTitle;
             if (selectedQuality && selectedQuality !== 'best' && selectedQuality !== 'Original') {
                 filename += `_${selectedQuality}`;
             }
-            
             if (!filename.toLowerCase().endsWith('.mp4') && !filename.toLowerCase().endsWith('.mp3')) {
                 filename += isAudio ? '.mp3' : '.mp4';
             }
@@ -2206,7 +2209,7 @@ checkAuthSession();
             window.location.href = 'streamvault-login.html' + (mode ? '?mode=' + mode : '');
         }
 
-        // ── StreamVault Online Direct Save Controller (Native Mac/PC Directory Picker) ──
+        // ── StreamVault Online Direct Save Controller (Native Mac/PC Downloads & Folder Picker) ──
         let currentModalUrl = '';
         let currentModalDownloadUrl = '';
         let currentModalFullUrl = '';
@@ -2243,14 +2246,21 @@ checkAuthSession();
             currentModalUrl = opts.url || opts.downloadUrl || opts.fullDownloadUrl || '';
             currentModalDownloadUrl = opts.downloadUrl || currentModalUrl;
             currentModalFullUrl = opts.fullDownloadUrl || '';
-            currentModalFilename = opts.filename || (opts.format === 'mp3' ? 'download.mp3' : 'download.mp4');
             currentModalFormat = opts.format;
             currentModalQuality = opts.quality;
+
+            let fn = opts.filename || (opts.format === 'mp3' ? 'download.mp3' : 'download.mp4');
+            const targetExt = opts.format === 'mp3' ? '.mp3' : '.mp4';
+            if (!fn.toLowerCase().endsWith('.mp3') && !fn.toLowerCase().endsWith('.mp4')) {
+                fn += targetExt;
+            }
+            currentModalFilename = fn;
 
             const titleEl = document.getElementById('dl-modal-title');
             const badgeEl = document.getElementById('dl-modal-badge');
             const fnEl = document.getElementById('dl-modal-filename');
             const statusNotice = document.getElementById('dl-modal-save-status');
+            const browserBtn = document.getElementById('dl-modal-browser-btn');
             const saveBtn = document.getElementById('dl-modal-save-btn');
 
             if (titleEl) {
@@ -2263,14 +2273,44 @@ checkAuthSession();
                 fnEl.textContent = currentModalFilename;
             }
             if (statusNotice) {
-                statusNotice.innerHTML = '<span class="text-on-surface-variant text-xs">Ready to save. Choose your folder below.</span>';
+                statusNotice.innerHTML = '<span class="text-green-400 font-semibold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[16px] animate-bounce">download</span> Starting high-speed download...</span>';
+            }
+            if (browserBtn) {
+                browserBtn.disabled = false;
+                browserBtn.innerHTML = '<span class="material-symbols-outlined text-[20px]">download</span> High-Speed Download (Direct to PC/Mac)';
             }
             if (saveBtn) {
                 saveBtn.disabled = false;
-                saveBtn.innerHTML = '<span class="material-symbols-outlined text-[20px]">folder_open</span> Save to Folder (Mac/PC)';
+                saveBtn.innerHTML = '<span class="material-symbols-outlined text-[16px] text-primary">folder_open</span> Choose Specific Folder (Save As...)';
             }
 
             modal.classList.remove('hidden');
+
+            // Automatically trigger high-speed browser download so it shows in Chrome's download shelf/history immediately
+            setTimeout(() => {
+                triggerFastBrowserDownload();
+            }, 300);
+        }
+
+        function triggerFastBrowserDownload() {
+            const statusNotice = document.getElementById('dl-modal-save-status');
+            const targetUrl = currentModalDownloadUrl || currentModalFullUrl || currentModalUrl;
+            const filename = currentModalFilename || 'StreamVault_Download.mp4';
+
+            if (statusNotice) {
+                statusNotice.innerHTML = '<span class="text-green-400 font-bold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[18px]">check_circle</span> Downloading! Check your Chrome downloads icon (top right).</span>';
+            }
+
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = targetUrl;
+            a.setAttribute('download', filename);
+            a.target = '_self';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                try { document.body.removeChild(a); } catch(_) {}
+            }, 3000);
         }
 
         async function saveFileToDirectory() {
@@ -2300,7 +2340,7 @@ checkAuthSession();
                     }
                     if (btn) {
                         btn.disabled = true;
-                        btn.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">sync</span> Downloading to folder...';
+                        btn.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">sync</span> Saving to folder...';
                     }
 
                     const targetStreamUrl = currentModalDownloadUrl || currentModalFullUrl || currentModalUrl;
@@ -2348,13 +2388,13 @@ checkAuthSession();
                     }
 
                     if (statusNotice) {
-                        statusNotice.innerHTML = '<span class="text-green-400 font-bold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[18px]">check_circle</span> Saved! Your file was saved to your chosen folder.</span>';
+                        statusNotice.innerHTML = '<span class="text-green-400 font-bold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[18px]">check_circle</span> Saved to chosen folder! (Found directly in your chosen folder)</span>';
                     }
                     if (btn) {
                         btn.disabled = false;
-                        btn.innerHTML = '<span class="material-symbols-outlined text-[20px]">check_circle</span> File Saved Successfully!';
+                        btn.innerHTML = '<span class="material-symbols-outlined text-[16px] text-green-400">check_circle</span> File Saved Successfully!';
                         setTimeout(() => {
-                            btn.innerHTML = '<span class="material-symbols-outlined text-[20px]">folder_open</span> Save to Another Folder';
+                            btn.innerHTML = '<span class="material-symbols-outlined text-[16px] text-primary">folder_open</span> Choose Specific Folder (Save As...)';
                         }, 4000);
                     }
                     return;
@@ -2364,7 +2404,7 @@ checkAuthSession();
                         if (statusNotice) statusNotice.innerHTML = '<span class="text-on-surface-variant text-xs">Save dialog closed. Click above whenever you are ready.</span>';
                         if (btn) {
                             btn.disabled = false;
-                            btn.innerHTML = '<span class="material-symbols-outlined text-[20px]">folder_open</span> Save to Folder (Mac/PC)';
+                            btn.innerHTML = '<span class="material-symbols-outlined text-[16px] text-primary">folder_open</span> Choose Specific Folder (Save As...)';
                         }
                         return;
                     }
@@ -2372,29 +2412,8 @@ checkAuthSession();
                 }
             }
 
-            // 2. Direct browser download fallback (e.g. Safari / Firefox)
-            triggerDirectBrowserDownload();
-        }
-
-        function triggerDirectBrowserDownload() {
-            const statusNotice = document.getElementById('dl-modal-save-status');
-            const targetUrl = currentModalDownloadUrl || currentModalFullUrl || currentModalUrl;
-            const filename = currentModalFilename || 'StreamVault_Download.mp4';
-
-            if (statusNotice) {
-                statusNotice.innerHTML = '<span class="text-green-400 font-semibold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[16px]">download</span> Starting download... Check your browser downloads bar.</span>';
-            }
-
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = targetUrl;
-            a.setAttribute('download', filename);
-            a.target = '_self';
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-                try { document.body.removeChild(a); } catch(_) {}
-            }, 3000);
+            // Fallback to direct browser download
+            triggerFastBrowserDownload();
         }
 
         function closeDownloadModal() {
@@ -2411,7 +2430,7 @@ checkAuthSession();
             </button>
             
             <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-500/30 flex items-center justify-center mx-auto mb-3 text-green-400 shadow-[0_0_25px_rgba(34,197,94,0.3)]">
-                <span class="material-symbols-outlined text-[36px]">folder_special</span>
+                <span class="material-symbols-outlined text-[36px]">cloud_download</span>
             </div>
             
             <h3 class="text-xl font-display font-bold text-on-surface mb-1">Your Download is Ready!</h3>
@@ -2438,19 +2457,19 @@ checkAuthSession();
 
             <!-- Direct Actions -->
             <div class="flex flex-col gap-2.5">
-                <!-- Primary Action: Native Save Dialog to Directory (Finder on Mac / Explorer on PC) -->
-                <button type="button" id="dl-modal-save-btn" onclick="saveFileToDirectory()" class="w-full bg-gradient-to-r from-primary to-orange-500 text-on-primary py-3.5 rounded-xl font-bold hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/25 text-sm cursor-pointer">
-                    <span class="material-symbols-outlined text-[20px]">folder_open</span> Save to Folder (Mac/PC)
+                <!-- Primary Action: Direct High-Speed Download (registers in Chrome download manager & history) -->
+                <button type="button" id="dl-modal-browser-btn" onclick="triggerFastBrowserDownload()" class="w-full bg-gradient-to-r from-primary to-orange-500 text-on-primary py-3.5 rounded-xl font-bold hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/25 text-sm cursor-pointer">
+                    <span class="material-symbols-outlined text-[20px]">download</span> High-Speed Download (Direct to PC/Mac)
                 </button>
 
-                <!-- Direct Downloads Folder Fallback -->
-                <button type="button" id="dl-modal-browser-btn" onclick="triggerDirectBrowserDownload()" class="w-full bg-surface border border-white/10 hover:border-white/20 text-on-surface py-2.5 rounded-xl text-xs font-semibold hover:bg-white/5 transition-all flex items-center justify-center gap-1.5 cursor-pointer">
-                    <span class="material-symbols-outlined text-[16px] text-primary">download</span> Save Directly to Downloads Folder
+                <!-- Secondary Action: Save to Specific Folder with Finder/Explorer -->
+                <button type="button" id="dl-modal-save-btn" onclick="saveFileToDirectory()" class="w-full bg-surface border border-white/10 hover:border-white/20 text-on-surface py-2.5 rounded-xl text-xs font-semibold hover:bg-white/5 transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                    <span class="material-symbols-outlined text-[16px] text-primary">folder_open</span> Choose Specific Folder (Save As...)
                 </button>
                 
                 <p class="text-[11px] text-on-surface-variant/70 mt-1 flex items-center justify-center gap-1">
                     <span class="material-symbols-outlined text-[13px] text-primary">verified</span>
-                    <span>Clicking "Save to Folder" opens your native Mac / PC file dialog.</span>
+                    <span>Saved directly to your Downloads folder and registered in Chrome history.</span>
                 </p>
                 
                 <button type="button" onclick="closeDownloadModal()" class="w-full mt-1 text-on-surface-variant hover:text-white py-1.5 text-xs transition-colors cursor-pointer">

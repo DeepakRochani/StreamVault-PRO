@@ -217,18 +217,21 @@ serve(async (req: Request) => {
     let availableHeights = new Set<number>();
     let totalFormatsCount = 0;
     let adaptiveFormatsCount = 0;
-    let matchedClient = "MWEB";
+    let matchedClient = "ANDROID";
 
-    // 1. Try Innertube across multi-client strategy (MWEB -> ANDROID -> IOS -> WEB)
+    // 1. Try Innertube across multi-client strategy (ANDROID -> IOS -> TV -> MWEB -> WEB)
     const yt = await getInnertube();
     let videoInfo: any = null;
 
-    for (const client of ["MWEB", "ANDROID", "IOS", "WEB"] as const) {
+    for (const client of ["ANDROID", "IOS", "TV", "MWEB", "WEB"] as const) {
       try {
-        videoInfo = await yt.getBasicInfo(videoId, { client });
-        if (videoInfo?.basic_info?.title) {
+        const candidate = await yt.getBasicInfo(videoId, { client });
+        if (candidate?.basic_info?.title) {
+          videoInfo = candidate;
           matchedClient = client;
-          break;
+          if (candidate?.streaming_data?.formats?.length || candidate?.streaming_data?.adaptive_formats?.length) {
+            break;
+          }
         }
       } catch (err: any) {
         const msg = err?.message || String(err);

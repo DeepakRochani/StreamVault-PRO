@@ -34,7 +34,81 @@ const corsHeaders = {
 
 const defaultCookie = "GPS=1; PREF=hl=en&tz=UTC; SOCS=CAI; VISITOR_INFO1_LIVE=zjW6Y_RzRUI; VISITOR_PRIVACY_METADATA=CgJJThIEGgAgGg%3D%3D; YSC=JNKtOAO-9B4; __Secure-ROLLOUT_TOKEN=CMS3w9CquMO7HBDkkLrOjZiVAxjy_IHdjZiVAw%3D%3D; __Secure-YNID=19.YT=d_8aaW2DTY7zdtXvqL-AIp7_Zw6ChZJ007wb8ejTIyuzLPJ8Z6Oh6FI0GoKvtKsS_NTIjbXUdvUloi_4R__ayBHJVCmsqdgZc9ro7VOFQ4ppGq0q-Y1IcDwxWCrHS6kPecloKdHqO2vJPsOzjzL6IXnchLESO_r_V3HvntznNeNAnI__FsNEJeKX5YH5WCkowOhKToVPNicAc_RlTHDKRI2zbeKzdoaxWqKqDTRUKb7EuN7P4IYlfRmFQnkd3cqSvwvkaCtQpTcjmOZwGyfKlLVBlWLB_98MRHCa4XzaCPfljvIc6gttRWv79iRLTMceEjO11pWgu80RSnmnuEPG1A";
 
-// Fast Invidious stream resolver with verified active mirrors
+// Fast Innertube direct Google Video CDN resolver (Primary)
+async function resolveViaInnertube(videoId: string, isAudio: boolean, quality: string) {
+  const cookie = Deno.env.get("YOUTUBE_COOKIE") || defaultCookie;
+  let yt: any = null;
+
+  try {
+    yt = await Innertube.create({
+      cache: new UniversalCache(false),
+      generate_session_locally: true,
+      cookie: cookie,
+    });
+  } catch (_) {
+    yt = await Innertube.create({
+      cache: new UniversalCache(false),
+      generate_session_locally: true,
+    });
+  }
+
+  let video: any = null;
+  // Multi-client strategy: ANDROID -> IOS -> TV -> MWEB -> WEB
+  for (const client of ["ANDROID", "IOS", "TV", "MWEB", "WEB"] as const) {
+    try {
+      const candidate = await yt.getBasicInfo(videoId, { client });
+      if (candidate?.streaming_data?.formats?.length || candidate?.streaming_data?.adaptive_formats?.length) {
+        video = candidate;
+        break;
+      }
+    } catch (err: any) {
+      console.warn(`[Innertube Client ${client} Error]:`, err?.message || err);
+    }
+  }
+
+  const streamingData = video?.streaming_data;
+  if (!streamingData) {
+    throw new Error("No streaming data available from Innertube");
+  }
+
+  const formats = streamingData.formats || [];
+  const adaptive = streamingData.adaptive_formats || [];
+  let chosenFmt = null;
+
+  if (isAudio) {
+    const audioFormats = adaptive.filter((f: any) => f.has_audio);
+    audioFormats.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
+    chosenFmt = audioFormats[0] || formats.find((f: any) => f.has_audio);
+  } else {
+    const prog = formats.filter((f: any) => f.has_video && f.has_audio);
+    const targetH = parseInt(quality.replace(/[^0-9]/g, "") || "720");
+    const exactProg = prog.find((f: any) => f.height === targetH);
+    if (exactProg) {
+      chosenFmt = exactProg;
+    } else if (prog.length > 0 && targetH <= 720) {
+      prog.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
+      chosenFmt = prog[0];
+    } else {
+      const vAdaptive = adaptive.filter((f: any) => f.has_video);
+      chosenFmt = vAdaptive.find((f: any) => f.height === targetH) || (prog.length > 0 ? prog[0] : vAdaptive[0]);
+    }
+  }
+
+  if (!chosenFmt) throw new Error("No candidate format found");
+
+  let streamUrl = chosenFmt.url;
+  if (!streamUrl && typeof chosenFmt.decipher === "function") {
+    streamUrl = chosenFmt.decipher(yt.session.player);
+  }
+  if (!streamUrl) throw new Error("Could not decipher format URL");
+
+  return {
+    streamUrl,
+    mimeType: chosenFmt.mime_type?.split(";")[0] || (isAudio ? "audio/mp4" : "video/mp4"),
+  };
+}
+
+// Fast Invidious stream resolver with verified active mirrors (Fallback)
 const INVIDIOUS_MIRRORS = [
   "https://yt.chocolatemoo53.com",
   "https://inv.nadeko.net",
@@ -43,8 +117,20 @@ const INVIDIOUS_MIRRORS = [
   "https://invidious.private.coffee",
 ];
 
-// Helper: Resolve direct stream URL via Invidious API
+// Helper: Resolve direct stream URL via Innertube (Primary) or Invidious (Fallback)
 async function resolveStreamUrl(videoId: string, isAudio: boolean, quality: string): Promise<{ streamUrl: string; mimeType: string; itag?: string } | null> {
+  // 1. Try Innertube first for direct high-speed Google Video CDN stream (50-100 MB/s)
+  try {
+    const innertubeRes = await resolveViaInnertube(videoId, isAudio, quality);
+    if (innertubeRes?.streamUrl) {
+      console.log(`[Stream Resolver] Innertube direct CDN stream resolved for ${videoId}`);
+      return innertubeRes;
+    }
+  } catch (itErr: any) {
+    console.warn(`[Stream Resolver] Innertube attempt failed for ${videoId}:`, itErr?.message || itErr);
+  }
+
+  // 2. Fallback to Invidious mirrors
   const targetH = parseInt(quality.replace(/[^0-9]/g, "") || "1080");
   const itagMap: Record<number, string> = { 2160: "313", 1440: "271", 1080: "137", 720: "136", 480: "135", 360: "134" };
   const fallbackItag = isAudio ? "140" : (itagMap[targetH] || "137");
@@ -135,74 +221,6 @@ async function resolveStreamUrl(videoId: string, isAudio: boolean, quality: stri
   };
 }
 
-// Innertube fallback
-async function resolveViaInnertube(videoId: string, isAudio: boolean, quality: string) {
-  const cookie = Deno.env.get("YOUTUBE_COOKIE") || defaultCookie;
-  let yt: any = null;
-
-  try {
-    yt = await Innertube.create({
-      cache: new UniversalCache(false),
-      generate_session_locally: true,
-      cookie: cookie,
-    });
-  } catch (_) {
-    yt = await Innertube.create({
-      cache: new UniversalCache(false),
-      generate_session_locally: true,
-    });
-  }
-
-  let video: any = null;
-  for (const client of ["IOS", "TV", "ANDROID", "MWEB"] as const) {
-    try {
-      video = await yt.getBasicInfo(videoId, { client });
-      if (video?.streaming_data) break;
-    } catch (_) {}
-  }
-
-  const streamingData = video?.streaming_data;
-  if (!streamingData) {
-    throw new Error("No streaming data available from Innertube");
-  }
-
-  const formats = streamingData.formats || [];
-  const adaptive = streamingData.adaptive_formats || [];
-  let chosenFmt = null;
-
-  if (isAudio) {
-    const audioFormats = adaptive.filter((f: any) => f.has_audio);
-    audioFormats.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
-    chosenFmt = audioFormats[0] || formats.find((f: any) => f.has_audio);
-  } else {
-    const prog = formats.filter((f: any) => f.has_video && f.has_audio);
-    const targetH = parseInt(quality.replace(/[^0-9]/g, "") || "720");
-    const exactProg = prog.find((f: any) => f.height === targetH);
-    if (exactProg) {
-      chosenFmt = exactProg;
-    } else if (prog.length > 0) {
-      prog.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
-      chosenFmt = prog[0];
-    } else {
-      const vAdaptive = adaptive.filter((f: any) => f.has_video);
-      chosenFmt = vAdaptive.find((f: any) => f.height === targetH) || vAdaptive[0];
-    }
-  }
-
-  if (!chosenFmt) throw new Error("No candidate format found");
-
-  let streamUrl = chosenFmt.url;
-  if (!streamUrl && typeof chosenFmt.decipher === "function") {
-    streamUrl = chosenFmt.decipher(yt.session.player);
-  }
-  if (!streamUrl) throw new Error("Could not decipher format URL");
-
-  return {
-    streamUrl,
-    mimeType: chosenFmt.mime_type?.split(";")[0] || (isAudio ? "audio/mp4" : "video/mp4"),
-  };
-}
-
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -251,13 +269,18 @@ serve(async (req: Request) => {
           });
         }
 
+        const isGoogleVideo = streamUrl.includes("googlevideo.com");
         const upstreamHeaders: Record<string, string> = {
-          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "User-Agent": isGoogleVideo
+            ? "com.google.android.youtube/19.09.37 (Linux; U; Android 14) gzip"
+            : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
           "Accept": "*/*",
           "Accept-Encoding": "identity",
-          "Referer": "https://www.youtube.com/",
-          "Origin": "https://www.youtube.com",
         };
+        if (!isGoogleVideo) {
+          upstreamHeaders["Referer"] = "https://www.youtube.com/";
+          upstreamHeaders["Origin"] = "https://www.youtube.com";
+        }
         if (req.headers.has("range")) {
           upstreamHeaders["Range"] = req.headers.get("range")!;
         } else {
