@@ -34,9 +34,13 @@ const corsHeaders = {
 
 const defaultCookie = "GPS=1; PREF=hl=en&tz=UTC; SOCS=CAI; VISITOR_INFO1_LIVE=zjW6Y_RzRUI; VISITOR_PRIVACY_METADATA=CgJJThIEGgAgGg%3D%3D; YSC=JNKtOAO-9B4; __Secure-ROLLOUT_TOKEN=CMS3w9CquMO7HBDkkLrOjZiVAxjy_IHdjZiVAw%3D%3D; __Secure-YNID=19.YT=d_8aaW2DTY7zdtXvqL-AIp7_Zw6ChZJ007wb8ejTIyuzLPJ8Z6Oh6FI0GoKvtKsS_NTIjbXUdvUloi_4R__ayBHJVCmsqdgZc9ro7VOFQ4ppGq0q-Y1IcDwxWCrHS6kPecloKdHqO2vJPsOzjzL6IXnchLESO_r_V3HvntznNeNAnI__FsNEJeKX5YH5WCkowOhKToVPNicAc_RlTHDKRI2zbeKzdoaxWqKqDTRUKb7EuN7P4IYlfRmFQnkd3cqSvwvkaCtQpTcjmOZwGyfKlLVBlWLB_98MRHCa4XzaCPfljvIc6gttRWv79iRLTMceEjO11pWgu80RSnmnuEPG1A";
 
-// Fast Invidious stream resolver with verified active mirror
+// Fast Invidious stream resolver with verified active mirrors
 const INVIDIOUS_MIRRORS = [
   "https://yt.chocolatemoo53.com",
+  "https://inv.nadeko.net",
+  "https://invidious.nerdvpn.de",
+  "https://invidious.jing.rocks",
+  "https://invidious.private.coffee",
 ];
 
 // Helper: Resolve direct stream URL via Invidious API
@@ -247,55 +251,88 @@ serve(async (req: Request) => {
           });
         }
 
-        try {
-          const upstreamHeaders: Record<string, string> = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "*/*",
-          };
-          if (req.headers.has("range")) {
-            upstreamHeaders["Range"] = req.headers.get("range")!;
-          }
+        const upstreamHeaders: Record<string, string> = {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "*/*",
+          "Accept-Encoding": "identity",
+          "Referer": "https://www.youtube.com/",
+          "Origin": "https://www.youtube.com",
+        };
+        if (req.headers.has("range")) {
+          upstreamHeaders["Range"] = req.headers.get("range")!;
+        } else {
+          upstreamHeaders["Range"] = "bytes=0-";
+        }
 
-          const mediaRes = await fetch(streamUrl, {
+        let mediaRes: Response | null = null;
+        try {
+          mediaRes = await fetch(streamUrl, {
             headers: upstreamHeaders,
             redirect: "follow",
           });
-
-          if (mediaRes.ok || mediaRes.status === 206) {
-            const respHeaders = new Headers(corsHeaders);
-            respHeaders.set("Content-Type", isAudio ? "audio/mpeg" : (mediaRes.headers.get("content-type") || mimeType || "video/mp4"));
-            respHeaders.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"; filename*=UTF-8''${encodeURIComponent(customFilename)}`);
-            respHeaders.set("Cache-Control", "public, max-age=3600");
-
-            if (mediaRes.headers.has("content-length")) {
-              respHeaders.set("Content-Length", mediaRes.headers.get("content-length")!);
-            }
-            if (mediaRes.headers.has("accept-ranges")) {
-              respHeaders.set("Accept-Ranges", mediaRes.headers.get("accept-ranges")!);
-            }
-            if (mediaRes.headers.has("content-range")) {
-              respHeaders.set("Content-Range", mediaRes.headers.get("content-range")!);
-            }
-
-            return new Response(mediaRes.body, {
-              status: mediaRes.status,
-              headers: respHeaders,
-            });
-          } else {
-            console.warn(`[Stream Proxy] Upstream returned status ${mediaRes.status}`);
-          }
         } catch (streamErr: any) {
-          console.error("[Stream Proxy Fetch Error]:", streamErr?.message || streamErr);
+          console.warn("[Stream Proxy Upstream Direct Error]:", streamErr?.message || streamErr);
         }
 
-        // Fallback: 302 redirect with attachment headers if upstream proxy fetch failed
-        return new Response(null, {
-          status: 302,
-          headers: {
-            ...corsHeaders,
-            "Location": streamUrl,
-            "Content-Disposition": `attachment; filename="${encodeURIComponent(customFilename)}"`,
+        // If direct stream failed or returned non-200/206, proxy through Invidious /latest_version with local proxying
+        if (!mediaRes || (!mediaRes.ok && mediaRes.status !== 206)) {
+          if (videoId) {
+            const itagMap: Record<number, string> = { 2160: "313", 1440: "271", 1080: "137", 720: "136", 480: "135", 360: "134" };
+            const targetH = parseInt(quality.replace(/[^0-9]/g, "") || "1080");
+            const fallbackItag = isAudio ? "140" : (itagMap[targetH] || "137");
+
+            for (const mirror of INVIDIOUS_MIRRORS) {
+              try {
+                const proxyUrl = `${mirror}/latest_version?id=${videoId}&itag=${fallbackItag}&local=true`;
+                const mirrorRes = await fetch(proxyUrl, {
+                  headers: upstreamHeaders,
+                  redirect: "follow",
+                });
+                if (mirrorRes.ok || mirrorRes.status === 206) {
+                  mediaRes = mirrorRes;
+                  console.log(`[Stream Proxy] Succeeded via mirror ${mirror} (status ${mirrorRes.status})`);
+                  break;
+                }
+              } catch (_) {}
+            }
+          }
+        }
+
+        if (mediaRes && (mediaRes.ok || mediaRes.status === 206)) {
+          const respHeaders = new Headers(corsHeaders);
+          respHeaders.set("Content-Type", isAudio ? "audio/mpeg" : (mediaRes.headers.get("content-type") || mimeType || "video/mp4"));
+          respHeaders.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"; filename*=UTF-8''${encodeURIComponent(customFilename)}`);
+          respHeaders.set("Access-Control-Expose-Headers", "Content-Disposition, Content-Length, Content-Range");
+          respHeaders.set("Cache-Control", "public, max-age=3600");
+
+          if (mediaRes.headers.has("content-length")) {
+            respHeaders.set("Content-Length", mediaRes.headers.get("content-length")!);
+          }
+          if (mediaRes.headers.has("accept-ranges")) {
+            respHeaders.set("Accept-Ranges", mediaRes.headers.get("accept-ranges")!);
+          }
+          if (mediaRes.headers.has("content-range")) {
+            respHeaders.set("Content-Range", mediaRes.headers.get("content-range")!);
+          }
+
+          return new Response(mediaRes.body, {
+            status: mediaRes.status,
+            headers: respHeaders,
+          });
+        }
+
+        // Return a clean 502 JSON error instead of redirecting into a video player
+        return new Response(JSON.stringify({
+          success: false,
+          error: {
+            code: "CLOUD_EXTRACTION_UNAVAILABLE",
+            message: "Direct high-speed media stream could not be loaded. Please choose another quality (e.g. 720p HD or MP3) or try again.",
+            retryable: true,
+            desktopFallback: false,
           },
+        }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
