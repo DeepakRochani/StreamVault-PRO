@@ -467,6 +467,7 @@ serve(async (req: Request) => {
         streamUrl: directStream || fullDownloadUrl,
         audioStreamUrl: audioDirectStream || (hasAudioCombined ? undefined : fullAudioDownloadUrl),
         audioDownloadUrl: audioProxyUrl || (hasAudioCombined ? undefined : fullAudioDownloadUrl),
+        fullAudioDownloadUrl: fullAudioDownloadUrl || audioDirectStream,
         hasAudioCombined: hasAudioCombined,
         filename: filename,
         quality: quality,

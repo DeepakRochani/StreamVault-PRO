@@ -1731,8 +1731,10 @@ checkAuthSession();
                         const { toBlobURL } = window.FFmpegUtil;
                         const ffmpeg = new FFmpeg();
                         const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
+                        const workerURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/814.ffmpeg.js';
 
                         await ffmpeg.load({
+                            classWorkerURL: await toBlobURL(workerURL, 'text/javascript'),
                             coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
                             wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
                         });
@@ -1772,9 +1774,11 @@ checkAuthSession();
                     await ffmpeg.exec([
                         '-i', 'in_v.mp4',
                         '-i', 'in_a.m4a',
-                        '-c', 'copy',
+                        '-c:v', 'copy',
+                        '-c:a', 'copy',
                         '-map', '0:v:0',
                         '-map', '1:a:0?',
+                        '-shortest',
                         '-movflags', '+faststart',
                         'out.mp4'
                     ]);
@@ -1797,14 +1801,26 @@ checkAuthSession();
             }
         };
 
+        // Warm up FFmpeg WASM in background after page idle
+        setTimeout(() => {
+            if (window.StreamVaultRemuxer && typeof window.StreamVaultRemuxer.init === 'function') {
+                window.StreamVaultRemuxer.init().catch(() => {});
+            }
+        }, 1500);
+
         async function fetchBlobWithProgress(primaryUrl, fallbackUrl, onProgress) {
             let res = null;
+            const headers = { 'Accept': '*/*' };
+            if (window.SUPABASE_ANON_KEY && (primaryUrl.includes('supabase.co') || primaryUrl.includes('/api/download'))) {
+                headers['apikey'] = window.SUPABASE_ANON_KEY;
+                headers['Authorization'] = 'Bearer ' + window.SUPABASE_ANON_KEY;
+            }
             try {
-                res = await fetch(primaryUrl);
+                res = await fetch(primaryUrl, { headers });
             } catch (_) {}
             if (!res || !res.ok) {
                 if (fallbackUrl && fallbackUrl !== primaryUrl) {
-                    try { res = await fetch(fallbackUrl); } catch (_) {}
+                    try { res = await fetch(fallbackUrl, { headers }); } catch (_) {}
                 }
             }
             if (!res || !res.ok) {
@@ -1970,7 +1986,7 @@ checkAuthSession();
                     
                     saveToQueueHistory(videoData, dlFilename, dlId, format, null, true);
 
-                    const isVideoWithSeparateAudio = !isAudio && dlData.hasAudioCombined === false && (dlData.audioDownloadUrl || dlData.audioStreamUrl);
+                    const isVideoWithSeparateAudio = !isAudio && dlData.hasAudioCombined === false && (dlData.fullAudioDownloadUrl || dlData.audioDownloadUrl || dlData.audioStreamUrl);
 
                     let finalBlob = null;
 
@@ -1979,8 +1995,8 @@ checkAuthSession();
                         progressBar.style.width = '35%';
                         pctText.textContent = '35%';
 
-                        const videoUrl = dlData.downloadUrl || dlData.fullDownloadUrl || dlData.streamUrl;
-                        const audioUrl = dlData.audioDownloadUrl || dlData.fullAudioDownloadUrl || dlData.audioStreamUrl;
+                        const videoUrl = dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl;
+                        const audioUrl = dlData.fullAudioDownloadUrl || dlData.audioDownloadUrl || dlData.audioStreamUrl;
 
                         try {
                             const [videoBlob, audioBlob] = await Promise.all([
@@ -2002,7 +2018,8 @@ checkAuthSession();
                                 finalBlob = videoBlob;
                             }
                         } catch (errMerge) {
-                            console.warn('[StreamVault] Muxing warning, falling back to direct stream:', errMerge);
+                            console.error('[StreamVault Audio Mux Error]:', errMerge);
+                            statusText.innerHTML = '<span class="text-orange-400 font-medium">Notice: Audio multiplexing warning. Video stream ready.</span>';
                         }
                     }
 

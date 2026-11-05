@@ -23,7 +23,7 @@ function copyJsAssets() {
       const distDir = resolve(__dirname, 'dist');
       if (!fs.existsSync(distDir)) fs.mkdirSync(distDir);
       
-      const jsFiles = ['settings.js', 'ads.js', 'global-status.js', 'updater.js'];
+      const jsFiles = ['settings.js', 'ads.js', 'global-status.js', 'updater.js', '814.ffmpeg.js'];
       jsFiles.forEach(file => {
         if (fs.existsSync(file)) {
           fs.copyFileSync(file, resolve(distDir, file));
