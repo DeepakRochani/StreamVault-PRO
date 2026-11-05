@@ -21,6 +21,22 @@ class URLParser {
         }
     }
 
+    static extractYouTubeId(urlStr) {
+        if (!urlStr) return null;
+        try {
+            const vMatch = urlStr.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+            if (vMatch && vMatch[1]) return vMatch[1];
+            const shortMatch = urlStr.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+            if (shortMatch && shortMatch[1]) return shortMatch[1];
+            const pathMatch = urlStr.match(/(?:embed|shorts|v|live)\/([a-zA-Z0-9_-]{11})/);
+            if (pathMatch && pathMatch[1]) return pathMatch[1];
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = urlStr.match(regExp);
+            if (match && match[2] && match[2].length === 11) return match[2];
+        } catch (_) {}
+        return null;
+    }
+
     static detectPlatform(urlStr) {
         const normalized = this.normalize(urlStr);
         if (!normalized) {

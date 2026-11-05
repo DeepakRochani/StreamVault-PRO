@@ -1043,11 +1043,25 @@ checkAuthSession();
             });
         });
 
-        function getYouTubeId(url) {
+        function extractYouTubeId(url) {
+            if (!url) return null;
             try {
+                // If there's a v= parameter in query string
+                const vMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+                if (vMatch && vMatch[1]) return vMatch[1];
+
+                // youtu.be/ID
+                const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+                if (shortMatch && shortMatch[1]) return shortMatch[1];
+
+                // embed/ID or shorts/ID or live/ID
+                const pathMatch = url.match(/(?:embed|shorts|v|live)\/([a-zA-Z0-9_-]{11})/);
+                if (pathMatch && pathMatch[1]) return pathMatch[1];
+
+                // Standard fallback regex
                 const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|\&v=)([^#\&\?]*).*/;
                 const match = url.match(regExp);
-                if (match && match[2].length === 11) {
+                if (match && match[2] && match[2].length === 11) {
                     return match[2];
                 }
             } catch (e) {
@@ -1055,6 +1069,10 @@ checkAuthSession();
             }
             return null;
         }
+
+        const getYouTubeId = extractYouTubeId;
+        window.extractYouTubeId = extractYouTubeId;
+        window.getYouTubeId = extractYouTubeId;
 
         let currentAnalyzeController = null;
 
@@ -1142,7 +1160,9 @@ checkAuthSession();
             }
 
             // Instant extraction of YouTube video ID
-            const ytId = check.type === 'youtube' ? extractYouTubeId(check.normalizedUrl) : null;
+            const ytId = check.type === 'youtube' 
+                ? (typeof extractYouTubeId === 'function' ? extractYouTubeId(check.normalizedUrl) : (window.URLParser && typeof window.URLParser.extractYouTubeId === 'function' ? window.URLParser.extractYouTubeId(check.normalizedUrl) : null))
+                : null;
             const standardVideoQualities = [
                 { height: 2160, quality: "4K (2160p)", id: "2160p", sizeStr: "~1.5 GB", recommended: false },
                 { height: 1440, quality: "1440p", id: "1440p", sizeStr: "~700 MB", recommended: false },
