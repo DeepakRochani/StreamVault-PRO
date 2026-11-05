@@ -8,8 +8,7 @@
 <script src="js/config.js"></script>
 <script src="js/entitlements.js"></script>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+<script src="js/fmp4-remuxer.js"></script>
 <script src="ads.js"></script>
 <script src="js/url-parser.js"></script>
 <script src="settings.js"></script>
@@ -1711,102 +1710,7 @@ checkAuthSession();
             `;
         }
 
-        // ── StreamVault Browser Remuxer Engine (Single-Threaded WASM FFmpeg) ──
-        window.StreamVaultRemuxer = {
-            ffmpeg: null,
-            loadingPromise: null,
-            isLoaded: false,
-
-            async init() {
-                if (this.isLoaded && this.ffmpeg) return this.ffmpeg;
-                if (this.loadingPromise) return this.loadingPromise;
-
-                this.loadingPromise = (async () => {
-                    try {
-                        if (!window.FFmpegWASM || !window.FFmpegUtil) {
-                            console.warn('[StreamVault Remuxer] FFmpeg scripts not yet loaded');
-                            return null;
-                        }
-                        const { FFmpeg } = window.FFmpegWASM;
-                        const { toBlobURL } = window.FFmpegUtil;
-                        const ffmpeg = new FFmpeg();
-                        const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
-                        const workerURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/814.ffmpeg.js';
-
-                        await ffmpeg.load({
-                            classWorkerURL: await toBlobURL(workerURL, 'text/javascript'),
-                            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-                            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
-                        });
-
-                        this.ffmpeg = ffmpeg;
-                        this.isLoaded = true;
-                        console.log('[StreamVault Remuxer] FFmpeg WASM successfully ready');
-                        return ffmpeg;
-                    } catch (err) {
-                        console.warn('[StreamVault Remuxer Init Warn]:', err);
-                        return null;
-                    } finally {
-                        this.loadingPromise = null;
-                    }
-                })();
-
-                return this.loadingPromise;
-            },
-
-            async mergeVideoAndAudio(videoBlob, audioBlob) {
-                if (!videoBlob || !audioBlob) return videoBlob;
-                const ffmpeg = await this.init();
-                if (!ffmpeg) {
-                    console.warn('[StreamVault Remuxer] FFmpeg unavailable, returning video blob');
-                    return videoBlob;
-                }
-
-                try {
-                    const { fetchFile } = window.FFmpegUtil;
-                    const vData = await fetchFile(videoBlob);
-                    const aData = await fetchFile(audioBlob);
-
-                    await ffmpeg.writeFile('in_v.mp4', vData);
-                    await ffmpeg.writeFile('in_a.m4a', aData);
-
-                    // Direct stream copy mux (-c copy) - instant in-memory packet transfer without transcoding
-                    await ffmpeg.exec([
-                        '-i', 'in_v.mp4',
-                        '-i', 'in_a.m4a',
-                        '-c:v', 'copy',
-                        '-c:a', 'copy',
-                        '-map', '0:v:0',
-                        '-map', '1:a:0?',
-                        '-shortest',
-                        '-movflags', '+faststart',
-                        'out.mp4'
-                    ]);
-
-                    const data = await ffmpeg.readFile('out.mp4');
-                    const merged = new Blob([data.buffer], { type: 'video/mp4' });
-
-                    // Clean virtual FS
-                    try {
-                        await ffmpeg.deleteFile('in_v.mp4');
-                        await ffmpeg.deleteFile('in_a.m4a');
-                        await ffmpeg.deleteFile('out.mp4');
-                    } catch (_) {}
-
-                    return merged;
-                } catch (muxErr) {
-                    console.error('[StreamVault Remuxer Mux Error]:', muxErr);
-                    return videoBlob;
-                }
-            }
-        };
-
-        // Warm up FFmpeg WASM in background after page idle
-        setTimeout(() => {
-            if (window.StreamVaultRemuxer && typeof window.StreamVaultRemuxer.init === 'function') {
-                window.StreamVaultRemuxer.init().catch(() => {});
-            }
-        }, 1500);
+        // StreamVault Fast Pure-JS Remuxer Engine loaded via js/fmp4-remuxer.js
 
         async function fetchBlobWithProgress(primaryUrl, fallbackUrl, onProgress) {
             let res = null;
@@ -1841,7 +1745,7 @@ checkAuthSession();
                 chunks.push(value);
                 received += value.length;
                 if (total > 0 && typeof onProgress === 'function') {
-                    onProgress(received / total);
+                    onProgress(received / total, received, total);
                 }
             }
             return new Blob(chunks, { type: res.headers.get('content-type') || 'application/octet-stream' });
@@ -1992,25 +1896,30 @@ checkAuthSession();
 
                     if (isVideoWithSeparateAudio) {
                         statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Downloading high-res video & audio...';
-                        progressBar.style.width = '35%';
-                        pctText.textContent = '35%';
+                        progressBar.style.width = '15%';
+                        pctText.textContent = '15%';
 
                         const videoUrl = dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl;
                         const audioUrl = dlData.fullAudioDownloadUrl || dlData.audioDownloadUrl || dlData.audioStreamUrl;
 
                         try {
                             const [videoBlob, audioBlob] = await Promise.all([
-                                fetchBlobWithProgress(videoUrl, dlData.streamUrl, (pct) => {
-                                    const p = Math.round(30 + pct * 50);
+                                fetchBlobWithProgress(videoUrl, dlData.streamUrl, (pct, received, total) => {
+                                    const p = Math.round(15 + pct * 75);
                                     progressBar.style.width = `${p}%`;
                                     pctText.textContent = `${p}%`;
+                                    if (total > 0 && received > 0) {
+                                        const recMB = (received / 1048576).toFixed(1);
+                                        const totMB = (total / 1048576).toFixed(1);
+                                        sizeInfo.textContent = `${recMB} / ${totMB} MB`;
+                                    }
                                 }),
                                 fetchBlobWithProgress(audioUrl, dlData.audioStreamUrl, null)
                             ]);
 
-                            statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Merging video + audio with crystal-clear sound...';
-                            progressBar.style.width = '90%';
-                            pctText.textContent = '90%';
+                            statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Combining video + audio with crystal-clear sound...';
+                            progressBar.style.width = '95%';
+                            pctText.textContent = '95%';
 
                             if (window.StreamVaultRemuxer) {
                                 finalBlob = await window.StreamVaultRemuxer.mergeVideoAndAudio(videoBlob, audioBlob);
@@ -2027,37 +1936,41 @@ checkAuthSession();
                     progressBar.style.width = '100%';
                     pctText.textContent = '100%';
                     
-                    const safeDirectUrl = encodeURIComponent(directUrl);
-                    const safeDlUrl = encodeURIComponent(dlData.downloadUrl || directUrl);
-                    const safeFullDlUrl = encodeURIComponent(dlData.fullDownloadUrl || '');
-                    const safeFilename = encodeURIComponent(dlFilename);
-                    const safeFormat = encodeURIComponent(format);
-                    const safeQuality = encodeURIComponent(selectedQuality || '1080p');
-                    const safeTitle = encodeURIComponent(videoData.title || dlFilename);
-                    const safeThumb = encodeURIComponent(videoData.thumbnail || '');
+                    window.__lastDownloadedBlob = finalBlob;
+                    window.__lastDownloadedFilename = dlFilename;
 
-                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Ready! <button type="button" onclick="openDownloadModal({ blob: window.__lastDownloadedBlob, url: '${safeDirectUrl}', filename: '${safeFilename}', format: '${safeFormat}', quality: '${safeQuality}', title: '${safeTitle}' })" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/40 hover:bg-primary/60 px-3 py-1 rounded-lg border border-primary/50 shadow-sm transition-all"><span class="material-symbols-outlined text-[14px]">folder_open</span> Save File</button>`;
+                    // DIRECT DOWNLOAD TRIGGER (Single step, NO double popup!)
+                    const blobToSave = finalBlob;
+                    if (blobToSave) {
+                        const blobUrl = URL.createObjectURL(blobToSave);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = blobUrl;
+                        a.setAttribute('download', dlFilename);
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => {
+                            try { document.body.removeChild(a); } catch(_) {}
+                            URL.revokeObjectURL(blobUrl);
+                        }, 5000);
+                    } else {
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = dlData.fullDownloadUrl || directUrl;
+                        a.setAttribute('download', dlFilename);
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => {
+                            try { document.body.removeChild(a); } catch(_) {}
+                        }, 5000);
+                    }
+
+                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Complete! Saved with sound. <button type="button" onclick="triggerFastBrowserDownload()" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/40 hover:bg-primary/60 px-3 py-1 rounded-lg border border-primary/50 shadow-sm transition-all"><span class="material-symbols-outlined text-[14px]">download</span> Save Again</button>`;
                     statusText.classList.replace('text-primary', 'text-green-400');
                     speedText.textContent  = '';
                     sizeInfo.textContent   = '';
                     downloadAnotherBtn.classList.remove('hidden');
 
-                    window.__lastDownloadedBlob = finalBlob;
-
-                    // Open clean in-page Save Modal immediately (NO PLAYER, DIRECT OS SAVE)
-                    if (typeof openDownloadModal === 'function') {
-                        openDownloadModal({
-                            blob: finalBlob,
-                            url: directUrl,
-                            downloadUrl: dlData.downloadUrl,
-                            fullDownloadUrl: dlData.fullDownloadUrl,
-                            filename: dlFilename,
-                            format: format,
-                            quality: selectedQuality || '1080p',
-                            title: videoData.title,
-                            thumbnail: videoData.thumbnail
-                        });
-                    }
                     isInlineDownloadRunning = false;
                     return;
                 }
@@ -2485,8 +2398,9 @@ checkAuthSession();
             const browserBtn = document.getElementById('dl-modal-browser-btn');
             const saveBtn = document.getElementById('dl-modal-save-btn');
             const statusNotice = document.getElementById('dl-modal-save-status');
+            const targetBlob = currentModalBlob || window.__lastDownloadedBlob;
+            const filename = currentModalFilename || window.__lastDownloadedFilename || 'StreamVault_Download.mp4';
             const targetUrl = currentModalDownloadUrl || currentModalFullUrl || currentModalUrl;
-            const filename = currentModalFilename || 'StreamVault_Download.mp4';
 
             if (browserBtn) {
                 browserBtn.disabled = true;
@@ -2502,8 +2416,8 @@ checkAuthSession();
                 statusNotice.innerHTML = '<span class="text-green-400 font-bold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[18px]">check_circle</span> Downloading! Check your Chrome downloads icon (top right).</span>';
             }
 
-            if (currentModalBlob) {
-                const blobUrl = URL.createObjectURL(currentModalBlob);
+            if (targetBlob) {
+                const blobUrl = URL.createObjectURL(targetBlob);
                 const a = document.createElement('a');
                 a.style.display = 'none';
                 a.href = blobUrl;

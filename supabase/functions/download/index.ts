@@ -272,12 +272,12 @@ serve(async (req: Request) => {
       const quality = reqUrl.searchParams.get("quality") || "1080p";
       let customFilename = reqUrl.searchParams.get("filename") || (isAudio ? "audio.mp3" : "video.mp4");
 
-      if (!customFilename.toLowerCase().endsWith(".mp3") && !customFilename.toLowerCase().endsWith(".mp4")) {
+      if (!customFilename.toLowerCase().endsWith(".mp3") && !customFilename.toLowerCase().endsWith(".mp4") && !customFilename.toLowerCase().endsWith(".m4a")) {
         customFilename += isAudio ? ".mp3" : ".mp4";
       }
 
       let streamUrl = formatUrl;
-      let mimeType = isAudio ? "audio/mpeg" : "video/mp4";
+      let mimeType = isAudio ? (customFilename.endsWith(".m4a") ? "audio/mp4" : "audio/mpeg") : "video/mp4";
 
       const ytMatch = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
       const videoId = ytMatch ? ytMatch[1] : "";
@@ -355,7 +355,12 @@ serve(async (req: Request) => {
 
         if (mediaRes && (mediaRes.ok || mediaRes.status === 206)) {
           const respHeaders = new Headers(corsHeaders);
-          respHeaders.set("Content-Type", isAudio ? "audio/mpeg" : (mediaRes.headers.get("content-type") || mimeType || "video/mp4"));
+          const detectedType = mediaRes.headers.get("content-type");
+          const finalMime = isAudio
+            ? (customFilename.endsWith(".m4a") || detectedType?.includes("mp4") || detectedType?.includes("m4a") ? "audio/mp4" : "audio/mpeg")
+            : (detectedType || mimeType || "video/mp4");
+
+          respHeaders.set("Content-Type", finalMime);
           respHeaders.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"; filename*=UTF-8''${encodeURIComponent(customFilename)}`);
           respHeaders.set("Access-Control-Expose-Headers", "Content-Disposition, Content-Length, Content-Range");
           respHeaders.set("Cache-Control", "public, max-age=3600");
