@@ -43,31 +43,44 @@ export interface ResolvedStreamResult {
   hasAudioCombined: boolean;
 }
 
-// Fast Innertube direct Google Video CDN resolver (Primary)
-async function resolveViaInnertube(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
-  const cookie = Deno.env.get("YOUTUBE_COOKIE") || defaultCookie;
-  let yt: any = null;
-
-  try {
-    yt = await Innertube.create({
-      cache: new UniversalCache(false),
-      generate_session_locally: true,
-      cookie: cookie,
-    });
-  } catch (_) {
-    yt = await Innertube.create({
-      cache: new UniversalCache(false),
-      generate_session_locally: true,
-    });
-  }
-
-  let video: any = null;
-  // Multi-client strategy: ANDROID -> IOS -> TV -> MWEB -> WEB
-  for (const client of ["ANDROID", "IOS", "TV", "MWEB", "WEB"] as const) {
+// ── Shared Cached Innertube Session (Sub-second reuse) ──
+let cachedInnertube: any = null;
+async function getInnertube() {
+  if (!cachedInnertube) {
+    const cookie = Deno.env.get("YOUTUBE_COOKIE") || defaultCookie;
     try {
-      const candidate = await yt.getBasicInfo(videoId, { client });
+      cachedInnertube = await Innertube.create({
+        cache: new UniversalCache(false),
+        generate_session_locally: true,
+        cookie: cookie,
+      });
+    } catch (_) {
+      cachedInnertube = await Innertube.create({
+        cache: new UniversalCache(false),
+        generate_session_locally: true,
+      });
+    }
+  }
+  return cachedInnertube;
+}
+
+// Fast Innertube direct Google Video CDN resolver (<2s resolution)
+async function resolveViaInnertube(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
+  const yt = await getInnertube();
+  let video: any = null;
+
+  // Optimized client order: WEB -> TV_EMBEDDED -> ANDROID
+  const clientsToTry = ["WEB", "TV_EMBEDDED", "ANDROID"] as const;
+
+  for (const client of clientsToTry) {
+    try {
+      const candidatePromise = yt.getBasicInfo(videoId, { client });
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout on ${client}`)), 3000));
+      
+      const candidate: any = await Promise.race([candidatePromise, timeoutPromise]);
       if (candidate?.streaming_data?.formats?.length || candidate?.streaming_data?.adaptive_formats?.length) {
         video = candidate;
+        console.log(`[Stream Resolver] Successfully resolved formats via client: ${client}`);
         break;
       }
     } catch (err: any) {
@@ -96,17 +109,21 @@ async function resolveViaInnertube(videoId: string, isAudio: boolean, quality: s
     const prog = formats.filter((f: any) => f.has_video && f.has_audio);
     const targetH = parseInt(quality.replace(/[^0-9]/g, "") || "1080");
 
-    if (prog.length > 0) {
+    if (prog.length > 0 && targetH <= 720) {
       prog.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
       const exactProg = prog.find((f: any) => f.height === targetH);
-      chosenFmt = exactProg || prog.find((f: any) => f.height <= targetH) || prog[0];
-      hasAudioCombined = true;
-      console.log(`[Stream Resolver] Innertube Progressive Video+Audio Format: ${chosenFmt.quality_label || chosenFmt.height + 'p'} (itag: ${chosenFmt.itag})`);
-    } else {
+      if (exactProg) {
+        chosenFmt = exactProg;
+        hasAudioCombined = true;
+        console.log(`[Stream Resolver] Innertube Progressive Video+Audio Format: ${chosenFmt.quality_label || chosenFmt.height + 'p'} (itag: ${chosenFmt.itag})`);
+      }
+    }
+
+    if (!chosenFmt) {
       // YouTube modern adaptive formats (separate video and audio streams)
       const vAdaptive = adaptive.filter((f: any) => f.has_video);
       chosenFmt = vAdaptive.find((f: any) => f.height === targetH) || vAdaptive[0];
-      
+
       // Select best audio stream (prefer itag 140 AAC in MP4/m4a container)
       const aAdaptive = adaptive.filter((f: any) => f.has_audio);
       aAdaptive.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
@@ -141,110 +158,117 @@ async function resolveViaInnertube(videoId: string, isAudio: boolean, quality: s
   };
 }
 
-// Fast Invidious stream resolver with verified active mirrors (Fallback)
+// Fast active Invidious mirrors
 const INVIDIOUS_MIRRORS = [
   "https://yt.chocolatemoo53.com",
-  "https://inv.nadeko.net",
   "https://invidious.nerdvpn.de",
-  "https://invidious.jing.rocks",
-  "https://invidious.private.coffee",
+  "https://invidious.tiekoetter.com",
 ];
 
-// Helper: Resolve direct stream URL via Innertube (Primary) or Invidious (Fallback)
-async function resolveStreamUrl(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
-  // 1. Try Innertube first for direct high-speed Google Video CDN stream (50-100 MB/s)
-  try {
-    const innertubeRes = await resolveViaInnertube(videoId, isAudio, quality);
-    if (innertubeRes?.streamUrl) {
-      console.log(`[Stream Resolver] Innertube direct CDN stream resolved for ${videoId}`);
-      return innertubeRes;
-    }
-  } catch (itErr: any) {
-    console.warn(`[Stream Resolver] Innertube attempt failed for ${videoId}:`, itErr?.message || itErr);
-  }
-
-  // 2. Fallback to Invidious mirrors
+async function resolveViaInvidious(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
   const targetH = parseInt(quality.replace(/[^0-9]/g, "") || "1080");
-  const fallbackVideoItag = targetH >= 1080 ? "137" : (targetH >= 720 ? "136" : "135");
-  const fallbackItag = isAudio ? "140" : fallbackVideoItag;
 
-  for (const mirror of INVIDIOUS_MIRRORS) {
-    try {
-      const res = await fetch(`${mirror}/api/v1/videos/${videoId}`, {
-        signal: AbortSignal.timeout(3500),
-        headers: { "Accept": "application/json" },
-      });
+  const mirrorPromises = INVIDIOUS_MIRRORS.map(async (mirror) => {
+    const res = await fetch(`${mirror}/api/v1/videos/${videoId}`, {
+      signal: AbortSignal.timeout(3500),
+      headers: { "Accept": "application/json" },
+    });
 
-      if (!res.ok) continue;
-      const data = await res.json().catch(() => null);
-      if (!data) continue;
+    if (!res.ok) throw new Error(`Mirror ${mirror} status ${res.status}`);
+    const data = await res.json();
+    if (!data) throw new Error(`Mirror ${mirror} empty data`);
 
-      const adaptive = data.adaptiveFormats || [];
-      const prog = data.formatStreams || [];
+    const adaptive = data.adaptiveFormats || [];
+    const prog = data.formatStreams || [];
 
-      if (isAudio) {
-        const audioFormats = adaptive.filter((f: any) => f.type && f.type.includes("audio") && f.url);
-        if (audioFormats.length > 0) {
-          audioFormats.sort((a: any, b: any) => (parseInt(b.bitrate || "0") - parseInt(a.bitrate || "0")));
-          const chosen = audioFormats[0];
-          console.log(`[Stream Resolver] Invidious Audio via ${mirror} (itag: ${chosen.itag})`);
+    if (isAudio) {
+      const audioFormats = adaptive.filter((f: any) => f.type && f.type.includes("audio") && f.url);
+      if (audioFormats.length > 0) {
+        audioFormats.sort((a: any, b: any) => (parseInt(b.bitrate || "0") - parseInt(a.bitrate || "0")));
+        const chosen = audioFormats.find((f: any) => String(f.itag) === "140" || (f.type && f.type.includes("mp4"))) || audioFormats[0];
+        return {
+          streamUrl: chosen.url,
+          mimeType: chosen.type?.split(";")[0] || "audio/mp4",
+          itag: String(chosen.itag),
+          hasAudioCombined: true,
+        };
+      }
+    } else {
+      // For resolutions <= 720p, if an exact matching progressive stream (combined video+audio) exists, use it
+      if (prog && prog.length > 0 && targetH <= 720) {
+        const exactProg = prog.find((f: any) => {
+          const resNum = parseInt((f.resolution || "").replace(/[^0-9]/g, "") || "0");
+          return resNum === targetH;
+        });
+        if (exactProg && exactProg.url) {
           return {
-            streamUrl: chosen.url,
-            mimeType: chosen.type?.split(";")[0] || "audio/mp4",
-            itag: String(chosen.itag),
+            streamUrl: exactProg.url,
+            mimeType: exactProg.type?.split(";")[0] || "video/mp4",
+            itag: String(exactProg.itag),
             hasAudioCombined: true,
-          };
-        }
-      } else {
-        // Prioritize progressive formats (prog/formatStreams) which include both video and audio
-        if (prog && prog.length > 0) {
-          prog.sort((a: any, b: any) => {
-            const rA = parseInt((a.resolution || "").replace(/[^0-9]/g, "") || "0");
-            const rB = parseInt((b.resolution || "").replace(/[^0-9]/g, "") || "0");
-            return rB - rA;
-          });
-          const exactProg = prog.find((f: any) => {
-            const resNum = parseInt((f.resolution || "").replace(/[^0-9]/g, "") || "0");
-            return resNum === targetH;
-          });
-          const chosen = exactProg || prog[0];
-          console.log(`[Stream Resolver] Invidious Progressive Video+Audio via ${mirror} (${chosen.resolution})`);
-          return {
-            streamUrl: chosen.url,
-            mimeType: chosen.type?.split(";")[0] || "video/mp4",
-            itag: String(chosen.itag),
-            hasAudioCombined: true,
-          };
-        }
-
-        // Adaptive video + adaptive audio
-        const videoAdaptive = adaptive.filter((f: any) => f.type && f.type.includes("video") && f.url);
-        const audioAdaptive = adaptive.filter((f: any) => f.type && f.type.includes("audio") && f.url);
-        audioAdaptive.sort((a: any, b: any) => (parseInt(b.bitrate || "0") - parseInt(a.bitrate || "0")));
-        const chosenAudio = audioAdaptive.find((f: any) => f.itag === 140 || (f.type && f.type.includes("mp4"))) || audioAdaptive[0];
-
-        if (videoAdaptive.length > 0) {
-          const exactMatch = videoAdaptive.find((f: any) => {
-            const resNum = parseInt((f.resolution || "").replace(/[^0-9]/g, "") || "0");
-            return resNum === targetH;
-          });
-          const chosenVideo = exactMatch || videoAdaptive[0];
-          console.log(`[Stream Resolver] Invidious Adaptive Video (${chosenVideo.resolution}) + Audio via ${mirror}`);
-          return {
-            streamUrl: chosenVideo.url,
-            audioStreamUrl: chosenAudio?.url,
-            mimeType: chosenVideo.type?.split(";")[0] || "video/mp4",
-            itag: String(chosenVideo.itag),
-            hasAudioCombined: false,
           };
         }
       }
-    } catch (err: any) {
-      console.warn(`[Stream Resolver Warn] ${mirror}:`, err?.message || err);
+
+      // For 1080p+ (or any adaptive), get separate high-definition video + 140 AAC audio
+      const videoAdaptive = adaptive.filter((f: any) => f.type && f.type.includes("video") && f.url);
+      const audioAdaptive = adaptive.filter((f: any) => f.type && f.type.includes("audio") && f.url);
+      audioAdaptive.sort((a: any, b: any) => (parseInt(b.bitrate || "0") - parseInt(a.bitrate || "0")));
+      const chosenAudio = audioAdaptive.find((f: any) => String(f.itag) === "140" || (f.type && f.type.includes("mp4"))) || audioAdaptive[0];
+
+      if (videoAdaptive.length > 0) {
+        // Prefer MP4 container (avc1) for maximum player & remux compatibility
+        const mp4Videos = videoAdaptive.filter((f: any) => f.type && f.type.includes("mp4"));
+        const candidates = mp4Videos.length > 0 ? mp4Videos : videoAdaptive;
+
+        const exactMatch = candidates.find((f: any) => {
+          const resNum = parseInt((f.resolution || f.qualityLabel || "").replace(/[^0-9]/g, "") || "0");
+          return resNum === targetH;
+        });
+        const chosenVideo = exactMatch || candidates[0];
+        return {
+          streamUrl: chosenVideo.url,
+          audioStreamUrl: chosenAudio?.url,
+          mimeType: chosenVideo.type?.split(";")[0] || "video/mp4",
+          itag: String(chosenVideo.itag),
+          hasAudioCombined: false,
+        };
+      }
     }
+    throw new Error(`No matching formats on ${mirror}`);
+  });
+
+  try {
+    const mirrorResult = await Promise.any(mirrorPromises);
+    if (mirrorResult?.streamUrl) {
+      console.log(`[Stream Resolver] Invidious parallel mirror race succeeded`);
+      return mirrorResult;
+    }
+  } catch (_) {}
+
+  return null;
+}
+
+// Helper: Resolve direct stream URL via Invidious & Innertube in parallel race (<1.5s resolution)
+async function resolveStreamUrl(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
+  const resolvers = [
+    resolveViaInvidious(videoId, isAudio, quality),
+    resolveViaInnertube(videoId, isAudio, quality),
+  ];
+
+  try {
+    const fastest = await Promise.any(resolvers);
+    if (fastest?.streamUrl) {
+      console.log(`[Stream Resolver] Direct high-speed CDN stream resolved for ${videoId}`);
+      return fastest;
+    }
+  } catch (err: any) {
+    console.warn(`[Stream Resolver] Parallel resolution failed for ${videoId}:`, err?.message || err);
   }
 
   // Instant Fallback: Use verified direct latest_version proxy stream
+  const targetH = parseInt(quality.replace(/[^0-9]/g, "") || "1080");
+  const fallbackItag = isAudio ? "140" : (targetH >= 1080 ? "299" : (targetH >= 720 ? "298" : "135"));
   return {
     streamUrl: `https://yt.chocolatemoo53.com/latest_version?id=${videoId}&itag=${fallbackItag}`,
     audioStreamUrl: isAudio ? undefined : `https://yt.chocolatemoo53.com/latest_version?id=${videoId}&itag=140`,
@@ -279,7 +303,7 @@ serve(async (req: Request) => {
       let streamUrl = formatUrl;
       let mimeType = isAudio ? (customFilename.endsWith(".m4a") ? "audio/mp4" : "audio/mpeg") : "video/mp4";
 
-      const ytMatch = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+      const ytMatch = videoUrl.match(/(?:youtube[.]com\/(?:watch[?]v=|embed\/|shorts\/)|youtu[.]be\/)([a-zA-Z0-9_-]{11})/);
       const videoId = ytMatch ? ytMatch[1] : "";
 
       if (!streamUrl && videoId) {
@@ -314,8 +338,6 @@ serve(async (req: Request) => {
         }
         if (req.headers.has("range")) {
           upstreamHeaders["Range"] = req.headers.get("range")!;
-        } else {
-          upstreamHeaders["Range"] = "bytes=0-";
         }
 
         let mediaRes: Response | null = null;
@@ -332,21 +354,26 @@ serve(async (req: Request) => {
         if (!mediaRes || (!mediaRes.ok && mediaRes.status !== 206)) {
           if (videoId) {
             const targetH = parseInt(quality.replace(/[^0-9]/g, "") || "1080");
-            const fallbackItag = isAudio ? "140" : (targetH >= 1080 ? "137" : (targetH >= 720 ? "136" : "135"));
+            const itagsToTry = isAudio
+              ? ["140", "139"]
+              : (targetH >= 1080 ? ["299", "137", "303"] : (targetH >= 720 ? ["298", "136", "302"] : ["135", "134"]));
 
             for (const mirror of INVIDIOUS_MIRRORS) {
-              try {
-                const proxyUrl = `${mirror}/latest_version?id=${videoId}&itag=${fallbackItag}&local=true`;
-                const mirrorRes = await fetch(proxyUrl, {
-                  headers: upstreamHeaders,
-                  redirect: "follow",
-                });
-                if (mirrorRes.ok || mirrorRes.status === 206) {
-                  mediaRes = mirrorRes;
-                  console.log(`[Stream Proxy] Succeeded via mirror ${mirror} (status ${mirrorRes.status})`);
-                  break;
-                }
-              } catch (_) {}
+              for (const itag of itagsToTry) {
+                try {
+                  const proxyUrl = `${mirror}/latest_version?id=${videoId}&itag=${itag}`;
+                  const mirrorRes = await fetch(proxyUrl, {
+                    headers: upstreamHeaders,
+                    redirect: "follow",
+                  });
+                  if (mirrorRes.ok || mirrorRes.status === 206) {
+                    mediaRes = mirrorRes;
+                    console.log(`[Stream Proxy] Succeeded via mirror ${mirror} itag ${itag} (status ${mirrorRes.status})`);
+                    break;
+                  }
+                } catch (_) { }
+              }
+              if (mediaRes && (mediaRes.ok || mediaRes.status === 206)) break;
             }
           }
         }
@@ -436,7 +463,7 @@ serve(async (req: Request) => {
       let audioDirectStream: string | undefined = undefined;
       let hasAudioCombined = true;
 
-      const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+      const ytMatch = url.match(/(?:youtube[.]com\/(?:watch[?]v=|embed\/|shorts\/)|youtu[.]be\/)([a-zA-Z0-9_-]{11})/);
       const videoId = ytMatch ? ytMatch[1] : "";
 
       if (!directStream && videoId) {

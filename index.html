@@ -1726,7 +1726,7 @@ checkAuthSession();
                 let probeRes = await fetch(primaryUrl, {
                     headers: { ...authHeaders, 'Range': 'bytes=0-0' }
                 });
-                if (!probeRes.ok && fallbackUrl && fallbackUrl !== primaryUrl) {
+                if (!probeRes.ok && fallbackUrl && fallbackUrl !== primaryUrl && !fallbackUrl.includes('googlevideo.com')) {
                     targetUrl = fallbackUrl;
                     probeRes = await fetch(fallbackUrl, {
                         headers: { ...authHeaders, 'Range': 'bytes=0-0' }
@@ -1751,19 +1751,29 @@ checkAuthSession();
                 console.warn("[Turbo Downloader] Probe warning, continuing:", probeErr);
             }
 
-            // 2. High-Speed Multi-Threaded Concurrent Range Acceleration
-            // If the file is > 4 MB and supports HTTP Range, download with 6 concurrent pipelines!
-            if (supportsRange && total > 4 * 1024 * 1024) {
-                console.log(`[Turbo Downloader] Activating 6-worker multi-thread download accelerator for ${(total / 1048576).toFixed(1)} MB`);
+            // For small files (e.g. audio track <= 8MB), a single stream fetch is fastest and uses zero worker overhead
+            if (total > 0 && total <= 8 * 1024 * 1024) {
+                try {
+                    const res = await fetch(targetUrl, { headers: authHeaders });
+                    if (res.ok) {
+                        return await res.blob();
+                    }
+                } catch (_) {}
+            }
+
+            // 2. High-Speed Multi-Threaded Concurrent Range Acceleration for Large Files
+            // If the file is > 8 MB and supports HTTP Range, download with 3 concurrent workers!
+            if (supportsRange && total > 8 * 1024 * 1024) {
+                console.log(`[Turbo Downloader] Activating 3-worker multi-thread download accelerator for ${(total / 1048576).toFixed(1)} MB`);
                 
-                // Determine optimal chunk size: 4MB to 8MB chunks
-                const chunkSize = total > 100 * 1024 * 1024 ? 8 * 1024 * 1024 : 4 * 1024 * 1024;
+                // 8MB chunks for stability and blazing speed
+                const chunkSize = 8 * 1024 * 1024;
                 const chunkCount = Math.ceil(total / chunkSize);
                 const chunkBuffers = new Array(chunkCount);
                 
                 let nextChunkIdx = 0;
                 let downloadedBytes = 0;
-                const maxConcurrency = Math.min(6, chunkCount);
+                const maxConcurrency = Math.min(3, chunkCount);
 
                 async function worker() {
                     while (true) {
@@ -1816,7 +1826,6 @@ checkAuthSession();
                     return new Blob(chunkBuffers, { type: mimeType });
                 } catch (turboErr) {
                     console.warn("[Turbo Downloader] Chunk worker failed, falling back to single stream:", turboErr);
-                    // Fall through to standard sequential stream below
                 }
             }
 
@@ -1826,7 +1835,7 @@ checkAuthSession();
                 res = await fetch(targetUrl, { headers: authHeaders });
             } catch (_) {}
             if (!res || !res.ok) {
-                if (fallbackUrl && fallbackUrl !== targetUrl) {
+                if (fallbackUrl && fallbackUrl !== targetUrl && !fallbackUrl.includes('googlevideo.com')) {
                     try { res = await fetch(fallbackUrl, { headers: authHeaders }); } catch (_) {}
                 }
             }
@@ -1857,12 +1866,18 @@ checkAuthSession();
         let isInlineDownloadRunning = false;
 
         async function startInlineDownload(videoData, format, selectedQuality) {
+            window.__lastVideoData = videoData;
+            window.__lastFormat = format;
+            window.__lastQuality = selectedQuality;
             return _executeInlineDownload(videoData, format, selectedQuality);
         }
 
         async function _executeInlineDownload(videoData, format, selectedQuality) {
             if (isInlineDownloadRunning) return;
             isInlineDownloadRunning = true;
+            window.__lastVideoData = videoData;
+            window.__lastFormat = format;
+            window.__lastQuality = selectedQuality;
             if (typeof window.toggleAds === 'function') window.toggleAds(false);
 
             // Entitlement Gate: Locked quality check before initiating download
@@ -1890,11 +1905,11 @@ checkAuthSession();
             const qualDisplay = (selectedQuality && selectedQuality !== 'best' && selectedQuality !== 'Original') ? `${selectedQuality} • ` : '';
             const fmtDisplay = isAudio ? 'MP3' : 'MP4';
 
-            statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Downloading <strong class="text-white">${qualDisplay}${fmtDisplay}</strong> securely...`;
+            statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Preparing <strong class="text-white">${qualDisplay}${fmtDisplay}</strong> stream...`;
             speedText.textContent  = '--';
             sizeInfo.textContent   = '--';
-            pctText.textContent    = '';
-            progressBar.style.width = '50%';
+            pctText.textContent    = '5%';
+            progressBar.style.width = '5%';
             progressBar.className = 'h-full rounded-full transition-all duration-300 bg-gradient-to-r from-primary to-orange-500';
 
             let rawTitle = (videoData.title || 'download').trim();
@@ -2033,19 +2048,70 @@ checkAuthSession();
                                 fetchBlobWithProgress(audioUrl, dlData.audioStreamUrl, null)
                             ]);
 
+                            if (!videoBlob) throw new Error("Video stream returned empty data");
+
                             statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Combining video + audio with crystal-clear sound...';
                             progressBar.style.width = '95%';
                             pctText.textContent = '95%';
 
-                            if (window.StreamVaultRemuxer) {
+                            if (audioBlob && window.StreamVaultRemuxer) {
                                 finalBlob = await window.StreamVaultRemuxer.mergeVideoAndAudio(videoBlob, audioBlob);
                             } else {
                                 finalBlob = videoBlob;
                             }
                         } catch (errMerge) {
                             console.error('[StreamVault Audio Mux Error]:', errMerge);
-                            statusText.innerHTML = '<span class="text-orange-400 font-medium">Notice: Audio multiplexing warning. Video stream ready.</span>';
+                            progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
+                            statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] text-red-400">error</span> <span class="text-red-400 font-semibold">Download interrupted.</span> <button type="button" onclick="startInlineDownload(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/80 hover:bg-primary px-3 py-1 rounded-lg shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>`;
+                            isInlineDownloadRunning = false;
+                            return;
                         }
+                    } else {
+                        // Single combined video or pure audio stream
+                        statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Downloading <strong class="text-white">${qualDisplay}${fmtDisplay}</strong> at turbo speed...`;
+                        progressBar.style.width = '20%';
+                        pctText.textContent = '20%';
+
+                        const singleUrl = dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl;
+                        try {
+                            let lastProgressTime = performance.now();
+                            let lastProgressBytes = 0;
+                            finalBlob = await fetchBlobWithProgress(singleUrl, dlData.streamUrl, (pct, received, total) => {
+                                const p = Math.round(20 + pct * 75);
+                                progressBar.style.width = `${p}%`;
+                                pctText.textContent = `${p}%`;
+                                if (total > 0 && received > 0) {
+                                    const recMB = (received / 1048576).toFixed(1);
+                                    const totMB = (total / 1048576).toFixed(1);
+                                    sizeInfo.textContent = `${recMB} / ${totMB} MB`;
+
+                                    const now = performance.now();
+                                    const elapsedSec = (now - lastProgressTime) / 1000;
+                                    if (elapsedSec >= 0.4) {
+                                        const speed = ((received - lastProgressBytes) / 1048576) / elapsedSec;
+                                        if (speedText && speed > 0) {
+                                            speedText.textContent = `${speed.toFixed(1)} MB/s`;
+                                        }
+                                        lastProgressTime = now;
+                                        lastProgressBytes = received;
+                                    }
+                                }
+                            });
+                            if (!finalBlob) throw new Error("Stream returned empty data");
+                        } catch (singleErr) {
+                            console.error('[StreamVault Single Download Error]:', singleErr);
+                            progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
+                            statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] text-red-400">error</span> <span class="text-red-400 font-semibold">Download interrupted.</span> <button type="button" onclick="startInlineDownload(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/80 hover:bg-primary px-3 py-1 rounded-lg shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>`;
+                            isInlineDownloadRunning = false;
+                            return;
+                        }
+                    }
+
+                    if (!finalBlob) {
+                        progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
+                        statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] text-red-400">error</span> <span class="text-red-400 font-semibold">Could not process media stream.</span> <button type="button" onclick="startInlineDownload(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/80 hover:bg-primary px-3 py-1 rounded-lg shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>`;
+                        isInlineDownloadRunning = false;
+                        return;
                     }
 
                     progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
@@ -2055,33 +2121,20 @@ checkAuthSession();
                     window.__lastDownloadedBlob = finalBlob;
                     window.__lastDownloadedFilename = dlFilename;
 
-                    // DIRECT DOWNLOAD TRIGGER (Single step, NO double popup!)
-                    const blobToSave = finalBlob;
-                    if (blobToSave) {
-                        const blobUrl = URL.createObjectURL(blobToSave);
-                        const a = document.createElement('a');
-                        a.style.display = 'none';
-                        a.href = blobUrl;
-                        a.setAttribute('download', dlFilename);
-                        document.body.appendChild(a);
-                        a.click();
-                        setTimeout(() => {
-                            try { document.body.removeChild(a); } catch(_) {}
-                            URL.revokeObjectURL(blobUrl);
-                        }, 5000);
-                    } else {
-                        const a = document.createElement('a');
-                        a.style.display = 'none';
-                        a.href = dlData.fullDownloadUrl || directUrl;
-                        a.setAttribute('download', dlFilename);
-                        document.body.appendChild(a);
-                        a.click();
-                        setTimeout(() => {
-                            try { document.body.removeChild(a); } catch(_) {}
-                        }, 5000);
-                    }
+                    // DIRECT DOWNLOAD TRIGGER (Clean Blob URL save, NO external tab navigation!)
+                    const blobUrl = URL.createObjectURL(finalBlob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = blobUrl;
+                    a.setAttribute('download', dlFilename);
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                        try { document.body.removeChild(a); } catch(_) {}
+                        URL.revokeObjectURL(blobUrl);
+                    }, 10000);
 
-                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Complete! Saved with sound. <button type="button" onclick="triggerFastBrowserDownload()" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/40 hover:bg-primary/60 px-3 py-1 rounded-lg border border-primary/50 shadow-sm transition-all"><span class="material-symbols-outlined text-[14px]">download</span> Save Again</button>`;
+                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Complete! Saved with sound. <button type="button" onclick="triggerFastBrowserDownload()" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/40 hover:bg-primary/60 px-3 py-1 rounded-lg border border-primary/50 shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">download</span> Save Again</button>`;
                     statusText.classList.replace('text-primary', 'text-green-400');
                     speedText.textContent  = '';
                     sizeInfo.textContent   = '';
