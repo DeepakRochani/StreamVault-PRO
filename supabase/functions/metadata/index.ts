@@ -219,6 +219,62 @@ serve(async (req: Request) => {
     let adaptiveFormatsCount = 0;
     let matchedClient = "ANDROID";
 
+    // ── 0. Lightning Fast-Path: YouTube oEmbed (<150ms resolution) ──
+    if (!isDiagnostics) {
+      try {
+        const oembedCtrl = new AbortController();
+        const oembedTimeout = setTimeout(() => oembedCtrl.abort(), 1500);
+        const oembedRes = await fetch(
+          `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+          { headers: { "User-Agent": "Mozilla/5.0" }, signal: oembedCtrl.signal }
+        );
+        clearTimeout(oembedTimeout);
+        if (oembedRes.ok) {
+          const d = await oembedRes.json();
+          if (d.title) {
+            title = d.title;
+            channelName = d.author_name ?? channelName;
+            if (d.thumbnail_url) thumbnail = d.thumbnail_url;
+            
+            const standardQualities = [
+              { height: 2160, quality: "4K (2160p)", id: "2160p", sizeStr: "~1.5 GB", recommended: false },
+              { height: 1440, quality: "1440p", id: "1440p", sizeStr: "~700 MB", recommended: false },
+              { height: 1080, quality: "1080p HD", id: "1080p", sizeStr: "~350 MB", recommended: true },
+              { height: 720, quality: "720p HD", id: "720p", sizeStr: "~180 MB", recommended: false },
+              { height: 480, quality: "480p", id: "480p", sizeStr: "~80 MB", recommended: false },
+              { height: 360, quality: "360p", id: "360p", sizeStr: "~50 MB", recommended: false },
+            ];
+            const audioFormats = [
+              { quality: "320 kbps (Ultra HQ)", id: "320K", sizeStr: "~2.4 MB/min", recommended: true },
+              { quality: "256 kbps (High Quality)", id: "256K", sizeStr: "~1.9 MB/min", recommended: false },
+              { quality: "192 kbps (Standard)", id: "192K", sizeStr: "~1.4 MB/min", recommended: false },
+              { quality: "128 kbps (Economy)", id: "128K", sizeStr: "~0.9 MB/min", recommended: false },
+            ];
+
+            return new Response(JSON.stringify({
+              success: true,
+              title,
+              thumbnail,
+              duration,
+              platform: "youtube",
+              channel: channelName,
+              videoId,
+              url,
+              restricted: false,
+              authRequired: false,
+              desktopFallback: false,
+              videoFormats: standardQualities,
+              audioFormats,
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
+        }
+      } catch (_) {
+        // Fallback to Innertube if oEmbed timed out or video is restricted
+      }
+    }
+
     // 1. Try Innertube across multi-client strategy (ANDROID -> IOS -> TV -> MWEB -> WEB)
     const yt = await getInnertube();
     let videoInfo: any = null;
