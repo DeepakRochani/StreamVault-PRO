@@ -8,6 +8,8 @@
 <script src="js/config.js"></script>
 <script src="js/entitlements.js"></script>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
 <script src="ads.js"></script>
 <script src="js/url-parser.js"></script>
 <script src="settings.js"></script>
@@ -1709,15 +1711,140 @@ checkAuthSession();
             `;
         }
 
+        // ── StreamVault Browser Remuxer Engine (Single-Threaded WASM FFmpeg) ──
+        window.StreamVaultRemuxer = {
+            ffmpeg: null,
+            loadingPromise: null,
+            isLoaded: false,
+
+            async init() {
+                if (this.isLoaded && this.ffmpeg) return this.ffmpeg;
+                if (this.loadingPromise) return this.loadingPromise;
+
+                this.loadingPromise = (async () => {
+                    try {
+                        if (!window.FFmpegWASM || !window.FFmpegUtil) {
+                            console.warn('[StreamVault Remuxer] FFmpeg scripts not yet loaded');
+                            return null;
+                        }
+                        const { FFmpeg } = window.FFmpegWASM;
+                        const { toBlobURL } = window.FFmpegUtil;
+                        const ffmpeg = new FFmpeg();
+                        const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
+
+                        await ffmpeg.load({
+                            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
+                        });
+
+                        this.ffmpeg = ffmpeg;
+                        this.isLoaded = true;
+                        console.log('[StreamVault Remuxer] FFmpeg WASM successfully ready');
+                        return ffmpeg;
+                    } catch (err) {
+                        console.warn('[StreamVault Remuxer Init Warn]:', err);
+                        return null;
+                    } finally {
+                        this.loadingPromise = null;
+                    }
+                })();
+
+                return this.loadingPromise;
+            },
+
+            async mergeVideoAndAudio(videoBlob, audioBlob) {
+                if (!videoBlob || !audioBlob) return videoBlob;
+                const ffmpeg = await this.init();
+                if (!ffmpeg) {
+                    console.warn('[StreamVault Remuxer] FFmpeg unavailable, returning video blob');
+                    return videoBlob;
+                }
+
+                try {
+                    const { fetchFile } = window.FFmpegUtil;
+                    const vData = await fetchFile(videoBlob);
+                    const aData = await fetchFile(audioBlob);
+
+                    await ffmpeg.writeFile('in_v.mp4', vData);
+                    await ffmpeg.writeFile('in_a.m4a', aData);
+
+                    // Direct stream copy mux (-c copy) - instant in-memory packet transfer without transcoding
+                    await ffmpeg.exec([
+                        '-i', 'in_v.mp4',
+                        '-i', 'in_a.m4a',
+                        '-c', 'copy',
+                        '-map', '0:v:0',
+                        '-map', '1:a:0?',
+                        '-movflags', '+faststart',
+                        'out.mp4'
+                    ]);
+
+                    const data = await ffmpeg.readFile('out.mp4');
+                    const merged = new Blob([data.buffer], { type: 'video/mp4' });
+
+                    // Clean virtual FS
+                    try {
+                        await ffmpeg.deleteFile('in_v.mp4');
+                        await ffmpeg.deleteFile('in_a.m4a');
+                        await ffmpeg.deleteFile('out.mp4');
+                    } catch (_) {}
+
+                    return merged;
+                } catch (muxErr) {
+                    console.error('[StreamVault Remuxer Mux Error]:', muxErr);
+                    return videoBlob;
+                }
+            }
+        };
+
+        async function fetchBlobWithProgress(primaryUrl, fallbackUrl, onProgress) {
+            let res = null;
+            try {
+                res = await fetch(primaryUrl);
+            } catch (_) {}
+            if (!res || !res.ok) {
+                if (fallbackUrl && fallbackUrl !== primaryUrl) {
+                    try { res = await fetch(fallbackUrl); } catch (_) {}
+                }
+            }
+            if (!res || !res.ok) {
+                throw new Error(`Failed to fetch media stream (${res ? res.status : 'offline'})`);
+            }
+
+            const total = parseInt(res.headers.get('content-length') || '0', 10);
+            if (!res.body || total === 0 || !onProgress) {
+                return await res.blob();
+            }
+
+            const reader = res.body.getReader();
+            const chunks = [];
+            let received = 0;
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+                received += value.length;
+                if (total > 0 && typeof onProgress === 'function') {
+                    onProgress(received / total);
+                }
+            }
+            return new Blob(chunks, { type: res.headers.get('content-type') || 'application/octet-stream' });
+        }
+
+        let isInlineDownloadRunning = false;
+
         async function startInlineDownload(videoData, format, selectedQuality) {
             return _executeInlineDownload(videoData, format, selectedQuality);
         }
 
         async function _executeInlineDownload(videoData, format, selectedQuality) {
+            if (isInlineDownloadRunning) return;
+            isInlineDownloadRunning = true;
             if (typeof window.toggleAds === 'function') window.toggleAds(false);
 
             // Entitlement Gate: Locked quality check before initiating download
             if (window.StreamVaultEntitlements && window.StreamVaultEntitlements.isDesktopProRequired(selectedQuality, format)) {
+                isInlineDownloadRunning = false;
                 showDesktopProModal(selectedQuality);
                 return;
             }
@@ -1843,6 +1970,42 @@ checkAuthSession();
                     
                     saveToQueueHistory(videoData, dlFilename, dlId, format, null, true);
 
+                    const isVideoWithSeparateAudio = !isAudio && dlData.hasAudioCombined === false && (dlData.audioDownloadUrl || dlData.audioStreamUrl);
+
+                    let finalBlob = null;
+
+                    if (isVideoWithSeparateAudio) {
+                        statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Downloading high-res video & audio...';
+                        progressBar.style.width = '35%';
+                        pctText.textContent = '35%';
+
+                        const videoUrl = dlData.downloadUrl || dlData.fullDownloadUrl || dlData.streamUrl;
+                        const audioUrl = dlData.audioDownloadUrl || dlData.fullAudioDownloadUrl || dlData.audioStreamUrl;
+
+                        try {
+                            const [videoBlob, audioBlob] = await Promise.all([
+                                fetchBlobWithProgress(videoUrl, dlData.streamUrl, (pct) => {
+                                    const p = Math.round(30 + pct * 50);
+                                    progressBar.style.width = `${p}%`;
+                                    pctText.textContent = `${p}%`;
+                                }),
+                                fetchBlobWithProgress(audioUrl, dlData.audioStreamUrl, null)
+                            ]);
+
+                            statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Merging video + audio with crystal-clear sound...';
+                            progressBar.style.width = '90%';
+                            pctText.textContent = '90%';
+
+                            if (window.StreamVaultRemuxer) {
+                                finalBlob = await window.StreamVaultRemuxer.mergeVideoAndAudio(videoBlob, audioBlob);
+                            } else {
+                                finalBlob = videoBlob;
+                            }
+                        } catch (errMerge) {
+                            console.warn('[StreamVault] Muxing warning, falling back to direct stream:', errMerge);
+                        }
+                    }
+
                     progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
                     progressBar.style.width = '100%';
                     pctText.textContent = '100%';
@@ -1856,15 +2019,18 @@ checkAuthSession();
                     const safeTitle = encodeURIComponent(videoData.title || dlFilename);
                     const safeThumb = encodeURIComponent(videoData.thumbnail || '');
 
-                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Ready! <button type="button" onclick="openDownloadModal('${safeDirectUrl}', '${safeFilename}', '${safeFormat}', '${safeQuality}', '${safeTitle}', '${safeThumb}')" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/40 hover:bg-primary/60 px-3 py-1 rounded-lg border border-primary/50 shadow-sm transition-all"><span class="material-symbols-outlined text-[14px]">folder_open</span> Save File</button>`;
+                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Ready! <button type="button" onclick="openDownloadModal({ blob: window.__lastDownloadedBlob, url: '${safeDirectUrl}', filename: '${safeFilename}', format: '${safeFormat}', quality: '${safeQuality}', title: '${safeTitle}' })" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/40 hover:bg-primary/60 px-3 py-1 rounded-lg border border-primary/50 shadow-sm transition-all"><span class="material-symbols-outlined text-[14px]">folder_open</span> Save File</button>`;
                     statusText.classList.replace('text-primary', 'text-green-400');
                     speedText.textContent  = '';
                     sizeInfo.textContent   = '';
                     downloadAnotherBtn.classList.remove('hidden');
 
+                    window.__lastDownloadedBlob = finalBlob;
+
                     // Open clean in-page Save Modal immediately (NO PLAYER, DIRECT OS SAVE)
                     if (typeof openDownloadModal === 'function') {
                         openDownloadModal({
+                            blob: finalBlob,
                             url: directUrl,
                             downloadUrl: dlData.downloadUrl,
                             fullDownloadUrl: dlData.fullDownloadUrl,
@@ -1875,6 +2041,7 @@ checkAuthSession();
                             thumbnail: videoData.thumbnail
                         });
                     }
+                    isInlineDownloadRunning = false;
                     return;
                 }
 
@@ -1973,6 +2140,7 @@ checkAuthSession();
                 }, 1000);
 
             } catch (err) {
+                isInlineDownloadRunning = false;
                 console.log("=== ERROR TRACE ===");
                 console.log("Stack Trace:", err.stack || err);
                 console.error('[StreamVault] Download Error:', err);
@@ -2210,6 +2378,7 @@ checkAuthSession();
         }
 
         // ── StreamVault Online Direct Save Controller (Native Mac/PC Downloads & Folder Picker) ──
+        let currentModalBlob = null;
         let currentModalUrl = '';
         let currentModalDownloadUrl = '';
         let currentModalFullUrl = '';
@@ -2243,6 +2412,7 @@ checkAuthSession();
             try { opts.quality = decodeURIComponent(opts.quality || '1080p'); } catch(_) {}
             try { if (opts.title) opts.title = decodeURIComponent(opts.title); } catch(_) {}
 
+            currentModalBlob = opts.blob || null;
             currentModalUrl = opts.url || opts.downloadUrl || opts.fullDownloadUrl || '';
             currentModalDownloadUrl = opts.downloadUrl || currentModalUrl;
             currentModalFullUrl = opts.fullDownloadUrl || '';
@@ -2267,57 +2437,107 @@ checkAuthSession();
                 titleEl.textContent = opts.title || currentModalFilename;
             }
             if (badgeEl) {
-                badgeEl.textContent = opts.format === 'mp3' ? `MP3 Audio (${opts.quality || '320k'})` : `MP4 Video (${opts.quality || '1080p'})`;
+                badgeEl.textContent = opts.format === 'mp3' ? `MP3 Audio (${opts.quality || '320k'})` : `MP4 Video (${opts.quality || '1080p HD'} with Audio)`;
             }
             if (fnEl) {
                 fnEl.textContent = currentModalFilename;
             }
             if (statusNotice) {
-                statusNotice.innerHTML = '<span class="text-green-400 font-semibold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[16px] animate-bounce">download</span> Starting high-speed download...</span>';
+                statusNotice.innerHTML = '<span class="text-green-400 font-semibold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[16px]">check_circle</span> Ready! Click below to save with audio.</span>';
             }
             if (browserBtn) {
                 browserBtn.disabled = false;
-                browserBtn.innerHTML = '<span class="material-symbols-outlined text-[20px]">download</span> High-Speed Download (Direct to PC/Mac)';
+                browserBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+                browserBtn.innerHTML = '<span class="material-symbols-outlined text-[20px]">download</span> Download to Mac/PC (with Audio)';
             }
             if (saveBtn) {
                 saveBtn.disabled = false;
+                saveBtn.classList.remove('opacity-75', 'cursor-not-allowed');
                 saveBtn.innerHTML = '<span class="material-symbols-outlined text-[16px] text-primary">folder_open</span> Choose Specific Folder (Save As...)';
             }
 
             modal.classList.remove('hidden');
-
-            // Automatically trigger high-speed browser download so it shows in Chrome's download shelf/history immediately
-            setTimeout(() => {
-                triggerFastBrowserDownload();
-            }, 300);
         }
 
+        let isModalDownloadActive = false;
+
         function triggerFastBrowserDownload() {
+            if (isModalDownloadActive) return;
+            isModalDownloadActive = true;
+
+            const browserBtn = document.getElementById('dl-modal-browser-btn');
+            const saveBtn = document.getElementById('dl-modal-save-btn');
             const statusNotice = document.getElementById('dl-modal-save-status');
             const targetUrl = currentModalDownloadUrl || currentModalFullUrl || currentModalUrl;
             const filename = currentModalFilename || 'StreamVault_Download.mp4';
+
+            if (browserBtn) {
+                browserBtn.disabled = true;
+                browserBtn.classList.add('opacity-75', 'cursor-not-allowed');
+                browserBtn.innerHTML = '<span class="material-symbols-outlined text-[20px] animate-spin">sync</span> Downloading to Mac/PC...';
+            }
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.classList.add('opacity-75', 'cursor-not-allowed');
+            }
 
             if (statusNotice) {
                 statusNotice.innerHTML = '<span class="text-green-400 font-bold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[18px]">check_circle</span> Downloading! Check your Chrome downloads icon (top right).</span>';
             }
 
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = targetUrl;
-            a.setAttribute('download', filename);
-            a.target = '_self';
-            document.body.appendChild(a);
-            a.click();
+            if (currentModalBlob) {
+                const blobUrl = URL.createObjectURL(currentModalBlob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = blobUrl;
+                a.setAttribute('download', filename);
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    try { document.body.removeChild(a); } catch(_) {}
+                    URL.revokeObjectURL(blobUrl);
+                }, 4000);
+            } else {
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = targetUrl;
+                a.setAttribute('download', filename);
+                a.target = '_self';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    try { document.body.removeChild(a); } catch(_) {}
+                }, 3000);
+            }
+
             setTimeout(() => {
-                try { document.body.removeChild(a); } catch(_) {}
-            }, 3000);
+                isModalDownloadActive = false;
+                if (browserBtn) {
+                    browserBtn.disabled = false;
+                    browserBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+                    browserBtn.innerHTML = '<span class="material-symbols-outlined text-[20px]">download</span> Download to Mac/PC (with Audio)';
+                }
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+                }
+            }, 4000);
         }
 
         async function saveFileToDirectory() {
+            if (isModalDownloadActive) return;
+            isModalDownloadActive = true;
+
             const btn = document.getElementById('dl-modal-save-btn');
+            const browserBtn = document.getElementById('dl-modal-browser-btn');
             const statusNotice = document.getElementById('dl-modal-save-status');
             const filename = currentModalFilename || 'StreamVault_Download.mp4';
             const isAudio = currentModalFormat === 'mp3' || filename.toLowerCase().endsWith('.mp3');
+
+            if (browserBtn) {
+                browserBtn.disabled = true;
+                browserBtn.classList.add('opacity-75', 'cursor-not-allowed');
+            }
 
             // 1. Native OS File System Access API (Immediate Finder/Explorer Dialog on Mac & PC)
             if (typeof window.showSaveFilePicker === 'function') {
@@ -2335,75 +2555,95 @@ checkAuthSession();
                         }]
                     });
 
-                    if (statusNotice) {
-                        statusNotice.innerHTML = '<span class="text-primary font-semibold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[16px] animate-spin">sync</span> Connecting to high-speed stream...</span>';
-                    }
                     if (btn) {
                         btn.disabled = true;
+                        btn.classList.add('opacity-75', 'cursor-not-allowed');
                         btn.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">sync</span> Saving to folder...';
                     }
 
-                    const targetStreamUrl = currentModalDownloadUrl || currentModalFullUrl || currentModalUrl;
-                    let response = null;
-                    try {
-                        response = await fetch(targetStreamUrl);
-                    } catch (netErr) {
-                        if (currentModalFullUrl && currentModalFullUrl !== targetStreamUrl) {
-                            response = await fetch(currentModalFullUrl);
-                        } else {
-                            throw netErr;
-                        }
-                    }
-
-                    if (!response || !response.ok) {
-                        throw new Error(response ? `Server returned HTTP ${response.status}` : 'Connection failed');
-                    }
-
-                    const contentLength = parseInt(response.headers.get('Content-Length') || '0', 10);
                     const writable = await handle.createWritable();
 
-                    if (response.body) {
-                        const reader = response.body.getReader();
-                        let receivedBytes = 0;
-                        while (true) {
-                            const { done, value } = await reader.read();
-                            if (done) break;
-                            await writable.write(value);
-                            receivedBytes += value.length;
-                            if (contentLength > 0 && statusNotice) {
-                                const pct = Math.min(100, Math.round((receivedBytes / contentLength) * 100));
-                                const mb = (receivedBytes / (1024 * 1024)).toFixed(1);
-                                const totalMb = (contentLength / (1024 * 1024)).toFixed(1);
-                                statusNotice.innerHTML = `<span class="text-primary font-semibold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[16px] animate-spin">download</span> Saving: ${mb} MB / ${totalMb} MB (${pct}%)</span>`;
-                            } else if (statusNotice) {
-                                const mb = (receivedBytes / (1024 * 1024)).toFixed(1);
-                                statusNotice.innerHTML = `<span class="text-primary font-semibold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[16px] animate-spin">download</span> Saving: ${mb} MB saved...</span>`;
-                            }
+                    if (currentModalBlob) {
+                        if (statusNotice) {
+                            statusNotice.innerHTML = '<span class="text-primary font-semibold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[16px] animate-spin">sync</span> Writing file with audio to folder...</span>';
                         }
+                        await writable.write(currentModalBlob);
                         await writable.close();
                     } else {
-                        const blob = await response.blob();
-                        await writable.write(blob);
-                        await writable.close();
+                        const targetStreamUrl = currentModalDownloadUrl || currentModalFullUrl || currentModalUrl;
+                        let response = null;
+                        try {
+                            response = await fetch(targetStreamUrl);
+                        } catch (netErr) {
+                            if (currentModalFullUrl && currentModalFullUrl !== targetStreamUrl) {
+                                response = await fetch(currentModalFullUrl);
+                            } else {
+                                throw netErr;
+                            }
+                        }
+
+                        if (!response || !response.ok) {
+                            throw new Error(response ? `Server returned HTTP ${response.status}` : 'Connection failed');
+                        }
+
+                        const contentLength = parseInt(response.headers.get('Content-Length') || '0', 10);
+                        if (response.body) {
+                            const reader = response.body.getReader();
+                            let receivedBytes = 0;
+                            let lastUpdate = 0;
+                            while (true) {
+                                const { done, value } = await reader.read();
+                                if (done) break;
+                                await writable.write(value);
+                                receivedBytes += value.length;
+                                const now = Date.now();
+                                if (now - lastUpdate > 300) {
+                                    lastUpdate = now;
+                                    if (contentLength > 0 && statusNotice) {
+                                        const pct = Math.min(100, Math.round((receivedBytes / contentLength) * 100));
+                                        const mb = (receivedBytes / (1024 * 1024)).toFixed(1);
+                                        const totalMb = (contentLength / (1024 * 1024)).toFixed(1);
+                                        statusNotice.innerHTML = `<span class="text-primary font-semibold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[16px] animate-spin">download</span> Saving: ${mb} MB / ${totalMb} MB (${pct}%)</span>`;
+                                    }
+                                }
+                            }
+                            await writable.close();
+                        } else {
+                            const blob = await response.blob();
+                            await writable.write(blob);
+                            await writable.close();
+                        }
                     }
 
                     if (statusNotice) {
-                        statusNotice.innerHTML = '<span class="text-green-400 font-bold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[18px]">check_circle</span> Saved to chosen folder! (Found directly in your chosen folder)</span>';
+                        statusNotice.innerHTML = '<span class="text-green-400 font-bold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[18px]">check_circle</span> Saved to chosen folder!</span>';
                     }
                     if (btn) {
                         btn.disabled = false;
+                        btn.classList.remove('opacity-75', 'cursor-not-allowed');
                         btn.innerHTML = '<span class="material-symbols-outlined text-[16px] text-green-400">check_circle</span> File Saved Successfully!';
                         setTimeout(() => {
                             btn.innerHTML = '<span class="material-symbols-outlined text-[16px] text-primary">folder_open</span> Choose Specific Folder (Save As...)';
                         }, 4000);
                     }
+                    isModalDownloadActive = false;
+                    if (browserBtn) {
+                        browserBtn.disabled = false;
+                        browserBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+                    }
                     return;
                 } catch (err) {
+                    isModalDownloadActive = false;
+                    if (browserBtn) {
+                        browserBtn.disabled = false;
+                        browserBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+                    }
                     if (err.name === 'AbortError') {
                         // User cancelled Finder/Explorer dialog
                         if (statusNotice) statusNotice.innerHTML = '<span class="text-on-surface-variant text-xs">Save dialog closed. Click above whenever you are ready.</span>';
                         if (btn) {
                             btn.disabled = false;
+                            btn.classList.remove('opacity-75', 'cursor-not-allowed');
                             btn.innerHTML = '<span class="material-symbols-outlined text-[16px] text-primary">folder_open</span> Choose Specific Folder (Save As...)';
                         }
                         return;
@@ -2413,10 +2653,12 @@ checkAuthSession();
             }
 
             // Fallback to direct browser download
+            isModalDownloadActive = false;
             triggerFastBrowserDownload();
         }
 
         function closeDownloadModal() {
+            isModalDownloadActive = false;
             const modal = document.getElementById('download-ready-modal');
             if (modal) modal.classList.add('hidden');
         }
@@ -2459,7 +2701,7 @@ checkAuthSession();
             <div class="flex flex-col gap-2.5">
                 <!-- Primary Action: Direct High-Speed Download (registers in Chrome download manager & history) -->
                 <button type="button" id="dl-modal-browser-btn" onclick="triggerFastBrowserDownload()" class="w-full bg-gradient-to-r from-primary to-orange-500 text-on-primary py-3.5 rounded-xl font-bold hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/25 text-sm cursor-pointer">
-                    <span class="material-symbols-outlined text-[20px]">download</span> High-Speed Download (Direct to PC/Mac)
+                    <span class="material-symbols-outlined text-[20px]">download</span> Download to Mac/PC (with Audio)
                 </button>
 
                 <!-- Secondary Action: Save to Specific Folder with Finder/Explorer -->
