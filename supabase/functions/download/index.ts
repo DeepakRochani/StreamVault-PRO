@@ -304,9 +304,7 @@ serve(async (req: Request) => {
 
         const isGoogleVideo = streamUrl.includes("googlevideo.com");
         const upstreamHeaders: Record<string, string> = {
-          "User-Agent": isGoogleVideo
-            ? "com.google.android.youtube/19.09.37 (Linux; U; Android 14) gzip"
-            : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
           "Accept": "*/*",
           "Accept-Encoding": "identity",
         };
@@ -362,14 +360,12 @@ serve(async (req: Request) => {
 
           respHeaders.set("Content-Type", finalMime);
           respHeaders.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"; filename*=UTF-8''${encodeURIComponent(customFilename)}`);
-          respHeaders.set("Access-Control-Expose-Headers", "Content-Disposition, Content-Length, Content-Range");
-          respHeaders.set("Cache-Control", "public, max-age=3600");
+          respHeaders.set("Access-Control-Expose-Headers", "Content-Disposition, Content-Length, Content-Range, Accept-Ranges");
+          respHeaders.set("Accept-Ranges", "bytes");
+          respHeaders.set("Cache-Control", "public, max-age=86400, s-maxage=86400");
 
           if (mediaRes.headers.has("content-length")) {
             respHeaders.set("Content-Length", mediaRes.headers.get("content-length")!);
-          }
-          if (mediaRes.headers.has("accept-ranges")) {
-            respHeaders.set("Accept-Ranges", mediaRes.headers.get("accept-ranges")!);
           }
           if (mediaRes.headers.has("content-range")) {
             respHeaders.set("Content-Range", mediaRes.headers.get("content-range")!);
