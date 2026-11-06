@@ -16,9 +16,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <!-- Tailwind CSS -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script type="module" src="js/config.js"></script>
-    <script type="module" src="js/config.js"></script>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="js/config.js"></script>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <!-- Tailwind Config injected from Design System -->
 <script id="tailwind-config">
       tailwind.config = {
@@ -193,27 +192,27 @@
 <div class="flex items-start justify-between relative z-10">
 <div class="flex items-center gap-4">
 <div class="w-16 h-16 rounded-full bg-surface-container-highest border border-white/10 flex items-center justify-center overflow-hidden">
-<span class="material-symbols-outlined text-4xl text-on-surface-variant">person</span>
+<span id="user-avatar-icon" class="material-symbols-outlined text-4xl text-on-surface-variant">person</span>
 </div>
 <div>
-<h3 class="font-title-md text-title-md text-on-surface">Alex Mercer</h3>
-<p class="font-mono-sm text-mono-sm text-on-surface-variant mt-1">ID: SV-8942-PRO</p>
+<h3 id="user-display-name" class="font-title-md text-title-md text-on-surface">Guest User</h3>
+<p id="user-display-id" class="font-mono-sm text-mono-sm text-on-surface-variant mt-1">Not signed in</p>
 </div>
 </div>
-<!-- Pro Badge -->
-<div class="bg-primary-container text-on-primary-container font-label-md text-label-md px-3 py-1 rounded-full uppercase tracking-widest pro-glow flex items-center gap-1">
-<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
-                        PRO
-                    </div>
+<!-- Plan Badge -->
+<div id="user-plan-badge" class="bg-white/10 text-on-surface-variant font-label-md text-label-md px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">person</span>
+    GUEST
+</div>
 </div>
 <div class="mt-5 pt-6 border-t border-white/5 flex justify-between items-center relative z-10">
 <div>
-<p class="font-body-sm text-body-sm text-on-surface-variant">Subscription active until</p>
-<p class="font-mono-sm text-mono-sm text-on-surface mt-1">Oct 24, 2025</p>
+<p id="user-sub-label" class="font-body-sm text-body-sm text-on-surface-variant">Account Status</p>
+<p id="user-sub-date" class="font-mono-sm text-mono-sm text-on-surface mt-1">Sign in to save downloads</p>
 </div>
-<button class="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors font-label-md text-label-md text-on-surface">
-                        Manage Billing
-                    </button>
+<button id="user-action-btn" class="px-4 py-2 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-bold transition-colors font-label-md text-label-md shadow-sm">
+    Sign In
+</button>
 </div>
 </section>
 
@@ -392,7 +391,101 @@
             }
         });
 
+        async function loadUserSettingsProfile() {
+            let user = null;
+
+            // 1. Try Supabase Auth Session
+            if (window.supabaseClient) {
+                try {
+                    const { data: { session } } = await window.supabaseClient.auth.getSession();
+                    if (session && session.user) {
+                        const u = session.user;
+                        const meta = u.user_metadata || {};
+                        user = {
+                            id: u.id,
+                            email: u.email,
+                            name: meta.full_name || meta.name || (u.email ? u.email.split('@')[0] : 'User'),
+                            role: meta.role || (u.email === 'admin@streamvault.com' ? 'super_admin' : 'user'),
+                            created_at: u.created_at
+                        };
+                    }
+                } catch(e) {
+                    console.warn('Supabase auth error in settings:', e);
+                }
+            }
+
+            // 2. Try Server Session with token if stored
+            if (!user) {
+                try {
+                    const token = localStorage.getItem('streamvault_admin_token');
+                    const headers = {};
+                    if (token) headers['Authorization'] = 'Bearer ' + token;
+                    const res = await fetch((window.API_BASE_URL || '') + '/api/auth/me', { headers });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.loggedIn && data.user) user = data.user;
+                    }
+                } catch(e) {}
+            }
+
+            const nameEl = document.getElementById('user-display-name');
+            const idEl = document.getElementById('user-display-id');
+            const badgeEl = document.getElementById('user-plan-badge');
+            const subLabelEl = document.getElementById('user-sub-label');
+            const subDateEl = document.getElementById('user-sub-date');
+            const actionBtn = document.getElementById('user-action-btn');
+
+            if (user) {
+                if (nameEl) nameEl.innerText = user.name || 'User';
+                if (idEl) idEl.innerText = user.email || ('ID: ' + user.id.substring(0, 8).toUpperCase());
+                
+                const isPro = user.role === 'pro' || user.role === 'super_admin' || user.role === 'admin';
+                if (badgeEl) {
+                    badgeEl.className = isPro 
+                        ? "bg-primary-container text-on-primary-container font-label-md text-label-md px-3 py-1 rounded-full uppercase tracking-widest pro-glow flex items-center gap-1"
+                        : "bg-white/10 text-on-surface font-label-md text-label-md px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1";
+                    badgeEl.innerHTML = `<span class="material-symbols-outlined text-[14px]">${isPro ? 'workspace_premium' : 'check_circle'}</span> ${isPro ? 'PRO' : 'FREE'}`;
+                }
+                if (subLabelEl) subLabelEl.innerText = isPro ? "Subscription Status" : "Account Status";
+                if (subDateEl) subDateEl.innerText = isPro ? "Active (Unlimited 4K/8K)" : "Active Free Tier";
+                if (actionBtn) {
+                    actionBtn.innerText = "View Profile";
+                    actionBtn.className = "px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors font-label-md text-label-md text-on-surface";
+                    actionBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        window.location.href = 'streamvault-profile.html';
+                    };
+                }
+            } else {
+                if (nameEl) nameEl.innerText = "Guest User";
+                if (idEl) idEl.innerText = "Not signed in";
+                if (badgeEl) {
+                    badgeEl.className = "bg-white/10 text-on-surface-variant font-label-md text-label-md px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1";
+                    badgeEl.innerHTML = `<span class="material-symbols-outlined text-[14px]">person</span> GUEST`;
+                }
+                if (subLabelEl) subLabelEl.innerText = "Account Sync";
+                if (subDateEl) subDateEl.innerText = "Sign in to save downloads";
+                if (actionBtn) {
+                    actionBtn.innerText = "Sign In";
+                    actionBtn.className = "px-4 py-2 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-bold transition-colors font-label-md text-label-md shadow-sm";
+                    actionBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        window.location.href = 'streamvault-login.html?mode=login';
+                    };
+                }
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
+            loadUserSettingsProfile();
+            if (window.supabaseClient) {
+                try {
+                    window.supabaseClient.auth.onAuthStateChange(() => {
+                        loadUserSettingsProfile();
+                    });
+                } catch(e) {}
+            }
+
             // Navigation routing
             document.querySelectorAll('.nav-home').forEach(el => {
                 el.addEventListener('click', () => { window.location.href = 'index.html'; });
@@ -404,7 +497,9 @@
                 el.addEventListener('click', () => { window.location.href = 'app-settings.html'; });
             });
             document.querySelectorAll('.btn-billing').forEach(el => {
-                el.addEventListener('click', () => { window.location.href = 'streamvault-billing.html'; });
+                el.addEventListener('click', () => { 
+                    window.location.href = window.currentUser ? 'streamvault-profile.html' : 'streamvault-login.html?mode=login'; 
+                });
             });
         });
     </script>
