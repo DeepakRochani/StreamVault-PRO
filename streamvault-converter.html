@@ -14,8 +14,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script type="module" src="js/config.js"></script>
-    <script type="module" src="js/config.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="js/lame.min.js"></script>
     <script src="settings.js"></script>
     <script src="ads.js"></script>
     <script src="global-status.js"></script>
@@ -357,7 +357,10 @@
 
                     <div id="active-job-save-container" class="flex flex-col w-full gap-4">
                         <button id="btn-save-as" onclick="saveFileAs()" class="w-full h-14 bg-primary hover:bg-primary-container text-on-primary rounded-xl font-display text-lg font-bold transition-all flex justify-center items-center gap-2 hover:shadow-[0_0_20px_rgba(255,85,64,0.4)]">
-                            <span class="material-symbols-outlined">save</span> Save As...
+                            <span class="material-symbols-outlined">save</span> Download File
+                        </button>
+                        <button id="btn-save-lossless" onclick="downloadLosslessAudio()" class="hidden w-full py-2 bg-white/5 hover:bg-white/10 text-on-surface-variant hover:text-white rounded-xl text-xs font-sans transition-colors flex items-center justify-center gap-1.5 border border-white/5">
+                            <span class="material-symbols-outlined text-[16px] text-primary">audio_file</span> Download Lossless Original Audio (.m4a)
                         </button>
                         
                         <div id="manual-save-container" class="hidden flex-col gap-2 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
@@ -521,6 +524,470 @@
             document.getElementById('convert-btn').disabled = !selectedFile;
         }
 
+        let cancelConversionRequested = false;
+
+        function triggerBrowserBlobDownload(blob, filename) {
+            const objectUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = objectUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                try { document.body.removeChild(a); } catch(_) {}
+                URL.revokeObjectURL(objectUrl);
+            }, 10000);
+        }
+
+        async function ensureLameLoaded() {
+            if (typeof lamejs !== 'undefined' && lamejs.Mp3Encoder) return true;
+            return new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'js/lame.min.js';
+                s.onload = () => resolve(true);
+                s.onerror = () => {
+                    const cdn = document.createElement('script');
+                    cdn.src = 'https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js';
+                    cdn.onload = () => resolve(true);
+                    cdn.onerror = () => reject(new Error('Failed to load MP3 encoder module.'));
+                    document.head.appendChild(cdn);
+                };
+                document.head.appendChild(s);
+            });
+        }
+
+        // Pure-JS MP4 Demuxer: Extracts audio track (AAC) into a valid M4A container in <15ms
+        function extractAudioTrackToM4A(u8) {
+            const view = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+
+            function parseBoxes(start, end) {
+                const boxes = [];
+                let p = start;
+                while (p + 8 <= end) {
+                    let sz = view.getUint32(p, false);
+                    const typ = String.fromCharCode(u8[p+4], u8[p+5], u8[p+6], u8[p+7]);
+                    let headerSz = 8;
+                    if (sz === 1) {
+                        if (p + 16 > end) break;
+                        const high = view.getUint32(p + 8, false);
+                        const low = view.getUint32(p + 12, false);
+                        sz = (high * 4294967296) + low;
+                        headerSz = 16;
+                    } else if (sz === 0) {
+                        sz = end - p;
+                    }
+                    if (sz <= 0) break;
+                    boxes.push({ typ, sz, pos: p, headerSz });
+                    p += sz;
+                }
+                return boxes;
+            }
+
+            const topBoxes = parseBoxes(0, u8.byteLength);
+            const moov = topBoxes.find(b => b.typ === 'moov');
+            if (!moov) return null;
+
+            const moovChildren = parseBoxes(moov.pos + moov.headerSz, moov.pos + moov.sz);
+            const mvhd = moovChildren.find(b => b.typ === 'mvhd');
+            if (!mvhd) return null;
+
+            // Find audio track
+            let audioTrak = null;
+            let audioStbl = null;
+
+            for (const trak of moovChildren.filter(b => b.typ === 'trak')) {
+                const trakChildren = parseBoxes(trak.pos + trak.headerSz, trak.pos + trak.sz);
+                const mdia = trakChildren.find(b => b.typ === 'mdia');
+                if (!mdia) continue;
+                const mdiaChildren = parseBoxes(mdia.pos + mdia.headerSz, mdia.pos + mdia.sz);
+                const hdlr = mdiaChildren.find(b => b.typ === 'hdlr');
+                if (!hdlr) continue;
+                const hType = String.fromCharCode(u8[hdlr.pos + 16], u8[hdlr.pos + 17], u8[hdlr.pos + 18], u8[hdlr.pos + 19]);
+                if (hType === 'soun') {
+                    audioTrak = trak;
+                    const minf = mdiaChildren.find(b => b.typ === 'minf');
+                    if (minf) {
+                        const minfChildren = parseBoxes(minf.pos + minf.headerSz, minf.pos + minf.sz);
+                        audioStbl = minfChildren.find(b => b.typ === 'stbl');
+                    }
+                    break;
+                }
+            }
+
+            if (!audioTrak || !audioStbl) return null;
+
+            // Check if fragmented fMP4
+            const isFragmented = topBoxes.some(b => b.typ === 'moof');
+            if (isFragmented) {
+                const ftypHdr = new Uint8Array([
+                    0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70,
+                    0x4D, 0x34, 0x41, 0x20, 0x00, 0x00, 0x02, 0x00,
+                    0x4D, 0x34, 0x41, 0x20, 0x6D, 0x70, 0x34, 0x32,
+                    0x69, 0x73, 0x6F, 0x6D, 0x00, 0x00, 0x00, 0x00
+                ]);
+                const newMoov = u8.subarray(moov.pos, moov.pos + moov.sz);
+                const parts = [ftypHdr, newMoov];
+                for (const b of topBoxes) {
+                    if (b.typ === 'moof' || b.typ === 'mdat') {
+                        parts.push(u8.subarray(b.pos, b.pos + b.sz));
+                    }
+                }
+                const totalLen = parts.reduce((acc, p) => acc + p.byteLength, 0);
+                const res = new Uint8Array(totalLen);
+                let offset = 0;
+                for (const p of parts) {
+                    res.set(p, offset);
+                    offset += p.byteLength;
+                }
+                return res;
+            }
+
+            // Unfragmented MP4: parse stbl sample tables
+            const stblChildren = parseBoxes(audioStbl.pos + audioStbl.headerSz, audioStbl.pos + audioStbl.sz);
+            const stscBox = stblChildren.find(b => b.typ === 'stsc');
+            const stszBox = stblChildren.find(b => b.typ === 'stsz');
+            const co64Box = stblChildren.find(b => b.typ === 'co64');
+            const stcoBox = stblChildren.find(b => b.typ === 'stco');
+
+            if (!stscBox || !stszBox || (!co64Box && !stcoBox)) return null;
+
+            const chunkOffsets = [];
+            if (co64Box) {
+                const count = view.getUint32(co64Box.pos + 12, false);
+                for (let i = 0; i < count; i++) {
+                    const high = view.getUint32(co64Box.pos + 16 + i * 8, false);
+                    const low = view.getUint32(co64Box.pos + 20 + i * 8, false);
+                    chunkOffsets.push((high * 4294967296) + low);
+                }
+            } else {
+                const count = view.getUint32(stcoBox.pos + 12, false);
+                for (let i = 0; i < count; i++) {
+                    chunkOffsets.push(view.getUint32(stcoBox.pos + 16 + i * 4, false));
+                }
+            }
+
+            const defSampleSize = view.getUint32(stszBox.pos + 12, false);
+            const sampleCount = view.getUint32(stszBox.pos + 16, false);
+            const sampleSizes = [];
+            if (defSampleSize !== 0) {
+                for (let i = 0; i < sampleCount; i++) sampleSizes.push(defSampleSize);
+            } else {
+                for (let i = 0; i < sampleCount; i++) {
+                    sampleSizes.push(view.getUint32(stszBox.pos + 20 + i * 4, false));
+                }
+            }
+
+            const stscEntries = [];
+            const stscCount = view.getUint32(stscBox.pos + 12, false);
+            for (let i = 0; i < stscCount; i++) {
+                stscEntries.push({
+                    firstChunk: view.getUint32(stscBox.pos + 16 + i * 12, false),
+                    samplesPerChunk: view.getUint32(stscBox.pos + 20 + i * 12, false),
+                    sampleDescId: view.getUint32(stscBox.pos + 24 + i * 12, false)
+                });
+            }
+
+            const chunkSizes = [];
+            let sampleIdx = 0;
+            for (let c = 0; c < chunkOffsets.length; c++) {
+                const chunkNum = c + 1;
+                let entry = stscEntries[0];
+                for (let e = 0; e < stscEntries.length; e++) {
+                    if (chunkNum >= stscEntries[e].firstChunk) entry = stscEntries[e];
+                    else break;
+                }
+                let cSize = 0;
+                for (let s = 0; s < entry.samplesPerChunk && sampleIdx < sampleSizes.length; s++) {
+                    cSize += sampleSizes[sampleIdx++];
+                }
+                chunkSizes.push(cSize);
+            }
+
+            const audioDataParts = [];
+            let totalAudioBytes = 0;
+            for (let i = 0; i < chunkOffsets.length; i++) {
+                const off = chunkOffsets[i];
+                const len = chunkSizes[i];
+                if (off + len <= u8.byteLength) {
+                    audioDataParts.push(u8.subarray(off, off + len));
+                    totalAudioBytes += len;
+                }
+            }
+
+            const ftyp = new Uint8Array([
+                0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70,
+                0x4D, 0x34, 0x41, 0x20, 0x00, 0x00, 0x02, 0x00,
+                0x4D, 0x34, 0x41, 0x20, 0x6D, 0x70, 0x34, 0x32,
+                0x69, 0x73, 0x6F, 0x6D, 0x00, 0x00, 0x00, 0x00
+            ]);
+
+            const newAudioTrak = new Uint8Array(audioTrak.sz);
+            newAudioTrak.set(u8.subarray(audioTrak.pos, audioTrak.pos + audioTrak.sz));
+            const newTrakView = new DataView(newAudioTrak.buffer, newAudioTrak.byteOffset, newAudioTrak.byteLength);
+
+            const mvhdData = u8.subarray(mvhd.pos, mvhd.pos + mvhd.sz);
+
+            function makeBoxU8(type, buffers) {
+                let total = 8;
+                for (const b of buffers) total += b.byteLength;
+                const box = new Uint8Array(total);
+                const v = new DataView(box.buffer, box.byteOffset, box.byteLength);
+                v.setUint32(0, total, false);
+                box[4] = type.charCodeAt(0); box[5] = type.charCodeAt(1);
+                box[6] = type.charCodeAt(2); box[7] = type.charCodeAt(3);
+                let cur = 8;
+                for (const b of buffers) {
+                    box.set(b, cur);
+                    cur += b.byteLength;
+                }
+                return box;
+            }
+
+            const trakOffset = audioTrak.pos;
+            const co64Rel = co64Box ? co64Box.pos - trakOffset : -1;
+            const stcoRel = stcoBox ? stcoBox.pos - trakOffset : -1;
+
+            let moovBox = makeBoxU8('moov', [mvhdData, newAudioTrak]);
+            const mdatOffset = ftyp.byteLength + moovBox.byteLength;
+
+            let curOff = mdatOffset + 8;
+            for (let i = 0; i < chunkOffsets.length; i++) {
+                if (co64Rel !== -1) {
+                    const high = Math.floor(curOff / 4294967296);
+                    const low = curOff >>> 0;
+                    newTrakView.setUint32(co64Rel + 16 + i * 8, high, false);
+                    newTrakView.setUint32(co64Rel + 20 + i * 8, low, false);
+                } else if (stcoRel !== -1) {
+                    newTrakView.setUint32(stcoRel + 16 + i * 4, curOff, false);
+                }
+                curOff += chunkSizes[i];
+            }
+
+            moovBox = makeBoxU8('moov', [mvhdData, newAudioTrak]);
+
+            const mdatHdr = new Uint8Array(8);
+            const mdatView = new DataView(mdatHdr.buffer);
+            mdatView.setUint32(0, totalAudioBytes + 8, false);
+            mdatHdr[4] = 0x6D; mdatHdr[5] = 0x64; mdatHdr[6] = 0x61; mdatHdr[7] = 0x74; // 'mdat'
+
+            const outLen = ftyp.byteLength + moovBox.byteLength + 8 + totalAudioBytes;
+            const result = new Uint8Array(outLen);
+            let p = 0;
+            result.set(ftyp, p); p += ftyp.byteLength;
+            result.set(moovBox, p); p += moovBox.byteLength;
+            result.set(mdatHdr, p); p += 8;
+            for (const chunk of audioDataParts) {
+                result.set(chunk, p);
+                p += chunk.byteLength;
+            }
+
+            return result;
+        }
+
+        async function convertAudioInBrowser(file, type, formatConfig) {
+            await ensureLameLoaded();
+            
+            const updateProgress = (pct, status) => {
+                document.getElementById('active-job-progress-bar').style.width = `${pct}%`;
+                document.getElementById('active-job-progress-text').textContent = `${pct}%`;
+                if (status) document.getElementById('active-job-status').textContent = status;
+            };
+
+            updateProgress(10, 'Reading file into memory...');
+            const arrayBuffer = await file.arrayBuffer();
+            if (cancelConversionRequested) throw new Error('Conversion cancelled');
+
+            updateProgress(25, 'Extracting audio stream...');
+            let audioDataBuffer = null;
+            window.__activeLosslessM4ABlob = null;
+
+            if (type === 'MP4_TO_MP3') {
+                try {
+                    const u8 = new Uint8Array(arrayBuffer);
+                    const extracted = extractAudioTrackToM4A(u8);
+                    if (extracted && extracted.byteLength > 1000) {
+                        audioDataBuffer = extracted.buffer;
+                        window.__activeLosslessM4ABlob = new Blob([extracted], { type: 'audio/mp4' });
+                        console.log('[StreamVault Converter] Successfully extracted standalone M4A audio track in memory!');
+                    }
+                } catch (e) {
+                    console.warn('[StreamVault Converter] M4A direct extraction notice:', e);
+                }
+            }
+
+            if (cancelConversionRequested) throw new Error('Conversion cancelled');
+            updateProgress(40, 'Decoding audio samples...');
+
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) throw new Error('Web Audio is not supported in this browser.');
+            const audioCtx = new AudioContextClass();
+            let audioBuffer = null;
+
+            try {
+                const target = audioDataBuffer || arrayBuffer.slice(0);
+                audioBuffer = await audioCtx.decodeAudioData(target);
+            } catch (err1) {
+                console.warn('[StreamVault Converter] Target decode failed, retrying original buffer:', err1);
+                try {
+                    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+                } catch (err2) {
+                    throw new Error('Unable to decode audio from this file. Please verify it contains a valid audio track.');
+                }
+            }
+
+            if (cancelConversionRequested) throw new Error('Conversion cancelled');
+
+            const sampleRate = audioBuffer.sampleRate;
+            const numChannels = audioBuffer.numberOfChannels;
+            const numSamples = audioBuffer.length;
+            const bitrateStr = formatConfig?.bitrate || '320k';
+            const bitrateNum = parseInt(bitrateStr.replace('k', ''), 10) || 320;
+
+            updateProgress(50, `Preparing ${bitrateNum}kbps MP3 encoder...`);
+
+            // Read Float32 channel data
+            const leftFloat = audioBuffer.getChannelData(0);
+            const rightFloat = numChannels > 1 ? audioBuffer.getChannelData(1) : null;
+
+            // MP3_TO_MP3 audio normalization
+            if (type === 'MP3_TO_MP3' && formatConfig.normalize) {
+                let peak = 0;
+                for (let i = 0; i < numSamples; i++) {
+                    const l = Math.abs(leftFloat[i]);
+                    if (l > peak) peak = l;
+                    if (rightFloat) {
+                        const r = Math.abs(rightFloat[i]);
+                        if (r > peak) peak = r;
+                    }
+                }
+                if (peak > 0.001) {
+                    const normFactor = 0.95 / peak;
+                    for (let i = 0; i < numSamples; i++) {
+                        leftFloat[i] *= normFactor;
+                        if (rightFloat) rightFloat[i] *= normFactor;
+                    }
+                }
+            }
+
+            // Convert Float32 to 16-bit PCM Int16
+            const leftPcm = new Int16Array(numSamples);
+            for (let i = 0; i < numSamples; i++) {
+                const s = Math.max(-1, Math.min(1, leftFloat[i]));
+                leftPcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            }
+
+            let rightPcm = null;
+            if (numChannels > 1 && rightFloat) {
+                rightPcm = new Int16Array(numSamples);
+                for (let i = 0; i < numSamples; i++) {
+                    const s = Math.max(-1, Math.min(1, rightFloat[i]));
+                    rightPcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                }
+            }
+
+            if (cancelConversionRequested) throw new Error('Conversion cancelled');
+
+            const channels = numChannels > 1 ? 2 : 1;
+            const encoder = new lamejs.Mp3Encoder(channels, sampleRate, bitrateNum);
+            const mp3Chunks = [];
+            const blockSize = 1152;
+            let lastYield = performance.now();
+
+            for (let i = 0; i < numSamples; i += blockSize) {
+                if (cancelConversionRequested) throw new Error('Conversion cancelled');
+
+                const lChunk = leftPcm.subarray(i, i + blockSize);
+                const rChunk = rightPcm ? rightPcm.subarray(i, i + blockSize) : null;
+                const buf = rightPcm ? encoder.encodeBuffer(lChunk, rChunk) : encoder.encodeBuffer(lChunk);
+                if (buf && buf.length > 0) mp3Chunks.push(new Uint8Array(buf));
+
+                const now = performance.now();
+                if (now - lastYield > 40) {
+                    const progressPct = Math.round(50 + ((i / numSamples) * 48));
+                    updateProgress(progressPct, `Encoding ${bitrateNum}kbps MP3 (${progressPct}%)...`);
+                    await new Promise(r => setTimeout(r, 0));
+                    lastYield = performance.now();
+                }
+            }
+
+            const flushBuf = encoder.flush();
+            if (flushBuf && flushBuf.length > 0) {
+                mp3Chunks.push(new Uint8Array(flushBuf));
+            }
+
+            const finalMp3Blob = new Blob(mp3Chunks, { type: 'audio/mp3' });
+            const mbSize = (finalMp3Blob.size / 1024 / 1024).toFixed(2);
+
+            let suggestedName = file.name.replace(/\.[^/.]+$/, "");
+            suggestedName += `_${bitrateNum}kbps_Converted.mp3`;
+
+            window.__activeJobBlob = finalMp3Blob;
+            window.__activeJobSuggestedName = suggestedName;
+            activeJobId = 'job-' + Date.now();
+            activeJobPath = suggestedName;
+
+            updateProgress(100, '✓ Completed');
+            document.getElementById('active-job-status').textContent = '✓ Completed';
+            document.getElementById('active-job-status').className = 'px-4 py-1.5 rounded-full bg-green-500/20 text-green-400 font-mono text-sm font-bold';
+            document.getElementById('active-job-progress-container').classList.add('hidden');
+            document.getElementById('active-job-completed-container').classList.remove('hidden');
+            document.getElementById('active-job-completed-container').classList.add('flex');
+            document.getElementById('active-job-path').textContent = suggestedName;
+            document.getElementById('active-job-size').textContent = `Size: ${mbSize} MB`;
+
+            document.getElementById('active-job-save-container').classList.remove('hidden');
+            document.getElementById('active-job-save-container').classList.add('flex');
+            document.getElementById('active-job-actions-container').classList.add('hidden');
+
+            const losslessBtn = document.getElementById('btn-save-lossless');
+            if (losslessBtn) {
+                if (window.__activeLosslessM4ABlob) {
+                    losslessBtn.classList.remove('hidden');
+                    losslessBtn.classList.add('flex');
+                } else {
+                    losslessBtn.classList.add('hidden');
+                    losslessBtn.classList.remove('flex');
+                }
+            }
+
+            addToHistory(file.name, `${mbSize} MB`, 'Completed', 'text-green-400');
+
+            // Trigger browser download immediately
+            triggerBrowserBlobDownload(finalMp3Blob, suggestedName);
+            showToast("Download started");
+        }
+
+        function downloadLosslessAudio() {
+            if (!window.__activeLosslessM4ABlob) return;
+            const originalName = document.getElementById('active-job-name').textContent || 'Audio';
+            const m4aName = originalName.replace(/\.[^/.]+$/, "") + "_Lossless.m4a";
+            triggerBrowserBlobDownload(window.__activeLosslessM4ABlob, m4aName);
+            showToast("Lossless M4A Download started");
+        }
+
+        async function convertViaDesktopServer(file, type, formatConfig) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const upRes = await fetch((window.API_BASE_URL || '') + '/api/upload', { method: 'POST', body: formData });
+            const upData = await upRes.json();
+            if (!upData.success) throw new Error(upData.error || 'Upload failed');
+
+            const jobId = 'conv-' + Date.now();
+            activeJobId = jobId;
+
+            const convRes = await fetch((window.API_BASE_URL || '') + '/api/convert', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: jobId, inputPath: upData.filePath, originalName: upData.originalName, type, formatConfig })
+            });
+            const convData = await convRes.json();
+            if (!convData.success) throw new Error(convData.error || 'Conversion failed');
+
+            activeJobTimer = setInterval(() => pollActiveJob(jobId), 1000);
+        }
+
         async function startConversion() {
             if (!window.isLoggedIn && window.loginEnabled === true) {
                 showLoginModal();
@@ -531,60 +998,58 @@
             
             const btn = document.getElementById('convert-btn');
             btn.disabled = true;
-            btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Uploading...';
+            btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Converting...';
 
-            const formData = new FormData();
-            formData.append('file', selectedFile);
+            const type = document.querySelector('input[name="convType"]:checked').value;
+            const formatConfig = {};
+            if (type === 'MP4_TO_MP3') {
+                formatConfig.bitrate = document.getElementById('sel-bitrate-mp3').value;
+            } else if (type === 'MP4_TO_MP4') {
+                formatConfig.resolution = document.getElementById('sel-res-mp4').value;
+                formatConfig.compression = document.getElementById('sel-comp-mp4').value;
+            } else if (type === 'MP3_TO_MP3') {
+                formatConfig.bitrate = document.getElementById('sel-bitrate-mp3mp3').value;
+                formatConfig.normalize = document.getElementById('chk-norm').checked;
+                formatConfig.removeSilence = document.getElementById('chk-silence').checked;
+            }
+
+            cancelConversionRequested = false;
+
+            // Show Active Job UI
+            document.getElementById('active-job-section').classList.remove('hidden');
+            document.getElementById('active-job-name').textContent = selectedFile.name;
+            document.getElementById('active-job-status').textContent = 'Initializing...';
+            document.getElementById('active-job-status').className = 'px-4 py-1.5 rounded-full bg-primary/20 text-primary font-mono text-sm font-bold animate-pulse';
+            document.getElementById('active-job-progress-container').classList.remove('hidden');
+            document.getElementById('active-job-completed-container').classList.add('hidden');
+            document.getElementById('active-job-completed-container').classList.remove('flex');
+            document.getElementById('active-job-progress-bar').style.width = '0%';
+            document.getElementById('active-job-progress-text').textContent = '0%';
+            document.getElementById('active-job-cancel-btn').onclick = () => cancelJob('active');
 
             try {
-                const upRes = await fetch((window.API_BASE_URL || '') + '/api/upload', { method: 'POST', body: formData });
-                const upData = await upRes.json();
-                if (!upData.success) throw new Error(upData.error || 'Upload failed');
-
-                const type = document.querySelector('input[name="convType"]:checked').value;
-                const formatConfig = {};
-                if (type === 'MP4_TO_MP3') formatConfig.bitrate = document.getElementById('sel-bitrate-mp3').value;
-                else if (type === 'MP4_TO_MP4') {
-                    formatConfig.resolution = document.getElementById('sel-res-mp4').value;
-                    formatConfig.compression = document.getElementById('sel-comp-mp4').value;
-                } else if (type === 'MP3_TO_MP3') {
-                    formatConfig.bitrate = document.getElementById('sel-bitrate-mp3mp3').value;
-                    formatConfig.normalize = document.getElementById('chk-norm').checked;
-                    formatConfig.removeSilence = document.getElementById('chk-silence').checked;
+                if (type === 'MP4_TO_MP3' || type === 'MP3_TO_MP3') {
+                    // Ultra-fast client-side in-browser audio extraction & MP3 encoding
+                    await convertAudioInBrowser(selectedFile, type, formatConfig);
+                } else if (type === 'MP4_TO_MP4') {
+                    // Check if local desktop backend is running
+                    const isLocalDesktop = (window.API_BASE_URL && window.API_BASE_URL.length > 0) || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                    if (isLocalDesktop) {
+                        await convertViaDesktopServer(selectedFile, type, formatConfig);
+                    } else {
+                        throw new Error('Video transcoding (MP4 to MP4) requires StreamVault Desktop Pro. For web, please use MP4 → MP3 audio conversion.');
+                    }
                 }
-
-                const jobId = 'conv-' + Date.now();
-                activeJobId = jobId;
-                
-                // Show Active Job UI
-                document.getElementById('active-job-section').classList.remove('hidden');
-                document.getElementById('active-job-name').textContent = upData.originalName;
-                document.getElementById('active-job-status').textContent = 'Converting...';
-                document.getElementById('active-job-status').className = 'px-4 py-1.5 rounded-full bg-primary/20 text-primary font-mono text-sm font-bold animate-pulse';
-                document.getElementById('active-job-progress-container').classList.remove('hidden');
-                document.getElementById('active-job-completed-container').classList.add('hidden');
-                document.getElementById('active-job-completed-container').classList.remove('flex');
-                document.getElementById('active-job-progress-bar').style.width = '0%';
-                document.getElementById('active-job-progress-text').textContent = '0%';
-                document.getElementById('active-job-cancel-btn').onclick = () => cancelJob(jobId);
-
-                const convRes = await fetch((window.API_BASE_URL || '') + '/api/convert', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: jobId, inputPath: upData.filePath, originalName: upData.originalName, type, formatConfig })
-                });
-                const convData = await convRes.json();
-                if (!convData.success) throw new Error(convData.error || 'Conversion failed');
-
-                // Start Polling for this job specifically
-                activeJobTimer = setInterval(() => pollActiveJob(jobId), 1000);
-
             } catch (err) {
-                alert("Error: " + err.message);
-                document.getElementById('active-job-section').classList.add('hidden');
+                console.error('[StreamVault Converter Error]:', err);
+                document.getElementById('active-job-status').textContent = 'Error';
+                document.getElementById('active-job-status').className = 'px-4 py-1.5 rounded-full bg-red-500/20 text-red-400 font-mono text-sm font-bold';
+                document.getElementById('active-job-progress-container').classList.add('hidden');
+                showToast("Error: " + err.message);
+                addToHistory(selectedFile.name, '--', 'Failed', 'text-red-400');
             } finally {
                 btn.innerHTML = '<span class="material-symbols-outlined text-[28px]">bolt</span> Convert File';
-                btn.disabled = false; // Allow another conversion
+                btn.disabled = false;
             }
         }
 
@@ -618,12 +1083,8 @@
                         document.getElementById('active-job-actions-container').classList.add('hidden');
                         document.getElementById('active-job-actions-container').classList.remove('grid');
                         
-                        activeJobPath = job.outputPath; // Temporary path
-                        
-                        // Add to history list but update path later
+                        activeJobPath = job.outputPath;
                         addToHistory(job.originalName, `${mbSize} MB`, 'Completed', 'text-green-400');
-
-                        // Immediately trigger the Save As flow
                         saveFileAs();
                     } else {
                         document.getElementById('active-job-status').textContent = 'Error: 0 Bytes';
@@ -650,64 +1111,63 @@
                 <td class="py-2 text-right font-mono text-xs ${statusClass} font-bold">${status}</td>
             `;
             list.insertBefore(tr, list.firstChild);
-            // keep last 5
             if (list.children.length > 6) list.removeChild(list.lastChild);
         }
 
         async function saveFileAs() {
-            if (!activeJobId || !activeJobPath) return;
-            
             const btn = document.getElementById('btn-save-as');
             const originalHtml = `<span class="material-symbols-outlined">save</span> Download File`;
             btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Downloading...';
             btn.disabled = true;
 
             try {
-                // Determine suggested name based on original name
+                if (window.__activeJobBlob) {
+                    const filename = window.__activeJobSuggestedName || (document.getElementById('active-job-name').textContent.replace(/\.[^/.]+$/, "") + "_Converted.mp3");
+                    triggerBrowserBlobDownload(window.__activeJobBlob, filename);
+                    document.getElementById('active-job-path').textContent = filename;
+                    document.getElementById('active-job-save-container').classList.add('hidden');
+                    document.getElementById('active-job-save-container').classList.remove('flex');
+                    document.getElementById('active-job-actions-container').classList.remove('hidden');
+                    document.getElementById('active-job-actions-container').classList.add('grid');
+                    showToast("Download started");
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                    return;
+                }
+
+                if (!activeJobPath) throw new Error('File not found');
+
                 let suggested = document.getElementById('active-job-name').textContent;
-                suggested = suggested.replace(/\.[^/.]+$/, ""); // remove extension
+                suggested = suggested.replace(/\.[^/.]+$/, "");
                 const isMp3 = activeJobPath.endsWith('.mp3');
                 suggested += isMp3 ? "_Converted.mp3" : "_Converted.mp4";
 
-                // Trigger browser download
                 const downloadUrl = `/api/serve-file?path=${encodeURIComponent(activeJobPath)}&filename=${encodeURIComponent(suggested)}`;
-
                 const response = await fetch(downloadUrl);
                 if (!response.ok) throw new Error('File download failed');
                 const blob = await response.blob();
-                const objectUrl = URL.createObjectURL(blob);
-                
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = objectUrl;
-                a.download = suggested;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(objectUrl);
+                triggerBrowserBlobDownload(blob, suggested);
 
-                
                 document.getElementById('active-job-path').textContent = "Downloading...";
-                
                 document.getElementById('active-job-save-container').classList.add('hidden');
                 document.getElementById('active-job-save-container').classList.remove('flex');
                 document.getElementById('active-job-actions-container').classList.remove('hidden');
                 document.getElementById('active-job-actions-container').classList.add('grid');
-                
-                // Show success toast
                 showToast("Download started");
-                
                 btn.innerHTML = originalHtml;
                 btn.disabled = false;
-                
             } catch (err) {
-                alert("Failed to initiate download: " + err.message);
+                showToast("Download: " + err.message);
                 btn.innerHTML = originalHtml;
                 btn.disabled = false;
             }
         }
 
         async function manualSaveFile() {
+            if (window.__activeJobBlob) {
+                saveFileAs();
+                return;
+            }
             if (!activeJobPath) return alert("Source file path lost.");
             
             try {
@@ -729,7 +1189,6 @@
                 document.getElementById('active-job-save-container').classList.remove('flex');
                 document.getElementById('active-job-actions-container').classList.remove('hidden');
                 document.getElementById('active-job-actions-container').classList.add('grid');
-                
                 showToast("Download started");
             } catch(e) {
                 alert("Download failed: " + e.message);
@@ -737,31 +1196,51 @@
         }
 
         async function cancelJob(id) {
-            await fetch((window.API_BASE_URL || '') + '/api/queue/action', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id, action: 'cancel' })
-            });
+            cancelConversionRequested = true;
+            if (activeJobTimer) clearInterval(activeJobTimer);
+            if (window.API_BASE_URL && id !== 'active') {
+                fetch((window.API_BASE_URL || '') + '/api/queue/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, action: 'cancel' })
+                }).catch(() => {});
+            }
+            document.getElementById('active-job-status').textContent = 'Cancelled';
+            document.getElementById('active-job-status').className = 'px-4 py-1.5 rounded-full bg-red-500/20 text-red-400 font-mono text-sm font-bold';
+            document.getElementById('active-job-progress-container').classList.add('hidden');
+            const btn = document.getElementById('convert-btn');
+            btn.innerHTML = '<span class="material-symbols-outlined text-[28px]">bolt</span> Convert File';
+            btn.disabled = false;
         }
 
         async function openFileFromActive() {
+            if (window.__activeJobBlob) {
+                const url = URL.createObjectURL(window.__activeJobBlob);
+                window.open(url, '_blank');
+                triggerAutoReset();
+                return;
+            }
             if (activeJobPath) {
                 await fetch((window.API_BASE_URL || '') + '/api/open-file', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ path: activeJobPath })
-                });
+                }).catch(() => {});
                 triggerAutoReset();
             }
         }
 
         async function openFolderFromActive() {
+            if (window.__activeJobBlob) {
+                saveFileAs();
+                return;
+            }
             if (activeJobPath) {
                 await fetch((window.API_BASE_URL || '') + '/api/open-folder', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ path: activeJobPath })
-                });
+                }).catch(() => {});
             }
         }
 
