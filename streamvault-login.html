@@ -125,6 +125,13 @@
             <button onclick="toggleAuthMode()" id="toggle-btn" class="text-primary hover:text-primary-container font-bold transition-colors">Sign up</button>
         </p>
 
+        <div class="mt-4 pt-3 border-t border-white/5 text-center">
+            <a href="streamvault-admin-login.html" class="text-xs text-on-surface-variant/70 hover:text-primary transition-colors inline-flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[15px]">admin_panel_settings</span>
+                <span>Administrator Portal</span>
+            </a>
+        </div>
+
     </div>
 
     <!-- Go Back -->
@@ -166,9 +173,9 @@
             e.preventDefault();
             const btn = document.getElementById('submit-btn');
             
-            const email = document.getElementById('email').value;
+            const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
-            const name = document.getElementById('name').value;
+            const name = document.getElementById('name').value.trim();
             const confirmPass = document.getElementById('confirm-password').value;
             
             if (!isLogin && password !== confirmPass) {
@@ -180,26 +187,76 @@
 
             btn.disabled = true;
             btn.innerText = 'Please wait...';
-            
-            const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+
+            // Special check: Admin credentials route to Admin Portal
+            if (email.toLowerCase() === 'admin@streamvault.com') {
+                try {
+                    const res = await fetch((window.API_BASE_URL || '') + '/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+                    const data = await res.json();
+                    if (data.success && data.user && (data.user.role === 'super_admin' || data.user.role === 'admin')) {
+                        if (data.token) localStorage.setItem('streamvault_admin_token', data.token);
+                        if (data.user) localStorage.setItem('streamvault_admin_user', JSON.stringify(data.user));
+                        window.location.href = 'streamvault-admin.html';
+                        return;
+                    } else {
+                        throw new Error(data.error || 'Invalid administrator credentials');
+                    }
+                } catch(adminErr) {
+                    const msg = document.getElementById('error-msg');
+                    msg.innerText = adminErr.message;
+                    msg.classList.remove('hidden');
+                    btn.disabled = false;
+                    btn.innerText = 'Sign In';
+                    return;
+                }
+            }
 
             try {
-                const res = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password, name })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    const redirect = sessionStorage.getItem('redirectUrl') || 'index.html';
-                    sessionStorage.removeItem('redirectUrl');
-                    window.location.href = redirect;
+                // Real User Authentication with Supabase
+                if (window.supabaseClient) {
+                    if (isLogin) {
+                        const { data, error } = await window.supabaseClient.auth.signInWithPassword({
+                            email,
+                            password
+                        });
+                        if (error) throw error;
+                    } else {
+                        const { data, error } = await window.supabaseClient.auth.signUp({
+                            email,
+                            password,
+                            options: {
+                                data: {
+                                    full_name: name || (email ? email.split('@')[0] : 'User'),
+                                    name: name || (email ? email.split('@')[0] : 'User')
+                                }
+                            }
+                        });
+                        if (error) throw error;
+                        if (data.user && !data.session) {
+                            alert("Account created successfully! If confirmation email is required, please check your inbox.");
+                        }
+                    }
                 } else {
-                    throw new Error(data.error || 'Authentication failed');
+                    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password, name })
+                    });
+                    const data = await res.json();
+                    if (!data.success) throw new Error(data.error || 'Authentication failed');
                 }
+
+                const redirect = sessionStorage.getItem('redirectUrl') || 'index.html';
+                sessionStorage.removeItem('redirectUrl');
+                window.location.href = redirect;
             } catch (err) {
                 const msg = document.getElementById('error-msg');
-                msg.innerText = err.message;
+                msg.innerText = err.message || 'Authentication failed';
                 msg.classList.remove('hidden');
                 btn.disabled = false;
                 btn.innerText = isLogin ? 'Sign In' : 'Create Account';
@@ -209,7 +266,7 @@
         async function handleGoogleLogin() {
             try {
                 if (window.supabaseClient) {
-                    const redirectUrl = window.location.origin + '/streamvault-dashboard.html';
+                    const redirectUrl = window.location.origin + '/index.html';
                     const { data, error } = await window.supabaseClient.auth.signInWithOAuth({
                         provider: 'google',
                         options: {
@@ -244,7 +301,7 @@
                 try {
                     const { data: { session } } = await window.supabaseClient.auth.getSession();
                     if (session && session.user) {
-                        const redirect = sessionStorage.getItem('redirectUrl') || 'streamvault-dashboard.html';
+                        const redirect = sessionStorage.getItem('redirectUrl') || 'index.html';
                         sessionStorage.removeItem('redirectUrl');
                         window.location.href = redirect;
                     }

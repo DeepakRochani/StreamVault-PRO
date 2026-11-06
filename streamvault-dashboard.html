@@ -553,8 +553,17 @@
         }
 
         async function logout() {
-            await fetch((window.API_BASE_URL || '') + '/api/auth/logout', { method: 'POST' });
-            window.location.href = 'streamvault-login.html';
+            if (window.supabaseClient) {
+                try { await window.supabaseClient.auth.signOut(); } catch(e) {}
+            }
+            try {
+                await fetch((window.API_BASE_URL || '') + '/api/auth/logout', { method: 'POST' });
+            } catch(e) {}
+            try {
+                localStorage.removeItem('streamvault_admin_token');
+                localStorage.removeItem('streamvault_admin_user');
+            } catch(e) {}
+            window.location.href = 'index.html';
         }
 
         // Init App

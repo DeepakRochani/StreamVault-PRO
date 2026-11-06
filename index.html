@@ -250,7 +250,7 @@
     </div>
 
     <div class="flex items-center gap-2">
-        <a href="streamvault-admin-login.html" class="p-2 rounded-xl hover:bg-white/5 text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1 text-xs font-bold border border-white/5" title="Admin Portal">
+        <a id="admin-nav-btn" href="streamvault-admin-login.html" class="hidden p-2 rounded-xl hover:bg-white/5 text-primary hover:text-primary-container transition-colors items-center gap-1 text-xs font-bold border border-primary/20 bg-primary/10" title="Admin Portal">
             <span class="material-symbols-outlined text-[18px]">admin_panel_settings</span>
             <span class="hidden sm:inline">Admin</span>
         </a>
@@ -269,14 +269,14 @@
             <a href="streamvault-profile.html" class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 text-sm text-on-surface transition-colors">
                 <span class="material-symbols-outlined text-[18px] text-primary">person</span> My Profile
             </a>
-            <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 text-sm text-on-surface transition-colors">
-                <span class="material-symbols-outlined text-[18px] text-secondary">download</span> My Downloads
+            <a href="streamvault-dashboard.html" class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 text-sm text-on-surface transition-colors">
+                <span class="material-symbols-outlined text-[18px] text-secondary">dashboard</span> Dashboard
             </a>
             <a href="streamvault-converter.html" class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 text-sm text-on-surface transition-colors">
-                <span class="material-symbols-outlined text-[18px] text-green-400">movie_edit</span> My Conversions
+                <span class="material-symbols-outlined text-[18px] text-green-400">movie_edit</span> Converter
             </a>
-            <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 text-sm text-on-surface transition-colors">
-                <span class="material-symbols-outlined text-[18px] text-on-surface-variant">settings</span> Settings
+            <a id="ud-admin-link" href="streamvault-admin.html" class="hidden flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 text-sm text-primary transition-colors font-bold">
+                <span class="material-symbols-outlined text-[18px]">admin_panel_settings</span> Admin Panel
             </a>
         </div>
         <div class="p-2 border-t border-white/10">
@@ -340,66 +340,135 @@
     });
 
     async function logout() {
-        await fetch((window.API_BASE_URL || '') + '/api/auth/logout', { method: 'POST' });
-        window.location.href = 'streamvault-welcome.html';
+        if (window.supabaseClient) {
+            try { await window.supabaseClient.auth.signOut(); } catch(e) {}
+        }
+        try {
+            await fetch((window.API_BASE_URL || '') + '/api/auth/logout', { method: 'POST' });
+        } catch(e) {}
+        try {
+            localStorage.removeItem('streamvault_admin_token');
+            localStorage.removeItem('streamvault_admin_user');
+            localStorage.removeItem('user');
+        } catch(e) {}
+        window.location.reload();
     }
 
     window.isLoggedIn = false;
+    window.currentUser = null;
+
     async function checkAuthSession() {
+        let user = null;
+
+        // 1. Prioritize Supabase Auth Session (Google OAuth or Email/Password)
         if (window.supabaseClient) {
             try {
                 const { data: { session } } = await window.supabaseClient.auth.getSession();
-                if (session && session.access_token) {
-                    await fetch((window.API_BASE_URL || '') + '/api/auth/supabase-sync', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ access_token: session.access_token })
-                    });
+                if (session && session.user) {
+                    const u = session.user;
+                    const meta = u.user_metadata || {};
+                    const fullName = meta.full_name || meta.name || '';
+                    user = {
+                        id: u.id,
+                        email: u.email,
+                        name: fullName || (u.email ? u.email.split('@')[0] : 'User'),
+                        role: meta.role || (u.email === 'admin@streamvault.com' ? 'super_admin' : 'user'),
+                        created_at: u.created_at,
+                        notifications: []
+                    };
                 }
             } catch (err) {
                 console.warn('Supabase OAuth check:', err);
             }
         }
         
-        try {
-            const r = await fetch((window.API_BASE_URL || '') + '/api/auth/me');
-            const data = await r.json();
-            window.isLoggedIn = data.loggedIn;
-            if(data.loggedIn) {
-            authBtn.onclick = toggleMenu;
-            authBtn.className = "w-10 h-10 rounded-xl bg-primary-container/20 flex items-center justify-center border border-primary/20 text-primary font-bold hover:bg-primary-container/30 transition-colors";
-            authBtn.innerHTML = (data.user.name || data.user.email).substring(0, 2).toUpperCase();
+        // 2. If no Supabase user, check server session (/api/auth/me) with token if present
+        if (!user) {
+            try {
+                const token = localStorage.getItem('streamvault_admin_token');
+                const headers = {};
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                const r = await fetch((window.API_BASE_URL || '') + '/api/auth/me', { headers });
+                if (r.ok) {
+                    const data = await r.json();
+                    if (data && data.loggedIn && data.user) {
+                        user = data.user;
+                    }
+                }
+            } catch (err) {
+                console.warn('Server session check notice:', err);
+            }
+        }
+
+        const authBtn = document.getElementById('auth-btn');
+        const adminBtn = document.getElementById('admin-nav-btn');
+        const adminFooterBtn = document.getElementById('admin-footer-btn');
+        const udAdminLink = document.getElementById('ud-admin-link');
+
+        if (user) {
+            window.isLoggedIn = true;
+            window.currentUser = user;
+
+            if (authBtn) {
+                authBtn.onclick = toggleMenu;
+                authBtn.className = "w-10 h-10 rounded-xl bg-primary-container/20 flex items-center justify-center border border-primary/20 text-primary font-bold hover:bg-primary-container/30 transition-colors shadow-sm";
+                const initials = (user.name || user.email || 'U').substring(0, 2).toUpperCase();
+                authBtn.innerHTML = initials;
+                authBtn.title = user.name || user.email;
+            }
             
-            document.getElementById('ud-name').innerText = data.user.name || 'User';
-            document.getElementById('ud-email').innerText = data.user.email;
+            const udName = document.getElementById('ud-name');
+            if (udName) udName.innerText = user.name || 'User';
+            const udEmail = document.getElementById('ud-email');
+            if (udEmail) udEmail.innerText = user.email || '';
+
+            // Check if user is actually admin
+            const isAdmin = user.role === 'admin' || user.role === 'super_admin' || user.email === 'admin@streamvault.com';
+            if (adminBtn) {
+                if (isAdmin) adminBtn.classList.remove('hidden');
+                else adminBtn.classList.add('hidden');
+            }
+            if (adminFooterBtn) {
+                if (isAdmin) adminFooterBtn.classList.remove('hidden');
+                else adminFooterBtn.classList.add('hidden');
+            }
+            if (udAdminLink) {
+                if (isAdmin) udAdminLink.classList.remove('hidden');
+                else udAdminLink.classList.add('hidden');
+            }
 
             // Load Notifications
-            document.getElementById('notif-container').classList.remove('hidden');
-            const notifs = data.user.notifications || [];
-            if(notifs.length > 0) {
+            const notifContainer = document.getElementById('notif-container');
+            if (notifContainer) notifContainer.classList.remove('hidden');
+            const notifs = user.notifications || [];
+            if (notifs.length > 0) {
                 const badge = document.getElementById('notif-badge');
-                badge.classList.remove('hidden');
-                badge.innerText = notifs.length;
-                badge.className = "absolute top-1 right-1 w-4 h-4 text-[9px] font-bold bg-primary text-on-primary rounded-full flex items-center justify-center";
+                if (badge) {
+                    badge.classList.remove('hidden');
+                    badge.innerText = notifs.length;
+                    badge.className = "absolute top-1 right-1 w-4 h-4 text-[9px] font-bold bg-primary text-on-primary rounded-full flex items-center justify-center";
+                }
                 
                 const list = document.getElementById('notif-list');
-                list.innerHTML = '';
-                notifs.forEach(n => {
-                    const icon = n.priority === 'high' ? 'warning' : 'info';
-                    const col = n.priority === 'high' ? 'text-red-400' : 'text-primary';
-                    list.innerHTML += `
-                        <div class="p-4 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer bg-primary/5" onclick="markRead('${n.id}', this)">
-                            <div class="flex gap-3">
-                                <span class="material-symbols-outlined mt-0.5 ${col} text-[20px]">${icon}</span>
-                                <div>
-                                    <p class="font-bold text-sm text-on-surface">${n.title}</p>
-                                    <p class="text-xs text-on-surface-variant mt-1 leading-relaxed">${n.message}</p>
-                                    <p class="text-[10px] text-on-surface-variant mt-2">${new Date(n.created_at).toLocaleDateString()}</p>
+                if (list) {
+                    list.innerHTML = '';
+                    notifs.forEach(n => {
+                        const icon = n.priority === 'high' ? 'warning' : 'info';
+                        const col = n.priority === 'high' ? 'text-red-400' : 'text-primary';
+                        list.innerHTML += `
+                            <div class="p-4 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer bg-primary/5" onclick="markRead('${n.id}', this)">
+                                <div class="flex gap-3">
+                                    <span class="material-symbols-outlined mt-0.5 ${col} text-[20px]">${icon}</span>
+                                    <div>
+                                        <p class="font-bold text-sm text-on-surface">${n.title}</p>
+                                        <p class="text-xs text-on-surface-variant mt-1 leading-relaxed">${n.message}</p>
+                                        <p class="text-[10px] text-on-surface-variant mt-2">${new Date(n.created_at).toLocaleDateString()}</p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    `;
-                });
+                        `;
+                    });
+                }
             }
 
             // Auto-Resume Workflow
@@ -418,6 +487,18 @@
             }
         } else {
             // Guest Mode
+            window.isLoggedIn = false;
+            window.currentUser = null;
+
+            if (adminBtn) adminBtn.classList.add('hidden');
+            if (adminFooterBtn) adminFooterBtn.classList.add('hidden');
+            if (udAdminLink) udAdminLink.classList.add('hidden');
+
+            if (authBtn) {
+                authBtn.onclick = () => window.location.href = 'streamvault-login.html?mode=login';
+                authBtn.className = "bg-primary/10 hover:bg-primary/20 text-primary font-bold px-4 py-2 rounded-xl transition-all border border-primary/20 flex items-center gap-2";
+                authBtn.innerHTML = '<span class="material-symbols-outlined text-[18px]">login</span><span class="hidden sm:inline text-sm">Sign In</span>';
+            }
             const histSection = document.getElementById('history-section');
             if(histSection) {
                 histSection.innerHTML = `
@@ -447,6 +528,13 @@
     }
 }
 checkAuthSession();
+if (window.supabaseClient) {
+    try {
+        window.supabaseClient.auth.onAuthStateChange(() => {
+            checkAuthSession();
+        });
+    } catch(e) {}
+}
 </script>
 </header>
 
@@ -2974,7 +3062,7 @@ checkAuthSession();
         <a href="streamvault-legal.html#faq" class="hover:text-primary transition-colors">FAQ</a>
         <a href="streamvault-legal.html#privacy" class="hover:text-primary transition-colors">Privacy Policy</a>
         <a href="streamvault-legal.html#terms" class="hover:text-primary transition-colors">Terms of Use</a>
-        <a href="streamvault-admin-login.html" class="hover:text-primary text-primary/80 transition-colors flex items-center gap-1 font-semibold"><span class="material-symbols-outlined text-[16px]">admin_panel_settings</span> Admin Portal</a>
+        <a id="admin-footer-btn" href="streamvault-admin-login.html" class="hidden hover:text-primary text-primary/80 transition-colors flex items-center gap-1 font-semibold"><span class="material-symbols-outlined text-[16px]">admin_panel_settings</span> Admin Portal</a>
     </footer>
 
     <!-- BETA WIDGET -->

@@ -127,3 +127,4 @@ If you ever accidentally commit a secret key to GitHub:
    - You must rotate the key in the service provider dashboard so the old key is dead.
 3. **Update Cloud Environments:**
    - Paste the new key into Vercel and Supabase Secrets dashboards.
+
