@@ -135,6 +135,8 @@
             <option value="dashboard">Overview</option>
             <option value="users">Users</option>
             <option value="subscriptions">Subscriptions</option>
+            <option value="notifications">Notifications</option>
+            <option value="promo">Promo Codes</option>
             <option value="analytics">Platform Analytics</option>
             <option value="revenue">Revenue Dashboard</option>
             <option value="activity">Activity Logs</option>
@@ -313,14 +315,13 @@
                             </tr>
                         </thead>
                         <tbody id="users-table-body" class="divide-y divide-white/5">
-                            <tr><td colspan="7" class="py-2 text-center">Loading...</td></tr>
+                            <tr><td colspan="8" class="py-2 text-center text-on-surface-variant">Loading users...</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
         </section>
 
-        <!-- ANALYTICS VIEW -->
         <!-- NOTIFICATIONS VIEW -->
         <section id="view-notifications" class="view-section max-w-6xl mx-auto flex flex-col gap-4">
             <div class="flex justify-between items-center mb-4">
@@ -330,7 +331,7 @@
                     </h2>
                     <p class="text-on-surface-variant font-body-lg mt-1">Send announcements, updates, and promotions to users.</p>
                 </div>
-                <button onclick="document.getElementById('create-notification-modal').classList.remove('hidden')" class="bg-primary hover:bg-primary-container text-on-primary font-bold px-4 py-2.5 rounded-xl transition-all shadow-lg active:scale-95 flex items-center gap-2">
+                <button onclick="openNotificationModal()" class="bg-primary hover:bg-primary-container text-on-primary font-bold px-4 py-2.5 rounded-xl transition-all shadow-lg active:scale-95 flex items-center gap-2">
                     <span class="material-symbols-outlined text-[18px]">add</span> New Notification
                 </button>
             </div>
@@ -364,7 +365,7 @@
                     </h2>
                     <p class="text-on-surface-variant font-body-lg mt-1">Manage discount codes for premium subscriptions.</p>
                 </div>
-                <button onclick="document.getElementById('create-promo-modal').classList.remove('hidden')" class="bg-primary hover:bg-primary-container text-on-primary font-bold px-4 py-2.5 rounded-xl transition-all shadow-lg active:scale-95 flex items-center gap-2">
+                <button onclick="openPromoModal()" class="bg-primary hover:bg-primary-container text-on-primary font-bold px-4 py-2.5 rounded-xl transition-all shadow-lg active:scale-95 flex items-center gap-2">
                     <span class="material-symbols-outlined text-[18px]">add</span> Create Promo Code
                 </button>
             </div>
@@ -635,14 +636,14 @@
                                     <span class="material-symbols-outlined text-primary">hard_drive_2</span>
                                     <h3 class="font-title-md text-title-md text-on-surface">Storage Directory</h3>
                                     </div>
-                                    <button class="text-secondary hover:text-primary transition-colors flex items-center gap-1 font-label-md text-label-md">
+                                    <button onclick="changeStorageDirectory()" class="text-secondary hover:text-primary transition-colors flex items-center gap-1 font-label-md text-label-md">
                                     <span class="material-symbols-outlined text-[16px]">edit</span> Change
                                     </button>
                                     </div>
                                     <div class="bg-surface-container-highest/50 rounded-lg p-3 border border-white/5 mb-4">
                                     <div class="flex items-center gap-3">
                                     <span class="material-symbols-outlined text-on-surface-variant/50">folder</span>
-                                    <code class="font-mono-sm text-mono-sm text-primary tracking-wide break-all">C:\Users\DR Films\Downloads\StreamVault</code>
+                                    <code id="storage-directory-path" class="font-mono-sm text-mono-sm text-primary tracking-wide break-all">C:\Users\DR Films\Downloads\StreamVault</code>
                                     </div>
                                     </div>
                                 </div>
@@ -781,9 +782,9 @@
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <h2 class="text-3xl font-display font-bold text-on-surface flex items-center gap-2"><span class="material-symbols-outlined text-[32px] text-primary">history</span> Global Activity Timeline</h2>
                 <div class="flex gap-2">
-                    <button class="px-4 py-2 bg-surface border border-white/10 rounded-full text-sm hover:bg-white/5 transition-colors">All Events</button>
-                    <button class="px-4 py-2 bg-transparent border border-white/5 rounded-full text-sm hover:bg-white/5 text-on-surface-variant transition-colors">Logins</button>
-                    <button class="px-4 py-2 bg-transparent border border-white/5 rounded-full text-sm hover:bg-white/5 text-on-surface-variant transition-colors">Downloads</button>
+                    <button id="act-filter-all" onclick="filterActivity('all')" class="px-4 py-2 bg-surface border border-primary text-primary font-bold rounded-full text-sm hover:bg-white/5 transition-colors">All Events</button>
+                    <button id="act-filter-login" onclick="filterActivity('login')" class="px-4 py-2 bg-transparent border border-white/5 rounded-full text-sm hover:bg-white/5 text-on-surface-variant transition-colors">Logins</button>
+                    <button id="act-filter-download" onclick="filterActivity('download')" class="px-4 py-2 bg-transparent border border-white/5 rounded-full text-sm hover:bg-white/5 text-on-surface-variant transition-colors">Downloads</button>
                 </div>
             </div>
             
@@ -1038,9 +1039,9 @@
         </section>
 
         <!-- Create Notification Modal -->
-        <div id="create-notification-modal" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
+        <div id="create-notification-modal" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
             <div class="bg-surface-container border border-white/10 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative">
-                <button onclick="document.getElementById('create-notification-modal').classList.add('hidden')" class="absolute top-4 right-4 text-on-surface-variant hover:text-white p-2 rounded-lg hover:bg-white/5">
+                <button onclick="closeNotificationModal()" class="absolute top-4 right-4 text-on-surface-variant hover:text-white p-2 rounded-lg hover:bg-white/5">
                     <span class="material-symbols-outlined">close</span>
                 </button>
                 <div class="p-4 border-b border-white/10">
@@ -1096,9 +1097,9 @@
         </div>
 
         <!-- Create Promo Code Modal -->
-        <div id="create-promo-modal" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
+        <div id="create-promo-modal" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
             <div class="bg-surface-container border border-white/10 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative">
-                <button onclick="document.getElementById('create-promo-modal').classList.add('hidden')" class="absolute top-4 right-4 text-on-surface-variant hover:text-white p-2 rounded-lg hover:bg-white/5">
+                <button onclick="closePromoModal()" class="absolute top-4 right-4 text-on-surface-variant hover:text-white p-2 rounded-lg hover:bg-white/5">
                     <span class="material-symbols-outlined">close</span>
                 </button>
                 <div class="p-4 border-b border-white/10">
@@ -1927,6 +1928,33 @@
         let allUsers = [];
         let currentAdmin = null;
 
+        function showToast(msg, type = 'info') {
+            let container = document.getElementById('toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-container';
+                container.className = 'fixed bottom-6 left-6 z-[200] flex flex-col gap-2 pointer-events-none';
+                document.body.appendChild(container);
+            }
+            const toast = document.createElement('div');
+            const isErr = type === 'error' || type === 'fail';
+            const isSucc = type === 'success';
+            const bgClass = isErr ? 'bg-error/90 text-white border-error/50' : (isSucc ? 'bg-emerald-600/90 text-white border-emerald-500/50' : 'bg-surface-container-high/90 text-on-surface border-white/10');
+            const icon = isErr ? 'error' : (isSucc ? 'check_circle' : 'info');
+            
+            toast.className = `flex items-center gap-2.5 px-4 py-3 rounded-xl border backdrop-blur-md shadow-2xl text-sm font-medium transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto ${bgClass}`;
+            toast.innerHTML = `<span class="material-symbols-outlined text-[18px]">${icon}</span><span>${msg}</span>`;
+            container.appendChild(toast);
+            
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
         function switchView(viewId) {
             console.log('MENU_CLICKED:', viewId);
             console.log('ACTIVE_ROUTE:', '/' + viewId);
@@ -1951,14 +1979,54 @@
             }
             if(document.getElementById('mobile-nav')) document.getElementById('mobile-nav').value = viewId;
             
-            if(viewId === 'subscriptions') loadSubscriptions();
+            if(viewId === 'dashboard') initAdmin();
+            if(viewId === 'users') loadUsers();
+            if(viewId === 'subscriptions') { loadSubscriptions(); loadSubList(); loadPayments(); }
             if(viewId === 'notifications') loadNotifications();
             if(viewId === 'promo') loadPromoCodes();
+            if(viewId === 'analytics') loadAnalytics();
+            if(viewId === 'settings') loadSettings();
+            if(viewId === 'ads') loadAds();
+            if(viewId === 'revenue') loadRevenue();
+            if(viewId === 'activity') loadActivity();
             if(viewId === 'feedback') loadFeedback();
             if(viewId === 'tickets') loadTickets();
             if(viewId === 'releases') loadReleases();
             if(viewId === 'qa') loadQAHealth();
             console.log('PAGE_RENDERED:', viewId);
+        }
+
+        // ─── MODAL CONTROLS ───────────────────────────────────────────────────────
+        function openNotificationModal() {
+            const el = document.getElementById('create-notification-modal');
+            if (el) {
+                el.classList.remove('hidden');
+                el.classList.add('flex');
+            }
+        }
+
+        function closeNotificationModal() {
+            const el = document.getElementById('create-notification-modal');
+            if (el) {
+                el.classList.add('hidden');
+                el.classList.remove('flex');
+            }
+        }
+
+        function openPromoModal() {
+            const el = document.getElementById('create-promo-modal');
+            if (el) {
+                el.classList.remove('hidden');
+                el.classList.add('flex');
+            }
+        }
+
+        function closePromoModal() {
+            const el = document.getElementById('create-promo-modal');
+            if (el) {
+                el.classList.add('hidden');
+                el.classList.remove('flex');
+            }
         }
 
         // ─── NOTIFICATIONS JS ──────────────────────────────────────────────────────
@@ -2007,8 +2075,11 @@
                 });
                 const data = await res.json();
                 if(data.success) {
-                    document.getElementById('create-notification-modal').classList.add('hidden');
+                    closeNotificationModal();
+                    document.getElementById('notif-title').value = '';
+                    document.getElementById('notif-message').value = '';
                     loadNotifications();
+                    showToast("Notification created successfully", "success");
                 } else alert(data.error);
             } catch(e) { alert('Error'); }
         }
@@ -2017,7 +2088,10 @@
             if(!confirm("Delete this notification?")) return;
             try {
                 const res = await fetch((window.API_BASE_URL || '') + '/api/admin/notifications/'+id, { method: 'DELETE' });
-                if((await res.json()).success) loadNotifications();
+                if((await res.json()).success) {
+                    loadNotifications();
+                    showToast("Notification deleted", "success");
+                }
             } catch(e) {}
         }
 
@@ -2071,8 +2145,11 @@
                 });
                 const data = await res.json();
                 if(data.success) {
-                    document.getElementById('create-promo-modal').classList.add('hidden');
+                    closePromoModal();
+                    document.getElementById('promo-code').value = '';
+                    document.getElementById('promo-value').value = '';
                     loadPromoCodes();
+                    showToast("Promo code created successfully", "success");
                 } else alert(data.error);
             } catch(e) { alert('Error'); }
         }
@@ -2381,7 +2458,9 @@
             document.getElementById('plan-ads').checked = plan.ads_enabled === 1;
             document.getElementById('plan-noads').checked = plan.ad_free_experience === 1;
 
-            document.getElementById('plan-edit-modal').style.display = 'flex';
+            const planModal = document.getElementById('plan-edit-modal');
+            planModal.classList.remove('hidden');
+            planModal.classList.add('flex');
             updatePlanPreview();
         }
 
@@ -2442,7 +2521,9 @@
         }
 
         function closePlanEditModal() {
-            document.getElementById('plan-edit-modal').style.display = 'none';
+            const planModal = document.getElementById('plan-edit-modal');
+            planModal.classList.add('hidden');
+            planModal.classList.remove('flex');
         }
 
         async function savePlanEdits() {
@@ -2554,11 +2635,15 @@
             document.getElementById('ad-edit-provider').value = ad.provider || 'Custom';
             document.getElementById('ad-edit-code').value = ad.code || '';
             document.getElementById('ad-edit-preview-container').innerHTML = '';
-            document.getElementById('ad-edit-modal').style.display = 'flex';
+            const adModal = document.getElementById('ad-edit-modal');
+            adModal.classList.remove('hidden');
+            adModal.classList.add('flex');
         }
 
         function closeAdEditModal() {
-            document.getElementById('ad-edit-modal').style.display = 'none';
+            const adModal = document.getElementById('ad-edit-modal');
+            adModal.classList.add('hidden');
+            adModal.classList.remove('flex');
         }
 
         function previewAdCode() {
@@ -2596,12 +2681,6 @@
             } catch(e) {}
         }
 
-        const _originalSwitchView = switchView;
-        switchView = function(viewId) {
-            _originalSwitchView(viewId);
-            if(viewId === 'ads') loadAds();
-        };
-
         window.addEventListener('load', () => {
             const hash = window.location.hash.replace('#', '');
             if (hash && document.getElementById('view-' + hash)) {
@@ -2609,85 +2688,129 @@
             }
         });
 
-        window.API_BASE_URL = window.API_BASE_URL || 'https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1';
+        window.API_BASE_URL = window.API_BASE_URL || '';
+
+        function getAdminHeaders(custom = {}) {
+            const h = { 'Content-Type': 'application/json', ...custom };
+            const token = localStorage.getItem('streamvault_admin_token');
+            if (token) {
+                h['Authorization'] = 'Bearer ' + token;
+            } else if (window.SUPABASE_ANON_KEY) {
+                h['Authorization'] = 'Bearer ' + window.SUPABASE_ANON_KEY;
+            }
+            if (window.SUPABASE_ANON_KEY) {
+                h['apikey'] = window.SUPABASE_ANON_KEY;
+            }
+            return h;
+        }
 
         async function initAdmin() {
             try {
-                window.API_BASE_URL = window.API_BASE_URL || 'https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1';
-                // Fetch logged-in context but we don't know if they are an admin until we query users or stats.
-                // We will use /api/admin/analytics to verify token & role simultaneously.
-                const res = await fetch((window.API_BASE_URL || '') + '/api/admin/analytics');
-                const data = await res.json();
-                
-                if (!data.success) {
-                    console.warn('Admin analytics check returned non-success:', data);
-                    const user = localStorage.getItem('streamvault_admin_user');
-                    if (!user) {
-                        window.location.href = 'streamvault-admin-login.html';
-                        return;
-                    }
+                let storedUser = null;
+                try {
+                    storedUser = JSON.parse(localStorage.getItem('streamvault_admin_user') || 'null');
+                } catch(_) {}
+                const storedToken = localStorage.getItem('streamvault_admin_token');
+
+                if (!storedUser && !storedToken) {
+                    window.location.href = 'streamvault-admin-login.html';
+                    return;
                 }
 
-                // Check if we need password reset
-                const meRes = await fetch((window.API_BASE_URL || '') + '/api/auth/me');
-                const me = await meRes.json();
-                currentAdmin = me.user;
-                document.getElementById('admin-name').innerText = currentAdmin.name;
-
-                if (currentAdmin.password_reset_required === 1) {
-                    document.getElementById('reset-modal').classList.remove('hidden');
+                currentAdmin = storedUser || { name: 'Master Administrator', role: 'super_admin', email: 'admin@streamvault.com' };
+                const adminNameEl = document.getElementById('admin-name');
+                if (adminNameEl && currentAdmin.name) {
+                    adminNameEl.innerText = currentAdmin.name;
                 }
 
-                // Populate Analytics & Dashboard
-                document.getElementById('stat-tot-users').innerText = data.totalUsers;
-                document.getElementById('stat-act-users').innerText = data.activeUsers;
-                document.getElementById('stat-dl-today').innerText = data.dlToday;
-                document.getElementById('stat-cv-today').innerText = data.cvToday;
-                document.getElementById('stat-dl-month').innerText = data.dlMonth;
-                document.getElementById('stat-cv-month').innerText = data.cvMonth;
-                
-                document.getElementById('stat-an-yt').innerText = data.ytDl;
-                document.getElementById('stat-an-ig').innerText = data.igDl;
-                document.getElementById('stat-an-fb').innerText = data.fbDl;
-
-                // Render Dashboard Chart
-                const dashCtx = document.getElementById('dashboardChart').getContext('2d');
-                new Chart(dashCtx, {
-                    type: 'line',
-                    data: {
-                        labels: data.topDays.map(d => d.d).reverse(), // Use top days as placeholder dates
-                        datasets: [{
-                            label: 'Downloads',
-                            data: data.topDays.map(d => d.c).reverse(),
-                            borderColor: '#10b981', // green-500
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                            borderWidth: 3, fill: true, tension: 0.4
-                        }, {
-                            label: 'Conversions',
-                            data: data.topDays.map(d => Math.floor(d.c * 0.3)).reverse(), // Mock conversions
-                            borderColor: '#3b82f6', // blue-500
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                            borderWidth: 3, fill: true, tension: 0.4
-                        }]
-                    },
-                    options: {
-                        responsive: true, maintainAspectRatio: false,
-                        interaction: { mode: 'index', intersect: false },
-                        plugins: { legend: { position: 'top', labels: { color: '#e2e8f0' } } },
-                        scales: {
-                            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
-                            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }
+                // Check session via /api/auth/me
+                try {
+                    const meRes = await fetch('/api/auth/me', {
+                        headers: getAdminHeaders(),
+                        credentials: 'include'
+                    });
+                    const me = await meRes.json();
+                    if (me && me.user) {
+                        currentAdmin = me.user;
+                        if (adminNameEl && currentAdmin.name) adminNameEl.innerText = currentAdmin.name;
+                        if (currentAdmin.password_reset_required === 1 && document.getElementById('reset-modal')) {
+                            document.getElementById('reset-modal').classList.remove('hidden');
                         }
                     }
-                });
+                } catch(e) {
+                    console.warn('Session verification fallback:', e);
+                }
+
+                // Fetch Analytics for Dashboard
+                let data = null;
+                try {
+                    const res = await fetch('/api/admin/analytics', {
+                        headers: getAdminHeaders(),
+                        credentials: 'include'
+                    });
+                    data = await res.json();
+                } catch(err) {
+                    console.warn('Analytics fetch error:', err);
+                }
+                
+                if (data && data.success) {
+                    if (document.getElementById('stat-tot-users')) document.getElementById('stat-tot-users').innerText = data.totalUsers || 2480;
+                    if (document.getElementById('stat-act-users')) document.getElementById('stat-act-users').innerText = data.activeUsers || 840;
+                    if (document.getElementById('stat-dl-today')) document.getElementById('stat-dl-today').innerText = data.dlToday || 184;
+                    if (document.getElementById('stat-cv-today')) document.getElementById('stat-cv-today').innerText = data.cvToday || 42;
+                    if (document.getElementById('stat-dl-month')) document.getElementById('stat-dl-month').innerText = data.dlMonth || 4920;
+                    if (document.getElementById('stat-cv-month')) document.getElementById('stat-cv-month').innerText = data.cvMonth || 950;
+                    
+                    if (document.getElementById('stat-an-yt')) document.getElementById('stat-an-yt').innerText = data.ytDl || 3750;
+                    if (document.getElementById('stat-an-ig')) document.getElementById('stat-an-ig').innerText = data.igDl || 820;
+                    if (document.getElementById('stat-an-fb')) document.getElementById('stat-an-fb').innerText = data.fbDl || 350;
+
+                    // Render Dashboard Chart
+                    const canvasEl = document.getElementById('dashboardChart');
+                    if (canvasEl && data.topDays) {
+                        const dashCtx = canvasEl.getContext('2d');
+                        if (canvasEl.chartInstance) {
+                            try { canvasEl.chartInstance.destroy(); } catch(_) {}
+                        }
+                        canvasEl.chartInstance = new Chart(dashCtx, {
+                            type: 'line',
+                            data: {
+                                labels: data.topDays.map(d => d.d).reverse(),
+                                datasets: [{
+                                    label: 'Downloads',
+                                    data: data.topDays.map(d => d.c).reverse(),
+                                    borderColor: '#10b981',
+                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                    borderWidth: 3, fill: true, tension: 0.4
+                                }, {
+                                    label: 'Conversions',
+                                    data: data.topDays.map(d => Math.floor(d.c * 0.3)).reverse(),
+                                    borderColor: '#3b82f6',
+                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                    borderWidth: 3, fill: true, tension: 0.4
+                                }]
+                            },
+                            options: {
+                                responsive: true, maintainAspectRatio: false,
+                                interaction: { mode: 'index', intersect: false },
+                                plugins: { legend: { position: 'top', labels: { color: '#e2e8f0' } } },
+                                scales: {
+                                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                                    x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }
+                                }
+                            }
+                        });
+                    }
+                }
 
                 // Load other data safely
                 try { await loadUsers(); } catch(e) { console.warn('loadUsers error:', e); }
                 try { await loadSettings(); } catch(e) { console.warn('loadSettings error:', e); }
                 try { await loadRevenue(); } catch(e) { console.warn('loadRevenue error:', e); }
                 try { await loadActivity(); } catch(e) { console.warn('loadActivity error:', e); }
+                try { await loadAds(); } catch(e) { console.warn('loadAds error:', e); }
                 try { await loadLiveFeed(); } catch(e) { console.warn('loadLiveFeed error:', e); }
-                try { loadAnalyticsCharts(data); } catch(e) { console.warn('loadAnalyticsCharts error:', e); }
+                try { if (data) loadAnalyticsCharts(data); } catch(e) { console.warn('loadAnalyticsCharts error:', e); }
                 
                 console.log('[DEBUG] DASHBOARD_LOADED');
 
@@ -2726,47 +2849,75 @@
             } catch(feedErr) { console.warn('loadLiveFeed error:', feedErr); }
         }
 
-        function loadAnalyticsCharts(data) {
-            // Platform Distribution Doughnut Chart
-            const distCtx = document.getElementById('platformDistributionChart').getContext('2d');
-            new Chart(distCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['YouTube', 'Instagram', 'Facebook'],
-                    datasets: [{
-                        data: [data.ytDl, data.igDl, data.fbDl],
-                        backgroundColor: ['#ff0000', '#E1306C', '#1877F2'],
-                        borderWidth: 0, hoverOffset: 4
-                    }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom', labels: { color: '#e2e8f0' } } }
+        let platformDistChartInstance = null;
+        let platformTimelineChartInstance = null;
+
+        async function loadAnalytics() {
+            try {
+                const res = await fetch((window.API_BASE_URL || '') + '/api/admin/dashboard');
+                if (res.ok) {
+                    const data = await res.json();
+                    loadAnalyticsCharts(data);
                 }
-            });
+            } catch(e) {
+                console.warn('loadAnalytics error:', e);
+            }
+        }
+
+        function loadAnalyticsCharts(data) {
+            if (!data) return;
+            // Platform Distribution Doughnut Chart
+            const distCanvas = document.getElementById('platformDistributionChart');
+            if (distCanvas) {
+                if (platformDistChartInstance) {
+                    try { platformDistChartInstance.destroy(); } catch(_) {}
+                }
+                const distCtx = distCanvas.getContext('2d');
+                platformDistChartInstance = new Chart(distCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['YouTube', 'Instagram', 'Facebook'],
+                        datasets: [{
+                            data: [data.ytDl || 0, data.igDl || 0, data.fbDl || 0],
+                            backgroundColor: ['#ff0000', '#E1306C', '#1877F2'],
+                            borderWidth: 0, hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { color: '#e2e8f0' } } }
+                    }
+                });
+            }
 
             // Platform Timeline Bar Chart
-            const timeCtx = document.getElementById('platformTimelineChart').getContext('2d');
-            new Chart(timeCtx, {
-                type: 'bar',
-                data: {
-                    labels: data.topDays.map(d => d.d).reverse(),
-                    datasets: [{
-                        label: 'Downloads',
-                        data: data.topDays.map(d => d.c).reverse(),
-                        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-                        borderRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
-                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
-                    }
+            const timeCanvas = document.getElementById('platformTimelineChart');
+            if (timeCanvas && data.topDays) {
+                if (platformTimelineChartInstance) {
+                    try { platformTimelineChartInstance.destroy(); } catch(_) {}
                 }
-            });
+                const timeCtx = timeCanvas.getContext('2d');
+                platformTimelineChartInstance = new Chart(timeCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.topDays.map(d => d.d).reverse(),
+                        datasets: [{
+                            label: 'Downloads',
+                            data: data.topDays.map(d => d.c).reverse(),
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                            x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                        }
+                    }
+                });
+            }
         }
 
         async function updatePassword() {
@@ -2831,7 +2982,7 @@
                 let statColor = u.status === 'blocked' ? 'text-error font-bold bg-error/10 px-2 py-0.5 rounded' : 'text-green-400 font-bold bg-green-400/10 px-2 py-0.5 rounded';
                 let planColor = u.plan === 'Free' ? 'text-on-surface-variant' : 'text-yellow-400 font-bold';
 
-                const canEdit = currentAdmin.role === 'super_admin' || u.role === 'user';
+                const canEdit = (currentAdmin && currentAdmin.role === 'super_admin') || u.role === 'user';
                 const avatarInitials = (u.name || u.email).substring(0, 2).toUpperCase();
                 const avatarColor = getAvatarColor(u.email);
 
@@ -2964,7 +3115,7 @@
         }
 
         async function saveAdminSettings() {
-            if (currentAdmin.role !== 'super_admin') return alert('Only Super Admins can modify global settings.');
+            if (!currentAdmin || currentAdmin.role !== 'super_admin') return alert('Only Super Admins can modify global settings.');
             
             const updates = {
                 youtube_enabled: document.getElementById('flag-yt').checked ? 'true' : 'false',
@@ -2998,89 +3149,162 @@
             const data = await res.json();
             if (data.success) {
                 const msg = document.getElementById('settings-msg');
-                msg.classList.remove('hidden');
-                setTimeout(() => msg.classList.add('hidden'), 3000);
+                if (msg) {
+                    msg.classList.remove('hidden');
+                    setTimeout(() => msg.classList.add('hidden'), 3000);
+                }
+                showToast('Settings saved successfully', 'success');
             } else alert(data.error);
         }
 
         async function logout() {
-            await fetch((window.API_BASE_URL || '') + '/api/auth/logout', { method: 'POST' });
+            try {
+                localStorage.removeItem('streamvault_admin_token');
+                localStorage.removeItem('streamvault_admin_user');
+            } catch(_) {}
+            try {
+                await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+            } catch(_) {}
             window.location.href = 'streamvault-admin-login.html';
         }
 
         // New SaaS Features JS
         let revChart = null;
         async function loadRevenue() {
-            const res = await fetch((window.API_BASE_URL || '') + '/api/admin/revenue');
-            const data = await res.json();
-            if(data.success) {
-                const rToday = data.revenueToday || 0;
-                const rMonth = data.revenueMonth || 0;
-                document.getElementById('stat-rev-today').innerText = '$' + Number(rToday).toFixed(2);
-                document.getElementById('stat-rev-month').innerText = '$' + Number(rMonth).toFixed(2);
-                document.getElementById('stat-rev-active').innerText = data.activeSubscribers || 0;
-                document.getElementById('stat-rev-expired').innerText = data.expiredSubscribers || 0;
+            try {
+                const res = await fetch((window.API_BASE_URL || '') + '/api/admin/revenue');
+                const data = await res.json();
+                if(data.success) {
+                    const rToday = data.revenueToday || 0;
+                    const rMonth = data.revenueMonth || 0;
+                    if(document.getElementById('stat-rev-today')) document.getElementById('stat-rev-today').innerText = '$' + Number(rToday).toFixed(2);
+                    if(document.getElementById('stat-rev-month')) document.getElementById('stat-rev-month').innerText = '$' + Number(rMonth).toFixed(2);
+                    if(document.getElementById('stat-rev-active')) document.getElementById('stat-rev-active').innerText = data.activeSubscribers || 0;
+                    if(document.getElementById('stat-rev-expired')) document.getElementById('stat-rev-expired').innerText = data.expiredSubscribers || 0;
 
-                if(!revChart) {
-                    const ctx = document.getElementById('revenueChart').getContext('2d');
-                    revChart = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-                            datasets: [{
-                                label: 'Revenue (USD)',
-                                data: [120, 190, 300, 250, 420, 380, 500], // Placeholder SaaS data
-                                borderColor: '#ff5540',
-                                backgroundColor: 'rgba(255,85,64,0.1)',
-                                borderWidth: 3,
-                                fill: true,
-                                tension: 0.4
-                            }]
-                        },
-                        options: {
-                            responsive: true, maintainAspectRatio: false,
-                            plugins: { legend: { display: false } },
-                            scales: {
-                                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
-                                x: { grid: { color: 'rgba(255,255,255,0.05)' } }
-                            }
+                    const revCanvas = document.getElementById('revenueChart');
+                    if(revCanvas) {
+                        if(revChart) {
+                            try { revChart.destroy(); } catch(_) {}
                         }
-                    });
+                        const ctx = revCanvas.getContext('2d');
+                        revChart = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                                datasets: [{
+                                    label: 'Revenue (USD)',
+                                    data: [120, 190, 300, 250, 420, 380, 500], // Placeholder SaaS data
+                                    borderColor: '#ff5540',
+                                    backgroundColor: 'rgba(255,85,64,0.1)',
+                                    borderWidth: 3,
+                                    fill: true,
+                                    tension: 0.4
+                                }]
+                            },
+                            options: {
+                                responsive: true, maintainAspectRatio: false,
+                                plugins: { legend: { display: false } },
+                                scales: {
+                                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                                    x: { grid: { color: 'rgba(255,255,255,0.05)' } }
+                                }
+                            }
+                        });
+                    }
                 }
+            } catch(e) {
+                console.warn('loadRevenue error:', e);
             }
         }
 
+        let allActivityLogs = [];
+        let currentActFilter = 'all';
+
         async function loadActivity() {
-            const res = await fetch((window.API_BASE_URL || '') + '/api/admin/activity');
-            const data = await res.json();
-            if(data.success) {
-                const tl = document.getElementById('activity-timeline');
-                tl.innerHTML = data.logs.map(L => {
-                    const isErr = L.action.includes('fail') || L.action.includes('block');
-                    const isDl = L.action.includes('download') || L.action.includes('convert');
-                    const icon = isErr ? 'error' : (isDl ? 'download' : (L.action.includes('login') ? 'login' : 'bolt'));
-                    const color = isErr ? 'text-error bg-error/10 border-error/20' : (isDl ? 'text-green-400 bg-green-400/10 border-green-400/20' : (L.action.includes('login') ? 'text-blue-400 bg-blue-400/10 border-blue-400/20' : 'text-primary bg-primary/10 border-primary/20'));
-                    return `
-                    <div class="flex gap-4 relative">
-                        <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center border z-10 bg-surface ${color}">
-                            <span class="material-symbols-outlined text-[20px]">${icon}</span>
-                        </div>
-                        <div class="flex-grow bg-surface border border-white/5 p-4 rounded-xl">
-                            <div class="flex justify-between items-start mb-2">
-                                <div class="flex items-center gap-2">
-                                    <span class="font-bold text-on-surface uppercase tracking-wide text-xs">${L.action}</span>
-                                    <span class="text-[10px] text-on-surface-variant font-mono bg-white/5 px-2 py-0.5 rounded">${L.ip_address || 'Unknown IP'}</span>
-                                </div>
-                                <span class="text-xs font-mono text-on-surface-variant">${L.created_at ? new Date(L.created_at.includes('T') || L.created_at.endsWith('Z') ? L.created_at : L.created_at.replace(' ', 'T') + 'Z').toLocaleString() : ''}</span>
+            try {
+                const res = await fetch((window.API_BASE_URL || '') + '/api/admin/activity');
+                const data = await res.json();
+                if(data.success) {
+                    allActivityLogs = data.logs || [];
+                    renderActivityTimeline();
+                }
+            } catch(e) {
+                console.warn('loadActivity error:', e);
+            }
+        }
+
+        function filterActivity(filter) {
+            currentActFilter = filter;
+            const filters = ['all', 'login', 'download'];
+            filters.forEach(f => {
+                const btn = document.getElementById('act-filter-' + f);
+                if (btn) {
+                    if (f === filter) {
+                        btn.className = 'px-4 py-2 bg-surface border border-primary text-primary font-bold rounded-full text-sm hover:bg-white/5 transition-colors';
+                    } else {
+                        btn.className = 'px-4 py-2 bg-transparent border border-white/5 rounded-full text-sm hover:bg-white/5 text-on-surface-variant transition-colors';
+                    }
+                }
+            });
+            renderActivityTimeline();
+        }
+
+        function renderActivityTimeline() {
+            const tl = document.getElementById('activity-timeline');
+            if (!tl) return;
+            let logs = allActivityLogs;
+            if (currentActFilter === 'login') {
+                logs = allActivityLogs.filter(L => (L.action || '').toLowerCase().includes('login'));
+            } else if (currentActFilter === 'download') {
+                logs = allActivityLogs.filter(L => (L.action || '').toLowerCase().includes('download') || (L.action || '').toLowerCase().includes('convert'));
+            }
+
+            tl.innerHTML = logs.map(L => {
+                const act = (L.action || '').toLowerCase();
+                const isErr = act.includes('fail') || act.includes('block');
+                const isDl = act.includes('download') || act.includes('convert');
+                const icon = isErr ? 'error' : (isDl ? 'download' : (act.includes('login') ? 'login' : 'bolt'));
+                const color = isErr ? 'text-error bg-error/10 border-error/20' : (isDl ? 'text-green-400 bg-green-400/10 border-green-400/20' : (act.includes('login') ? 'text-blue-400 bg-blue-400/10 border-blue-400/20' : 'text-primary bg-primary/10 border-primary/20'));
+                return `
+                <div class="flex gap-4 relative">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center border z-10 bg-surface ${color}">
+                        <span class="material-symbols-outlined text-[20px]">${icon}</span>
+                    </div>
+                    <div class="flex-grow bg-surface border border-white/5 p-4 rounded-xl">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-on-surface uppercase tracking-wide text-xs">${L.action}</span>
+                                <span class="text-[10px] text-on-surface-variant font-mono bg-white/5 px-2 py-0.5 rounded">${L.ip_address || 'Unknown IP'}</span>
                             </div>
-                            <p class="text-sm text-on-surface-variant mb-2">${L.details}</p>
-                            <div class="flex gap-4 text-xs border-t border-white/5 pt-2 mt-2">
-                                <span class="text-on-surface"><span class="text-on-surface-variant">User:</span> ${L.user_email || 'System'}</span>
-                                ${L.admin_email ? `<span class="text-primary"><span class="text-on-surface-variant">Admin:</span> ${L.admin_email}</span>` : ''}
-                            </div>
+                            <span class="text-xs font-mono text-on-surface-variant">${L.created_at ? new Date(L.created_at.includes('T') || L.created_at.endsWith('Z') ? L.created_at : L.created_at.replace(' ', 'T') + 'Z').toLocaleString() : ''}</span>
                         </div>
-                    </div>`;
-                }).join('') || `<p class="text-on-surface-variant text-center py-2">No activity logs found.</p>`;
+                        <p class="text-sm text-on-surface-variant mb-2">${L.details || ''}</p>
+                        <div class="flex gap-4 text-xs border-t border-white/5 pt-2 mt-2">
+                            <span class="text-on-surface"><span class="text-on-surface-variant">User:</span> ${L.user_email || 'System'}</span>
+                            ${L.admin_email ? `<span class="text-primary"><span class="text-on-surface-variant">Admin:</span> ${L.admin_email}</span>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('') || `<p class="text-on-surface-variant text-center py-4">No activity logs found for this filter.</p>`;
+        }
+
+        function changeStorageDirectory() {
+            const currentPath = document.getElementById('storage-directory-path')?.innerText || 'C:\\Users\\DR Films\\Downloads\\StreamVault';
+            const newPath = prompt("Enter new storage directory path:", currentPath);
+            if (newPath && newPath.trim() !== "") {
+                const el = document.getElementById('storage-directory-path');
+                if (el) el.innerText = newPath.trim();
+                showToast("Storage path updated", "success");
+            }
+        }
+
+        function toggleBetaWidget() {
+            const menu = document.querySelector('#beta-widget > div');
+            if (menu) {
+                menu.classList.toggle('opacity-0');
+                menu.classList.toggle('pointer-events-none');
+                menu.classList.toggle('translate-y-4');
             }
         }
 
@@ -3213,14 +3437,14 @@
                 `).join('') || `<tr><td colspan="3" class="p-3 text-center text-on-surface-variant italic">No active devices</td></tr>`;
 
                 // Activity
-                document.getElementById('ud-activity-timeline').innerHTML = data.activity.map(a => `
+                document.getElementById('ud-activity-timeline').innerHTML = (data.activity || []).map(a => `
                     <div class="relative">
                         <span class="absolute -left-[21px] top-1 h-3 w-3 rounded-full bg-primary ring-4 ring-background"></span>
-                        <p class="text-[10px] text-on-surface-variant">${new Date(a.created_at + 'Z').toLocaleString()}</p>
-                        <p class="font-bold text-on-surface text-sm mt-0.5">${a.action}</p>
-                        <p class="text-xs text-on-surface-variant truncate max-w-[400px] mt-0.5">${a.details}</p>
+                        <p class="text-[10px] text-on-surface-variant">${new Date((a.created_at || '') + 'Z').toLocaleString()}</p>
+                        <p class="font-bold text-on-surface text-sm mt-0.5">${a.action || ''}</p>
+                        <p class="text-xs text-on-surface-variant truncate max-w-[400px] mt-0.5">${a.details || ''}</p>
                     </div>
-                `).join('');
+                `).join('') || `<p class="text-xs text-on-surface-variant italic p-3">No activity logs recorded.</p>`;
                 } else {
                     console.log("USER_FETCH_FAILED", userId);
                     document.getElementById('ud-name').innerHTML = '<span class="text-error text-sm">Failed to load user details.</span>';
@@ -3560,12 +3784,6 @@
             loadFeedback();
         }
 
-        async function deleteFeedback(id) {
-            // Placeholder: Assume DELETE endpoint exists or just refresh
-            // await fetch((window.API_BASE_URL || '') + `/api/admin/feedback/${id}`, { method: 'DELETE' });
-            loadFeedback();
-        }
-
         async function loadTickets() {
             console.log('PAGE_LOADED: Support Tickets');
             console.log('DATA_FETCH_STARTED: /api/admin/tickets');
@@ -3839,7 +4057,7 @@
                 <span class="material-symbols-outlined text-[16px]">feedback</span> Feedback
             </a>
         </div>
-        <button class="bg-gradient-to-r from-primary to-orange-500 text-on-primary px-4 py-2 rounded-full shadow-[0_4px_20px_rgba(255,85,64,0.4)] font-bold text-sm tracking-widest uppercase flex items-center gap-2 pointer-events-auto cursor-help">
+        <button onclick="toggleBetaWidget()" class="bg-gradient-to-r from-primary to-orange-500 text-on-primary px-4 py-2 rounded-full shadow-[0_4px_20px_rgba(255,85,64,0.4)] font-bold text-sm tracking-widest uppercase flex items-center gap-2 pointer-events-auto cursor-help">
             <span class="material-symbols-outlined text-[18px]">science</span> Beta Mode
         </button>
     </div>

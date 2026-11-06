@@ -92,7 +92,7 @@
     </div>
 
     <script>
-        window.API_BASE_URL = window.API_BASE_URL || 'https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1';
+        window.API_BASE_URL = window.API_BASE_URL || '';
 
         document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -107,10 +107,9 @@
             errBox.classList.add('hidden');
 
             const loginEndpoints = [
-                (window.API_BASE_URL ? (window.API_BASE_URL.replace(/\/api\/?$/, '') + '/admin/login') : null),
                 '/api/admin/login',
                 'https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1/admin/login'
-            ].filter(Boolean);
+            ];
 
             let success = false;
             let lastError = 'Authentication failed';

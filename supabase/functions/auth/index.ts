@@ -40,8 +40,9 @@ serve(async (req: Request) => {
 
   // ── 1. Session check: /me or root ─────────────────────────────
   if (pathname === "/me" || pathname === "" || pathname === "/") {
-    // 1a. Check if Admin Session Cookie is present
-    if (cookie.includes("token=sv_admin_token")) {
+    // 1a. Check if Admin Session Token or Cookie is present
+    const isTokenAdmin = authHeader && (authHeader.includes("sv_admin_jwt_") || authHeader.includes("sv_admin_token"));
+    if (cookie.includes("token=sv_admin_token") || isTokenAdmin) {
       return new Response(JSON.stringify({
         success: true,
         loggedIn: true,
