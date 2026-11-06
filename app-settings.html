@@ -406,6 +406,8 @@
                             email: u.email,
                             name: meta.full_name || meta.name || (u.email ? u.email.split('@')[0] : 'User'),
                             role: meta.role || (u.email === 'admin@streamvault.com' ? 'super_admin' : 'user'),
+                            plan: meta.plan || (u.email === 'admin@streamvault.com' ? 'Lifetime' : 'Free'),
+                            avatar: meta.avatar_url || meta.picture || null,
                             created_at: u.created_at
                         };
                     }
@@ -434,20 +436,31 @@
             const subLabelEl = document.getElementById('user-sub-label');
             const subDateEl = document.getElementById('user-sub-date');
             const actionBtn = document.getElementById('user-action-btn');
+            const avatarIcon = document.getElementById('user-avatar-icon');
 
             if (user) {
                 if (nameEl) nameEl.innerText = user.name || 'User';
                 if (idEl) idEl.innerText = user.email || ('ID: ' + user.id.substring(0, 8).toUpperCase());
                 
-                const isPro = user.role === 'pro' || user.role === 'super_admin' || user.role === 'admin';
+                if (avatarIcon && avatarIcon.parentElement) {
+                    if (user.avatar) {
+                        avatarIcon.parentElement.innerHTML = `<img src="${user.avatar}" alt="${user.name}" class="w-full h-full object-cover rounded-full" />`;
+                    } else {
+                        const initial = (user.name || user.email || 'U').charAt(0).toUpperCase();
+                        avatarIcon.parentElement.innerHTML = `<div class="w-full h-full flex items-center justify-center font-bold text-xl text-primary bg-primary/10">${initial}</div>`;
+                    }
+                }
+
+                const planName = (user.plan || (user.role === 'super_admin' ? 'Lifetime' : 'Free')).toUpperCase();
+                const isPro = user.role === 'pro' || user.role === 'super_admin' || user.role === 'admin' || (user.plan && user.plan.toLowerCase() !== 'free');
                 if (badgeEl) {
                     badgeEl.className = isPro 
                         ? "bg-primary-container text-on-primary-container font-label-md text-label-md px-3 py-1 rounded-full uppercase tracking-widest pro-glow flex items-center gap-1"
                         : "bg-white/10 text-on-surface font-label-md text-label-md px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1";
-                    badgeEl.innerHTML = `<span class="material-symbols-outlined text-[14px]">${isPro ? 'workspace_premium' : 'check_circle'}</span> ${isPro ? 'PRO' : 'FREE'}`;
+                    badgeEl.innerHTML = `<span class="material-symbols-outlined text-[14px]">${isPro ? 'workspace_premium' : 'check_circle'}</span> ${planName}`;
                 }
                 if (subLabelEl) subLabelEl.innerText = isPro ? "Subscription Status" : "Account Status";
-                if (subDateEl) subDateEl.innerText = isPro ? "Active (Unlimited 4K/8K)" : "Active Free Tier";
+                if (subDateEl) subDateEl.innerText = isPro ? `Active ${user.plan || 'PRO'} Tier (Unlimited 4K/8K)` : "Active Free Tier";
                 if (actionBtn) {
                     actionBtn.innerText = "View Profile";
                     actionBtn.className = "px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors font-label-md text-label-md text-on-surface";
@@ -459,6 +472,9 @@
             } else {
                 if (nameEl) nameEl.innerText = "Guest User";
                 if (idEl) idEl.innerText = "Not signed in";
+                if (avatarIcon && avatarIcon.parentElement) {
+                    avatarIcon.parentElement.innerHTML = `<span id="user-avatar-icon" class="material-symbols-outlined text-4xl text-on-surface-variant">person</span>`;
+                }
                 if (badgeEl) {
                     badgeEl.className = "bg-white/10 text-on-surface-variant font-label-md text-label-md px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1";
                     badgeEl.innerHTML = `<span class="material-symbols-outlined text-[14px]">person</span> GUEST`;

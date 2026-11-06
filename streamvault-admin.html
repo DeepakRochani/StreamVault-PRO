@@ -915,9 +915,14 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <!-- Manage Plans -->
                 <div class="bg-surface-container-high border border-white/10 rounded-2xl p-4">
-                    <h3 class="text-xl font-title-md text-on-surface mb-4 flex items-center gap-2">
-                        <span class="material-symbols-outlined text-primary">list_alt</span> Global Plans
-                    </h3>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-title-md text-on-surface flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">list_alt</span> Global Plans
+                        </h3>
+                        <button onclick="openCreatePlanModal()" class="bg-primary hover:bg-primary-container text-on-primary text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shadow active:scale-95">
+                            <span class="material-symbols-outlined text-[16px]">add_circle</span> Add Plan
+                        </button>
+                    </div>
                     <div class="flex flex-col gap-3" id="plans-list">
                         <!-- Populated by JS -->
                     </div>
@@ -930,23 +935,28 @@
                     </h3>
                     <div class="flex flex-col gap-4">
                         <div class="flex flex-col gap-1">
-                            <label class="text-sm text-on-surface-variant">Target User ID</label>
-                            <input type="text" id="grant-user-id" class="bg-surface border border-white/10 rounded-lg px-4 py-2 outline-none focus:border-primary text-on-surface" placeholder="User ID">
+                            <label class="text-sm text-on-surface-variant">Select User</label>
+                            <select id="grant-user-id" class="bg-surface border border-white/10 rounded-lg px-4 py-2 outline-none focus:border-primary text-on-surface">
+                                <option value="">-- Choose User --</option>
+                            </select>
+                            <p class="text-[11px] text-on-surface-variant mt-0.5">Or enter user email / ID manually:</p>
+                            <input type="text" id="grant-user-manual" class="bg-surface border border-white/10 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-primary text-on-surface" placeholder="e.g. user@gmail.com or UUID">
                         </div>
                         <div class="flex flex-col gap-1">
                             <label class="text-sm text-on-surface-variant">Select Plan</label>
-                            <select id="grant-plan-id" class="bg-surface border border-white/10 rounded-lg px-4 py-2 outline-none text-on-surface">
-                                <option value="premium">Premium</option>
-                                <option value="pro">Pro</option>
-                                <option value="lifetime">Lifetime</option>
+                            <select id="grant-plan-id" class="bg-surface border border-white/10 rounded-lg px-4 py-2 outline-none focus:border-primary text-on-surface">
+                                <option value="pro">Desktop Pro</option>
+                                <option value="lifetime">Lifetime Ultimate</option>
                                 <option value="free">Free (Revoke)</option>
                             </select>
                         </div>
                         <div class="flex flex-col gap-1">
                             <label class="text-sm text-on-surface-variant">Duration (Days)</label>
-                            <input type="number" id="grant-duration" value="30" class="bg-surface border border-white/10 rounded-lg px-4 py-2 outline-none focus:border-primary text-on-surface" placeholder="Ignored for Lifetime">
+                            <input type="number" id="grant-duration" value="30" class="bg-surface border border-white/10 rounded-lg px-4 py-2 outline-none focus:border-primary text-on-surface" placeholder="0 = Lifetime / Unlimited">
                         </div>
-                        <button onclick="grantSubscription()" class="bg-primary text-on-primary font-bold py-2 rounded-lg hover:bg-primary-container transition-colors mt-2">Apply Subscription</button>
+                        <button onclick="grantSubscription()" class="bg-primary text-on-primary font-bold py-2.5 rounded-lg hover:bg-primary-container transition-all shadow active:scale-95 flex items-center justify-center gap-2 mt-2">
+                            <span class="material-symbols-outlined text-[18px]">verified</span> Apply Subscription
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1154,7 +1164,7 @@
                 <div class="p-4 border-b border-white/5 flex justify-between items-center shrink-0">
                     <div>
                         <h3 class="text-2xl font-title-lg text-on-surface flex items-center gap-2">
-                            <span class="material-symbols-outlined text-primary">edit</span> Edit <span id="plan-edit-name" class="font-bold uppercase text-primary ml-1">Plan</span>
+                            <span class="material-symbols-outlined text-primary">edit</span> <span id="plan-modal-title">Edit</span> <span id="plan-edit-name" class="font-bold uppercase text-primary ml-1">Plan</span>
                         </h3>
                         <p class="text-on-surface-variant text-sm mt-1">Configure pricing, limits, and granular access controls for this subscription tier.</p>
                     </div>
@@ -1168,6 +1178,18 @@
                     <!-- Configurator Form (Scrollable) -->
                     <div class="w-full md:w-2/3 p-4 overflow-y-auto flex flex-col gap-5 custom-scrollbar">
                         
+                        <!-- Plan Identity Section (Visible when creating new plan) -->
+                        <div id="plan-name-input-row" class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-2 border-b border-white/5 hidden">
+                            <div class="flex flex-col gap-1">
+                                <label class="text-sm font-bold text-on-surface">Plan Name</label>
+                                <input type="text" id="plan-input-name" class="bg-surface border border-white/10 rounded-lg px-4 py-2 text-on-surface outline-none focus:border-primary" placeholder="e.g. Creator Pass" oninput="document.getElementById('plan-edit-name').innerText = this.value || 'Plan'; updatePlanPreview();">
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <label class="text-sm font-bold text-on-surface">Plan Identifier (ID)</label>
+                                <input type="text" id="plan-input-id" class="bg-surface border border-white/10 rounded-lg px-4 py-2 text-on-surface outline-none focus:border-primary font-mono text-xs" placeholder="e.g. creator_pass (lowercase)">
+                            </div>
+                        </div>
+
                         <!-- Pricing Section -->
                         <div class="flex flex-col gap-4">
                             <h4 class="text-lg font-bold text-on-surface border-b border-white/5 pb-2">Pricing & Display</h4>
@@ -2202,12 +2224,18 @@
                                     <p class="font-bold text-on-surface flex items-center gap-2">${p.name} <span class="text-xs px-2 py-0.5 bg-white/10 rounded font-mono">${p.id}</span><span class="text-xs px-2 py-0.5 ${billingBadge} rounded-full capitalize">${bType}</span></p>
                                     <p class="text-xs text-on-surface-variant mt-1">${priceLabel} &nbsp;•&nbsp; Downloads: ${p.daily_downloads === -1 ? 'Unlimited' : p.daily_downloads} &nbsp;•&nbsp; Max: ${p.max_resolution} &nbsp;•&nbsp; Ads: ${p.ads_enabled ? 'Yes' : 'No'}</p>
                                 </div>
-                                <button onclick="openPlanEditModal('${p.id}')" class="text-primary hover:text-primary-container p-2 rounded-lg hover:bg-white/5 transition-colors">
+                                <button onclick="openPlanEditModal('${p.id}')" class="text-primary hover:text-primary-container p-2 rounded-lg hover:bg-white/5 transition-colors" title="Edit Plan">
                                     <span class="material-symbols-outlined text-[20px]">edit</span>
                                 </button>
                             </div>
                         `;
                     });
+
+                    // Populate Grant Plan select options
+                    const grantPlanSelect = document.getElementById('grant-plan-id');
+                    if (grantPlanSelect && currentPlans.length > 0) {
+                        grantPlanSelect.innerHTML = currentPlans.map(p => `<option value="${p.id}">${p.name} (${p.billing_type || 'plan'})</option>`).join('');
+                    }
                 }
             } catch(e) {}
         }
@@ -2360,27 +2388,34 @@
         };
 
         function setupBillingDropdown(planId, currentBillingType) {
-            const cfg = PLAN_BILLING_CONFIG[planId] || { mode: 'standard', allowedCycles: ['monthly', 'yearly'] };
+            const cfg = (planId && PLAN_BILLING_CONFIG[planId]) || { mode: 'all', allowedCycles: ['monthly', 'yearly', 'lifetime', 'free'] };
             const select = document.getElementById('plan-billing-type');
             const billingRow = document.getElementById('billing-type-row');
 
             if (cfg.mode === 'free') {
-                // Free plan: hide billing row entirely
                 billingRow.classList.add('hidden');
+                select.innerHTML = '<option value="free">Free</option>';
                 select.value = 'free';
             } else if (cfg.mode === 'lifetime') {
-                // Lifetime plan: lock to lifetime
                 billingRow.classList.remove('hidden');
                 select.innerHTML = '<option value="lifetime">Lifetime</option>';
                 select.value = 'lifetime';
-            } else {
-                // Standard: show only monthly/yearly
+            } else if (cfg.mode === 'standard') {
                 billingRow.classList.remove('hidden');
                 select.innerHTML = `
                     <option value="monthly">Monthly</option>
                     <option value="yearly">Yearly</option>
                 `;
                 select.value = (currentBillingType === 'yearly') ? 'yearly' : 'monthly';
+            } else {
+                billingRow.classList.remove('hidden');
+                select.innerHTML = `
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                    <option value="lifetime">Lifetime</option>
+                    <option value="free">Free</option>
+                `;
+                select.value = currentBillingType || 'monthly';
             }
 
             updatePriceFields();
@@ -2406,7 +2441,6 @@
                 wrapMo.classList.remove('hidden');
                 wrapYr.classList.remove('hidden');
                 wrapLt.classList.add('hidden');
-                // Highlight active price field with a stronger border
                 wrapMo.querySelector('input').classList.toggle('border-primary', type === 'monthly');
                 wrapYr.querySelector('input').classList.toggle('border-primary', type === 'yearly');
                 wrapMo.querySelector('label').innerHTML = type === 'monthly'
@@ -2418,12 +2452,66 @@
             }
         }
 
+        function openCreatePlanModal() {
+            activeEditPlanId = null;
+            document.getElementById('plan-modal-title').innerText = 'Create New';
+            document.getElementById('plan-edit-name').innerText = 'Plan';
+            
+            const nameRow = document.getElementById('plan-name-input-row');
+            if (nameRow) nameRow.classList.remove('hidden');
+            
+            document.getElementById('plan-input-name').value = '';
+            document.getElementById('plan-input-id').value = '';
+            document.getElementById('plan-desc').value = '';
+
+            setupBillingDropdown(null, 'monthly');
+
+            document.getElementById('plan-price-mo').value = 9.99;
+            document.getElementById('plan-price-yr').value = 79.99;
+            document.getElementById('plan-price-lt').value = 149.99;
+
+            document.getElementById('plan-dl-daily').value = -1;
+            document.getElementById('plan-dl-monthly').value = -1;
+            document.getElementById('plan-cv-daily').value = -1;
+            document.getElementById('plan-cv-monthly').value = -1;
+
+            document.getElementById('plan-max-res').value = '4k';
+
+            document.getElementById('plan-yt').checked = true;
+            document.getElementById('plan-ig').checked = true;
+            document.getElementById('plan-fb').checked = true;
+            document.getElementById('plan-mp3').checked = true;
+            document.getElementById('plan-mp4').checked = true;
+            document.getElementById('plan-conv').checked = true;
+
+            document.getElementById('plan-batch').checked = true;
+            document.getElementById('plan-playlist').checked = true;
+            document.getElementById('plan-sync').checked = true;
+            document.getElementById('plan-cloud').checked = true;
+            document.getElementById('plan-devices').checked = true;
+            document.getElementById('plan-early').checked = false;
+            document.getElementById('plan-priority').checked = true;
+
+            document.getElementById('plan-ads').checked = false;
+            document.getElementById('plan-noads').checked = true;
+
+            const planModal = document.getElementById('plan-edit-modal');
+            planModal.classList.remove('hidden');
+            planModal.classList.add('flex');
+            updatePlanPreview();
+        }
+
         function openPlanEditModal(id) {
             const plan = currentPlans.find(p => p.id === id);
             if(!plan) return;
             activeEditPlanId = id;
 
+            document.getElementById('plan-modal-title').innerText = 'Edit';
             document.getElementById('plan-edit-name').innerText = plan.name;
+            
+            const nameRow = document.getElementById('plan-name-input-row');
+            if (nameRow) nameRow.classList.add('hidden');
+
             document.getElementById('plan-desc').value = plan.description || '';
 
             // Set billing dropdown based on plan identity
@@ -2440,23 +2528,23 @@
 
             document.getElementById('plan-max-res').value = plan.max_resolution || '720p';
 
-            document.getElementById('plan-yt').checked = plan.youtube_enabled === 1;
-            document.getElementById('plan-ig').checked = plan.instagram_enabled === 1;
-            document.getElementById('plan-fb').checked = plan.facebook_enabled === 1;
-            document.getElementById('plan-mp3').checked = plan.mp3_enabled === 1;
-            document.getElementById('plan-mp4').checked = plan.mp4_enabled === 1;
-            document.getElementById('plan-conv').checked = plan.converter_access === 1;
+            document.getElementById('plan-yt').checked = plan.youtube_enabled === 1 || plan.youtube_enabled === true;
+            document.getElementById('plan-ig').checked = plan.instagram_enabled === 1 || plan.instagram_enabled === true;
+            document.getElementById('plan-fb').checked = plan.facebook_enabled === 1 || plan.facebook_enabled === true;
+            document.getElementById('plan-mp3').checked = plan.mp3_enabled === 1 || plan.mp3_enabled === true;
+            document.getElementById('plan-mp4').checked = plan.mp4_enabled === 1 || plan.mp4_enabled === true;
+            document.getElementById('plan-conv').checked = plan.converter_access === 1 || plan.converter_access === true;
 
-            document.getElementById('plan-batch').checked = plan.batch_download === 1;
-            document.getElementById('plan-playlist').checked = plan.playlist_download === 1;
-            document.getElementById('plan-sync').checked = plan.download_history_sync === 1;
-            document.getElementById('plan-cloud').checked = plan.cloud_sync === 1;
-            document.getElementById('plan-devices').checked = plan.multi_device_access === 1;
-            document.getElementById('plan-early').checked = plan.early_access_features === 1;
-            document.getElementById('plan-priority').checked = plan.priority_features === 1;
+            document.getElementById('plan-batch').checked = plan.batch_download === 1 || plan.batch_download === true;
+            document.getElementById('plan-playlist').checked = plan.playlist_download === 1 || plan.playlist_download === true;
+            document.getElementById('plan-sync').checked = plan.download_history_sync === 1 || plan.download_history_sync === true;
+            document.getElementById('plan-cloud').checked = plan.cloud_sync === 1 || plan.cloud_sync === true;
+            document.getElementById('plan-devices').checked = plan.multi_device_access === 1 || plan.multi_device_access === true;
+            document.getElementById('plan-early').checked = plan.early_access_features === 1 || plan.early_access_features === true;
+            document.getElementById('plan-priority').checked = plan.priority_features === 1 || plan.priority_features === true;
 
-            document.getElementById('plan-ads').checked = plan.ads_enabled === 1;
-            document.getElementById('plan-noads').checked = plan.ad_free_experience === 1;
+            document.getElementById('plan-ads').checked = plan.ads_enabled === 1 || plan.ads_enabled === true;
+            document.getElementById('plan-noads').checked = plan.ad_free_experience === 1 || plan.ad_free_experience === true;
 
             const planModal = document.getElementById('plan-edit-modal');
             planModal.classList.remove('hidden');
@@ -2465,12 +2553,17 @@
         }
 
         function updatePlanPreview() {
-            if(!activeEditPlanId) return;
-            const plan = currentPlans.find(p => p.id === activeEditPlanId);
-            if(!plan) return;
+            let planName = 'Custom Plan';
+            let planDesc = document.getElementById('plan-desc').value || 'Basic Access';
+            if (activeEditPlanId) {
+                const plan = currentPlans.find(p => p.id === activeEditPlanId);
+                if (plan) planName = plan.name;
+            } else {
+                planName = document.getElementById('plan-input-name').value || 'New Plan';
+            }
 
-            document.getElementById('prev-name').innerText = plan.name;
-            document.getElementById('prev-desc').innerText = document.getElementById('plan-desc').value || 'Basic Access';
+            document.getElementById('prev-name').innerText = planName;
+            document.getElementById('prev-desc').innerText = planDesc;
 
             const bType = document.getElementById('plan-billing-type').value;
             let priceVal = '0';
@@ -2486,7 +2579,6 @@
                 priceVal = '0';
                 priceSuffix = ' Free Forever';
             } else {
-                // monthly
                 priceVal = document.getElementById('plan-price-mo').value || '0';
                 priceSuffix = '/month';
             }
@@ -2527,8 +2619,21 @@
         }
 
         async function savePlanEdits() {
-            if(!activeEditPlanId) return;
+            const isNew = !activeEditPlanId;
+            const planName = isNew 
+                ? document.getElementById('plan-input-name').value.trim() 
+                : (document.getElementById('plan-edit-name').innerText.trim() || 'Custom Plan');
+            const planId = isNew 
+                ? (document.getElementById('plan-input-id').value.trim() || planName.toLowerCase().replace(/[^a-z0-9]/g, '_')) 
+                : activeEditPlanId;
+            
+            if (isNew && (!planName || !planId)) {
+                return alert("Please enter both Plan Name and Plan ID");
+            }
+
             const payload = {
+                id: planId,
+                name: planName,
                 description: document.getElementById('plan-desc').value,
                 billing_type: document.getElementById('plan-billing-type').value,
                 price_monthly: parseFloat(document.getElementById('plan-price-mo').value) || 0,
@@ -2560,22 +2665,38 @@
                 ads_enabled: document.getElementById('plan-ads').checked,
                 ad_free_experience: document.getElementById('plan-noads').checked
             };
+
             try {
-                await fetch((window.API_BASE_URL || '') + '/api/admin/plans/' + activeEditPlanId, {
-                    method: 'PUT',
+                const endpoint = isNew 
+                    ? (window.API_BASE_URL || '') + '/api/admin/plans'
+                    : (window.API_BASE_URL || '') + '/api/admin/plans/' + activeEditPlanId;
+                const method = isNew ? 'POST' : 'PUT';
+
+                const res = await fetch(endpoint, {
+                    method: method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                closePlanEditModal();
-                loadSubscriptions();
-            } catch(e) { alert("Save failed"); }
+                const resData = await res.json();
+                if (resData.success) {
+                    closePlanEditModal();
+                    loadSubscriptions();
+                    alert(isNew ? "Subscription plan created successfully!" : "Subscription plan updated successfully!");
+                } else {
+                    alert(resData.error || "Save failed");
+                }
+            } catch(e) { 
+                alert("Save failed"); 
+            }
         }
 
         async function grantSubscription() {
-            const userId = document.getElementById('grant-user-id').value.trim();
+            let userId = document.getElementById('grant-user-id').value;
+            const manualUser = document.getElementById('grant-user-manual') ? document.getElementById('grant-user-manual').value.trim() : '';
+            if (manualUser) userId = manualUser;
             const planId = document.getElementById('grant-plan-id').value;
             const duration = document.getElementById('grant-duration').value;
-            if(!userId) return alert('Enter a target user ID');
+            if(!userId) return alert('Please select a user or enter their email/ID');
             try {
                 const res = await fetch((window.API_BASE_URL || '') + '/api/admin/subscriptions/grant', {
                     method: 'POST',
@@ -2585,8 +2706,10 @@
                 const data = await res.json();
                 if(data.success) {
                     alert('Subscription Granted Successfully!');
-                    document.getElementById('grant-user-id').value = '';
+                    if (document.getElementById('grant-user-manual')) document.getElementById('grant-user-manual').value = '';
                     loadSubscriptions();
+                    loadSubList();
+                    if (typeof loadUsers === 'function') loadUsers();
                 } else {
                     alert('Failed: ' + (data.error || 'Unknown error'));
                 }
@@ -2754,16 +2877,16 @@
                 }
                 
                 if (data && data.success) {
-                    if (document.getElementById('stat-tot-users')) document.getElementById('stat-tot-users').innerText = data.totalUsers || 2480;
-                    if (document.getElementById('stat-act-users')) document.getElementById('stat-act-users').innerText = data.activeUsers || 840;
-                    if (document.getElementById('stat-dl-today')) document.getElementById('stat-dl-today').innerText = data.dlToday || 184;
-                    if (document.getElementById('stat-cv-today')) document.getElementById('stat-cv-today').innerText = data.cvToday || 42;
-                    if (document.getElementById('stat-dl-month')) document.getElementById('stat-dl-month').innerText = data.dlMonth || 4920;
-                    if (document.getElementById('stat-cv-month')) document.getElementById('stat-cv-month').innerText = data.cvMonth || 950;
+                    if (document.getElementById('stat-tot-users')) document.getElementById('stat-tot-users').innerText = data.totalUsers ?? 0;
+                    if (document.getElementById('stat-act-users')) document.getElementById('stat-act-users').innerText = data.activeUsers ?? 0;
+                    if (document.getElementById('stat-dl-today')) document.getElementById('stat-dl-today').innerText = data.dlToday ?? 0;
+                    if (document.getElementById('stat-cv-today')) document.getElementById('stat-cv-today').innerText = data.cvToday ?? 0;
+                    if (document.getElementById('stat-dl-month')) document.getElementById('stat-dl-month').innerText = data.dlMonth ?? 0;
+                    if (document.getElementById('stat-cv-month')) document.getElementById('stat-cv-month').innerText = data.cvMonth ?? 0;
                     
-                    if (document.getElementById('stat-an-yt')) document.getElementById('stat-an-yt').innerText = data.ytDl || 3750;
-                    if (document.getElementById('stat-an-ig')) document.getElementById('stat-an-ig').innerText = data.igDl || 820;
-                    if (document.getElementById('stat-an-fb')) document.getElementById('stat-an-fb').innerText = data.fbDl || 350;
+                    if (document.getElementById('stat-an-yt')) document.getElementById('stat-an-yt').innerText = data.ytDl ?? 0;
+                    if (document.getElementById('stat-an-ig')) document.getElementById('stat-an-ig').innerText = data.igDl ?? 0;
+                    if (document.getElementById('stat-an-fb')) document.getElementById('stat-an-fb').innerText = data.fbDl ?? 0;
 
                     // Render Dashboard Chart
                     const canvasEl = document.getElementById('dashboardChart');
@@ -2943,6 +3066,15 @@
             if (data.success) {
                 allUsers = data.users;
                 renderUsers(allUsers);
+                updateGrantUserDropdown();
+            }
+        }
+
+        function updateGrantUserDropdown() {
+            const grantUserSelect = document.getElementById('grant-user-id');
+            if (grantUserSelect && Array.isArray(allUsers) && allUsers.length > 0) {
+                grantUserSelect.innerHTML = `<option value="">-- Choose User --</option>` + 
+                    allUsers.map(u => `<option value="${u.id}">${u.name || 'User'} (${u.email}) [${u.plan || 'Free'}]</option>`).join('');
             }
         }
 

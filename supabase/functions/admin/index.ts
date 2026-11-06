@@ -88,22 +88,14 @@ let usersList = [
   { id: "admin_master_1", name: "Master Administrator", email: ADMIN_EMAIL, role: "super_admin", status: "active", plan: "Lifetime", join_date: "2026-01-01", last_login: "2026-11-06 14:35:00", dlCount: 0, cvCount: 0 },
 ];
 
-let feedbackList = [
-  { id: "fb_1", type: "suggestion", rating: 5, message: "Loving the high-speed 4K download feature! Downloaded full 60fps concert flawlessly.", user_email: "vip@example.com", status: "new", created_at: new Date(Date.now() - 3600000).toISOString() },
-  { id: "fb_2", type: "feature", rating: 5, message: "Please add batch playlist downloading for Facebook video reels.", user_email: "alex@creative.io", status: "resolved", created_at: new Date(Date.now() - 7200000).toISOString() },
-  { id: "fb_3", type: "bug", rating: 4, message: "MP3 conversion quality was great at 320kbps.", user_email: "devon@media.io", status: "new", created_at: new Date(Date.now() - 86400000).toISOString() },
-];
+let feedbackList: Array<any> = [];
 
-let ticketsList = [
-  { id: "TK-101", user_email: "vip@example.com", type: "billing", status: "resolved", message: "Inquiry about annual invoice receipt.", created_at: new Date(Date.now() - 86400000 * 2).toISOString() },
-  { id: "TK-102", user_email: "alex@creative.io", type: "technical", status: "open", message: "Can I download 4K HDR 60fps on macOS Menubar app?", created_at: new Date(Date.now() - 3600000 * 4).toISOString() },
-  { id: "TK-103", user_email: "devon@media.io", type: "feature", status: "pending", message: "Requesting batch audio tag editor in converter.", created_at: new Date(Date.now() - 3600000 * 2).toISOString() },
-];
+let ticketsList: Array<any> = [];
 
 let releasesList = [
-  { version: "v2.4.0", status: "Published", platform: "All Platforms", release_notes: "Production cloud download bridge, Google AdSense integration, responsive converter and admin management suite.", is_current: 1, force_update: 0, downloads_count: 3840, created_at: "2026-11-06" },
-  { version: "v2.3.1", status: "Published", platform: "Windows / macOS", release_notes: "Desktop electron performance updates and audio converter fixes.", is_current: 0, force_update: 0, downloads_count: 5120, created_at: "2026-10-20" },
-  { version: "v2.5.0-beta", status: "Beta", platform: "All Platforms", release_notes: "High-concurrency cloud streaming and direct drive synchronization.", is_current: 0, force_update: 0, downloads_count: 120, created_at: "2026-11-05" },
+  { version: "v2.4.0", status: "Published", platform: "All Platforms", release_notes: "Production cloud download bridge, Google AdSense integration, responsive converter and admin management suite.", is_current: 1, force_update: 0, downloads_count: 0, created_at: "2026-11-06" },
+  { version: "v2.3.1", status: "Published", platform: "Windows / macOS", release_notes: "Desktop electron performance updates and audio converter fixes.", is_current: 0, force_update: 0, downloads_count: 0, created_at: "2026-10-20" },
+  { version: "v2.5.0-beta", status: "Beta", platform: "All Platforms", release_notes: "High-concurrency cloud streaming and direct drive synchronization.", is_current: 0, force_update: 0, downloads_count: 0, created_at: "2026-11-05" },
 ];
 
 serve(async (req: Request) => {
@@ -175,23 +167,27 @@ serve(async (req: Request) => {
 
     // ── 3. Platform Analytics (Dashboard Overview) ───────────────
     if (pathname === "/analytics") {
+      let totalUsers = 1;
+      try {
+        const { data: dbUsers } = await supabase.rpc("get_admin_users");
+        if (Array.isArray(dbUsers) && dbUsers.length > 0) {
+          totalUsers = dbUsers.length;
+        }
+      } catch (_) {}
+
       return new Response(JSON.stringify({
         success: true,
-        totalUsers: 2480,
-        activeUsers: 840,
-        dlToday: 184,
-        cvToday: 42,
-        dlMonth: 4920,
-        cvMonth: 950,
-        ytDl: 3750,
-        igDl: 820,
-        fbDl: 350,
+        totalUsers: totalUsers,
+        activeUsers: totalUsers,
+        dlToday: 0,
+        cvToday: 0,
+        dlMonth: 0,
+        cvMonth: 0,
+        ytDl: 0,
+        igDl: 0,
+        fbDl: 0,
         topDays: [
-          { d: "2026-11-06", c: 184 },
-          { d: "2026-11-05", c: 240 },
-          { d: "2026-11-04", c: 215 },
-          { d: "2026-11-03", c: 190 },
-          { d: "2026-11-02", c: 175 },
+          { d: new Date().toISOString().substring(0, 10), c: 0 },
         ],
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -214,13 +210,25 @@ serve(async (req: Request) => {
 
     // ── 5. Revenue Stats ─────────────────────────────────────────
     if (pathname === "/revenue") {
+      let activeSubscribers = 1;
+      let expiredSubscribers = 0;
+      let mrr = 0;
+      try {
+        const { data: subOverview } = await supabase.rpc("get_admin_subscriptions_overview");
+        if (subOverview?.stats) {
+          activeSubscribers = (subOverview.stats.pro || 0) + (subOverview.stats.premium || 0) + (subOverview.stats.lifetime || 1);
+          expiredSubscribers = subOverview.stats.expired || 0;
+          mrr = subOverview.stats.mrr || 0;
+        }
+      } catch (_) {}
+
       return new Response(JSON.stringify({
         success: true,
-        revenueToday: 185.50,
-        revenueMonth: 4850.00,
-        activeSubscribers: 388,
-        expiredSubscribers: 15,
-        totalRevenue: 18450.00,
+        revenueToday: 0,
+        revenueMonth: mrr,
+        activeSubscribers: activeSubscribers,
+        expiredSubscribers: expiredSubscribers,
+        totalRevenue: mrr,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -385,19 +393,32 @@ serve(async (req: Request) => {
 
     // ── 8. Subscriptions Stats ───────────────────────────────────
     if (pathname === "/subscriptions/stats") {
+      try {
+        const { data: subOverview, error } = await supabase.rpc("get_admin_subscriptions_overview");
+        if (!error && subOverview?.stats) {
+          return new Response(JSON.stringify({
+            success: true,
+            stats: subOverview.stats,
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (err) {
+        console.warn("Error fetching sub stats:", err);
+      }
       return new Response(JSON.stringify({
         success: true,
         stats: {
-          free: 1850,
-          premium: 320,
-          pro: 210,
-          lifetime: 100,
-          expired: 15,
-          mrr: 4850,
-          billing_monthly: 410,
-          billing_yearly: 120,
-          billing_lifetime: 100,
-          billing_free: 1850,
+          free: 0,
+          premium: 0,
+          pro: 0,
+          lifetime: 1,
+          expired: 0,
+          mrr: 0,
+          billing_monthly: 0,
+          billing_yearly: 0,
+          billing_lifetime: 1,
+          billing_free: 0,
         },
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -408,16 +429,31 @@ serve(async (req: Request) => {
     if (pathname === "/plans" || pathname.startsWith("/plans/")) {
       if (req.method === "POST" || req.method === "PUT") {
         const body = await req.json().catch(() => ({}));
-        const planId = pathname.replace("/plans/", "").trim();
-        const existing = plans.find(p => p.id === planId);
-        if (existing) {
-          Object.assign(existing, body);
-        } else if (body.id) {
-          plans.push(body);
+        const planId = pathname.replace("/plans/", "").replace("/plans", "").trim();
+        if (planId && !body.id) body.id = planId;
+        try {
+          await supabase.rpc("admin_upsert_plan", { p_plan: body });
+        } catch (err) {
+          console.warn("Error upserting plan:", err);
         }
-        return new Response(JSON.stringify({ success: true, plans }), {
+        const { data: dbPlans } = await supabase.from("plans").select("*").order("created_at", { ascending: true });
+        return new Response(JSON.stringify({ success: true, plans: dbPlans || plans }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+
+      try {
+        const { data: dbPlans, error } = await supabase.from("plans").select("*").order("created_at", { ascending: true });
+        if (!error && Array.isArray(dbPlans) && dbPlans.length > 0) {
+          return new Response(JSON.stringify({
+            success: true,
+            plans: dbPlans,
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (err) {
+        console.warn("Error fetching plans:", err);
       }
       return new Response(JSON.stringify({
         success: true,
@@ -429,39 +465,29 @@ serve(async (req: Request) => {
 
     // ── 10. Subscriptions List & Grant ───────────────────────────
     if (pathname === "/subscriptions/list") {
+      try {
+        const { data: subOverview, error } = await supabase.rpc("get_admin_subscriptions_overview");
+        if (!error && subOverview?.subscriptions) {
+          const subs = subOverview.subscriptions;
+          return new Response(JSON.stringify({
+            success: true,
+            subscriptions: subs,
+            total: subs.length,
+            page: 1,
+            limit: 50,
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (err) {
+        console.warn("Error fetching subs list:", err);
+      }
       return new Response(JSON.stringify({
         success: true,
-        subscriptions: [
-          {
-            id: "sub_1001",
-            user_id: "usr_1",
-            user_email: "vip@example.com",
-            user_name: "VIP Member",
-            plan_id: "pro",
-            plan_name: "Desktop Pro",
-            status: "active",
-            start_date: "2026-10-01 10:00:00",
-            expiry_date: "2027-10-01 10:00:00",
-            payment_provider: "stripe",
-            billing_type: "yearly",
-          },
-          {
-            id: "sub_1002",
-            user_id: "usr_2",
-            user_email: "alex@creative.io",
-            user_name: "Alex Reed",
-            plan_id: "lifetime",
-            plan_name: "Lifetime Ultimate",
-            status: "active",
-            start_date: "2026-10-15 14:30:00",
-            expiry_date: null,
-            payment_provider: "stripe",
-            billing_type: "lifetime",
-          },
-        ],
-        total: 2,
+        subscriptions: [],
+        total: 0,
         page: 1,
-        limit: 20,
+        limit: 50,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -469,12 +495,58 @@ serve(async (req: Request) => {
 
     if (pathname === "/subscriptions/grant") {
       const body = await req.json().catch(() => ({}));
-      return new Response(JSON.stringify({ success: true, granted: body }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      try {
+        const { data: result, error } = await supabase.rpc("admin_grant_subscription", {
+          p_user_id: body.user_id,
+          p_plan_id: body.plan_id,
+          p_duration_days: Number(body.duration_days) || 30,
+        });
+        if (!error && result?.success) {
+          activityLogs.unshift({
+            id: Date.now(),
+            action: "Subscription Granted",
+            details: `Plan ${result.plan_name} assigned to ${result.user_email}`,
+            user_email: ADMIN_EMAIL,
+            ip_address: "Cloud Admin",
+            created_at: new Date().toISOString().replace("T", " ").substring(0, 19),
+          });
+          return new Response(JSON.stringify({ success: true, granted: result }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } else {
+          return new Response(JSON.stringify({ success: false, error: result?.error || error?.message || "Grant failed" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return new Response(JSON.stringify({ success: false, error: msg }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     if (pathname.startsWith("/subscriptions/")) {
+      const parts = pathname.split("/").filter(Boolean); // ['subscriptions', 'sub_123', 'suspend']
+      const subId = parts[1];
+      const action = parts[2];
+      const body = await req.json().catch(() => ({}));
+
+      try {
+        if (action === "suspend") {
+          await supabase.from("subscriptions").update({ status: "suspended" }).eq("id", subId);
+        } else if (action === "activate") {
+          await supabase.from("subscriptions").update({ status: "active" }).eq("id", subId);
+        } else if (action === "cancel") {
+          await supabase.from("subscriptions").update({ status: "cancelled" }).eq("id", subId);
+        } else if (action === "extend") {
+          const days = Number(body.days) || 30;
+          await supabase.from("subscriptions").update({
+            expiry_date: new Date(Date.now() + days * 86400000).toISOString()
+          }).eq("id", subId);
+        }
+      } catch (_) {}
+
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -482,13 +554,24 @@ serve(async (req: Request) => {
 
     // ── 11. Payments List ────────────────────────────────────────
     if (pathname === "/payments") {
+      try {
+        const { data: dbPayments, error } = await supabase.from("payments").select("*").order("created_at", { ascending: false });
+        if (!error && Array.isArray(dbPayments)) {
+          return new Response(JSON.stringify({
+            success: true,
+            payments: dbPayments,
+            total: dbPayments.length,
+            page: 1,
+            limit: 20,
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (_) {}
       return new Response(JSON.stringify({
         success: true,
-        payments: [
-          { id: "pay_1", payment_id: "pi_stripe_1001", amount: 79.99, currency: "USD", status: "completed", user_name: "VIP Member", user_email: "vip@example.com", user_id: "usr_1", plan_name: "Desktop Pro", plan_id: "pro", created_at: "2026-10-01 10:00:00", date: "2026-10-01 10:00:00", provider: "stripe" },
-          { id: "pay_2", payment_id: "pi_stripe_1002", amount: 199.99, currency: "USD", status: "completed", user_name: "Alex Reed", user_email: "alex@creative.io", user_id: "usr_2", plan_name: "Lifetime Ultimate", plan_id: "lifetime", created_at: "2026-10-15 14:30:00", date: "2026-10-15 14:30:00", provider: "stripe" },
-        ],
-        total: 2,
+        payments: [],
+        total: 0,
         page: 1,
         limit: 20,
       }), {
@@ -511,12 +594,9 @@ serve(async (req: Request) => {
         csv = "ID,Name,Email,Role,Status,Plan,JoinDate,Downloads,Conversions\n" +
           exportUsers.map(u => `"${u.id}","${u.name}","${u.email}","${u.role}","${u.status}","${u.plan}","${u.join_date || u.created_at || ''}","${u.downloads_count || u.dlCount || 0}","${u.conversions_count || u.cvCount || 0}"`).join("\n");
       } else if (exportType === "downloads") {
-        csv = "ID,User,Platform,Format,Size,Date,Status\n" +
-          `"dl_1","Alex Mercer","YouTube","1080p MP4","45.2 MB","2026-11-06","Completed"\n` +
-          `"dl_2","Sara Connor","Instagram","Original Reel","12.8 MB","2026-11-06","Completed"`;
+        csv = "ID,User,Platform,Format,Size,Date,Status\n";
       } else {
-        csv = "ID,User,Filename,Output,Status,Date\n" +
-          `"cv_1","VIP Member","podcast_ep12.mp4","320kbps MP3","Completed","2026-11-06"`;
+        csv = "ID,User,Filename,Output,Status,Date\n";
       }
       return new Response(csv, {
         headers: {
@@ -625,19 +705,15 @@ serve(async (req: Request) => {
 
     // ── 15. User Feedback ────────────────────────────────────────
     if (pathname === "/feedback" || pathname.startsWith("/feedback/")) {
-      if (pathname.includes("test-data")) {
-        return new Response(JSON.stringify({ success: true, feedback: feedbackList }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       if (req.method === "POST" || req.method === "PUT") {
         const body = await req.json().catch(() => ({}));
         const fbId = pathname.replace("/feedback/", "").trim();
         const existing = feedbackList.find(f => f.id === fbId);
         if (existing) {
           if (body.status) existing.status = body.status;
+          try { await supabase.from("feedback").update({ status: body.status }).eq("id", fbId); } catch (_) {}
         } else if (body.message) {
-          feedbackList.unshift({
+          const newFb = {
             id: "fb_" + Date.now(),
             type: body.type || "suggestion",
             rating: body.rating || 5,
@@ -645,7 +721,9 @@ serve(async (req: Request) => {
             user_email: body.user_email || "user@streamvault.app",
             status: "new",
             created_at: new Date().toISOString(),
-          });
+          };
+          feedbackList.unshift(newFb);
+          try { await supabase.from("feedback").insert(newFb); } catch (_) {}
         }
         return new Response(JSON.stringify({ success: true, feedback: feedbackList }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -654,10 +732,21 @@ serve(async (req: Request) => {
       if (req.method === "DELETE") {
         const fbId = pathname.replace("/feedback/", "").trim();
         feedbackList = feedbackList.filter(f => f.id !== fbId);
+        try { await supabase.from("feedback").delete().eq("id", fbId); } catch (_) {}
         return new Response(JSON.stringify({ success: true, feedback: feedbackList }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+
+      try {
+        const { data: dbFb } = await supabase.from("feedback").select("*").order("created_at", { ascending: false });
+        if (Array.isArray(dbFb) && dbFb.length > 0) {
+          return new Response(JSON.stringify({ success: true, feedback: dbFb }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (_) {}
+
       return new Response(JSON.stringify({
         success: true,
         feedback: feedbackList,
@@ -672,11 +761,24 @@ serve(async (req: Request) => {
         const body = await req.json().catch(() => ({}));
         const tId = pathname.replace("/tickets/", "").trim();
         const tk = ticketsList.find(t => t.id === tId);
-        if (tk && body.status) tk.status = body.status;
+        if (tk && body.status) {
+          tk.status = body.status;
+          try { await supabase.from("tickets").update({ status: body.status }).eq("id", tId); } catch (_) {}
+        }
         return new Response(JSON.stringify({ success: true, tickets: ticketsList }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+
+      try {
+        const { data: dbTk } = await supabase.from("tickets").select("*").order("created_at", { ascending: false });
+        if (Array.isArray(dbTk) && dbTk.length > 0) {
+          return new Response(JSON.stringify({ success: true, tickets: dbTk }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (_) {}
+
       return new Response(JSON.stringify({
         success: true,
         tickets: ticketsList,
