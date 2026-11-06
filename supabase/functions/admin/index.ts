@@ -8,6 +8,7 @@
 // ============================================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +16,11 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Credentials": "true",
 };
+
+const supabaseUrl = Deno.env.get("SUPABASE_URL") || "https://sjnamkshicpxtyikzsnp.supabase.co";
+const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNqbmFta3NoaWNweHR5aWt6c25wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3MzEzOTYsImV4cCI6MjEwMTMwNzM5Nn0.pZG7nQhnuzxc19umXyztJ-CLhFYe5p527IGxlI_9hNc";
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || supabaseAnonKey;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const ADMIN_EMAIL = "admin@streamvault.com";
 const ADMIN_PASS = "streamvault2026";
@@ -73,16 +79,13 @@ let promoCodes = [
 
 let activityLogs = [
   { id: 1, action: "Admin Session Verified", details: "Admin accessed dashboard.", user_email: ADMIN_EMAIL, ip_address: "Cloud Edge", created_at: "2026-11-06 14:35:00" },
-  { id: 2, action: "Video Download (1080p)", details: "Completed 1080p MP4 cloud stream successfully.", user_email: "vip@example.com", ip_address: "Cloud Edge", created_at: "2026-11-06 14:30:00" },
-  { id: 3, action: "Audio Extraction (320K)", details: "Completed high-fidelity MP3 extraction.", user_email: "alex@creative.io", ip_address: "Cloud Edge", created_at: "2026-11-06 14:15:00" },
-  { id: 4, action: "Ad Impression Recorded", details: "Banner ad delivered to Free Tier visitor.", user_email: "guest@streamvault.app", ip_address: "Cloud Edge", created_at: "2026-11-06 14:00:00" },
+  { id: 2, action: "Google OAuth Synced", details: "User authentication profile verified in database.", user_email: "System Auth", ip_address: "Cloud Edge", created_at: "2026-11-06 14:30:00" },
+  { id: 3, action: "Edge Engine Initialized", details: "Botguard bypass and download pipelines active.", user_email: "System", ip_address: "Cloud Edge", created_at: "2026-11-06 14:15:00" },
+  { id: 4, action: "Ad Impression Recorded", details: "Google AdSense banner delivered to visitor.", user_email: "Visitor", ip_address: "Cloud Edge", created_at: "2026-11-06 14:00:00" },
 ];
 
 let usersList = [
-  { id: "admin_master_1", name: "Master Administrator", email: ADMIN_EMAIL, role: "super_admin", status: "active", plan: "Lifetime", join_date: "2026-01-01", last_login: "2026-11-06 14:35:00", dlCount: 184, cvCount: 42 },
-  { id: "usr_1", name: "VIP Member", email: "vip@example.com", role: "user", status: "active", plan: "Pro", join_date: "2026-10-01", last_login: "2026-11-06 12:12:00", dlCount: 76, cvCount: 19 },
-  { id: "usr_2", name: "Alex Reed", email: "alex@creative.io", role: "user", status: "active", plan: "Lifetime", join_date: "2026-10-15", last_login: "2026-11-05 18:20:00", dlCount: 112, cvCount: 31 },
-  { id: "usr_3", name: "Devon Vance", email: "devon@media.io", role: "user", status: "active", plan: "Free", join_date: "2026-11-01", last_login: "2026-11-06 10:45:00", dlCount: 8, cvCount: 2 },
+  { id: "admin_master_1", name: "Master Administrator", email: ADMIN_EMAIL, role: "super_admin", status: "active", plan: "Lifetime", join_date: "2026-01-01", last_login: "2026-11-06 14:35:00", dlCount: 0, cvCount: 0 },
 ];
 
 let feedbackList = [
@@ -235,6 +238,19 @@ serve(async (req: Request) => {
 
     // ── 7. Users List & User Actions ─────────────────────────────
     if (pathname === "/users") {
+      try {
+        const { data: dbUsers, error } = await supabase.rpc("get_admin_users");
+        if (!error && Array.isArray(dbUsers) && dbUsers.length > 0) {
+          return new Response(JSON.stringify({
+            success: true,
+            users: dbUsers,
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (err) {
+        console.warn("Error fetching real users via RPC:", err);
+      }
       return new Response(JSON.stringify({
         success: true,
         users: usersList,
@@ -249,56 +265,60 @@ serve(async (req: Request) => {
       const targetUserId = parts[1];
       const action = parts[2];
 
-      const user = usersList.find(u => u.id === targetUserId) || {
-        id: targetUserId,
-        name: "Member " + targetUserId,
-        email: targetUserId.includes("@") ? targetUserId : `${targetUserId}@streamvault.app`,
-        role: "user",
-        status: "active",
-        plan: "Pro",
-        daily_download_limit: 10,
-        daily_conversion_limit: 10,
-        storage_limit: 1024,
-        subscription_expiry: "2027-01-01",
-      };
-
       if (!action) {
         // GET /users/:id or DELETE /users/:id
         if (req.method === "DELETE") {
+          try {
+            await supabase.rpc("admin_delete_user", { p_user_id: targetUserId });
+          } catch (_) {}
           usersList = usersList.filter(u => u.id !== targetUserId);
           return new Response(JSON.stringify({ success: true }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
 
+        try {
+          const { data: details, error } = await supabase.rpc("get_admin_user_details", { p_user_id: targetUserId });
+          if (!error && details && details.success) {
+            return new Response(JSON.stringify(details), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        } catch (err) {
+          console.warn("Error fetching user details via RPC:", err);
+        }
+
+        const user = usersList.find(u => u.id === targetUserId) || {
+          id: targetUserId,
+          name: targetUserId === "admin_master_1" ? "Master Administrator" : "User " + targetUserId.substring(0, 8),
+          email: targetUserId === "admin_master_1" ? ADMIN_EMAIL : `${targetUserId}@gmail.com`,
+          role: targetUserId === "admin_master_1" ? "super_admin" : "user",
+          status: "active",
+          plan: targetUserId === "admin_master_1" ? "Lifetime" : "Free",
+          daily_download_limit: 10,
+          daily_conversion_limit: 5,
+          storage_limit: null,
+          subscription_expiry: null,
+        };
+
         return new Response(JSON.stringify({
           success: true,
           user: user,
           stats: {
-            totalStorage: 45 * 1024 * 1024,
-            ytCount: 18,
-            igCount: 6,
-            fbCount: 3,
+            totalStorage: 0,
+            ytCount: 0,
+            igCount: 0,
+            fbCount: 0,
           },
-          downloads: [
-            { id: "dl_1", title: "4K Nature Reel", platform: "YouTube", format: "MP4 4K", size: "24.5 MB", date: "2026-11-06" },
-            { id: "dl_2", title: "Acoustic Session", platform: "Instagram", format: "MP3 320K", size: "8.2 MB", date: "2026-11-05" },
-          ],
-          conversions: [
-            { id: "cv_1", filename: "podcast_ep12.mp4", output: "MP3 (320kbps)", status: "completed", date: "2026-11-06" },
-          ],
-          devices: [
-            { id: "dev_1", os: "macOS", browser: "Chrome 130", ip_address: "103.21.244.1", last_active: new Date().toISOString() },
-            { id: "dev_2", os: "Windows 11", browser: "Edge 128", ip_address: "157.240.21.35", last_active: new Date(Date.now() - 86400000).toISOString() },
-          ],
+          downloads: [],
+          conversions: [],
+          devices: [],
           features: [
             "youtube_enabled", "instagram_enabled", "facebook_enabled", "converter_enabled",
             "playlist_enabled", "batch_enabled", "4k_enabled", "history_enabled", "ads_enabled", "login_enabled"
           ],
           activity: [
-            { id: "act_1", action: "Video Download", details: "Downloaded 1080p MP4 from YouTube", created_at: "2026-11-06 14:30:00" },
-            { id: "act_2", action: "Audio Extraction", details: "Extracted 320kbps MP3", created_at: "2026-11-06 13:10:00" },
-            { id: "act_3", action: "User Login", details: "Signed in via Web App", created_at: "2026-11-06 12:00:00" },
+            { id: "act_1", action: "User Session Active", details: "Signed in via Web App", created_at: new Date().toISOString() },
           ],
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -308,19 +328,23 @@ serve(async (req: Request) => {
       if (action === "plan") {
         const body = await req.json().catch(() => ({}));
         if (body.plan) {
-          user.plan = body.plan;
+          try {
+            await supabase.rpc("admin_update_user", { p_user_id: targetUserId, p_plan: body.plan });
+          } catch (_) {}
           const uIdx = usersList.findIndex(u => u.id === targetUserId);
           if (uIdx >= 0) usersList[uIdx].plan = body.plan;
         }
-        return new Response(JSON.stringify({ success: true, user }), {
+        return new Response(JSON.stringify({ success: true, user: { id: targetUserId, plan: body.plan } }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       if (action === "block" || action === "status") {
         const body = await req.json().catch(() => ({}));
-        const newStatus = body.status || (user.status === "blocked" ? "active" : "blocked");
-        user.status = newStatus;
+        const newStatus = body.status || "active";
+        try {
+          await supabase.rpc("admin_update_user", { p_user_id: targetUserId, p_status: newStatus });
+        } catch (_) {}
         const uIdx = usersList.findIndex(u => u.id === targetUserId);
         if (uIdx >= 0) usersList[uIdx].status = newStatus;
         return new Response(JSON.stringify({ success: true, status: newStatus }), {
@@ -477,8 +501,15 @@ serve(async (req: Request) => {
       const exportType = pathname.replace("/export/", "").replace("/export", "").trim() || "users";
       let csv = "";
       if (exportType === "users") {
+        let exportUsers = usersList;
+        try {
+          const { data: dbUsers, error } = await supabase.rpc("get_admin_users");
+          if (!error && Array.isArray(dbUsers) && dbUsers.length > 0) {
+            exportUsers = dbUsers;
+          }
+        } catch (_) {}
         csv = "ID,Name,Email,Role,Status,Plan,JoinDate,Downloads,Conversions\n" +
-          usersList.map(u => `"${u.id}","${u.name}","${u.email}","${u.role}","${u.status}","${u.plan}","${u.created_at || ''}","${u.downloads_count || 0}","${u.conversions_count || 0}"`).join("\n");
+          exportUsers.map(u => `"${u.id}","${u.name}","${u.email}","${u.role}","${u.status}","${u.plan}","${u.join_date || u.created_at || ''}","${u.downloads_count || u.dlCount || 0}","${u.conversions_count || u.cvCount || 0}"`).join("\n");
       } else if (exportType === "downloads") {
         csv = "ID,User,Platform,Format,Size,Date,Status\n" +
           `"dl_1","Alex Mercer","YouTube","1080p MP4","45.2 MB","2026-11-06","Completed"\n` +

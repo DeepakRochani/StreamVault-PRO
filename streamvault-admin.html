@@ -2985,14 +2985,15 @@
                 const canEdit = (currentAdmin && currentAdmin.role === 'super_admin') || u.role === 'user';
                 const avatarInitials = (u.name || u.email).substring(0, 2).toUpperCase();
                 const avatarColor = getAvatarColor(u.email);
+                const avatarContent = u.avatar 
+                    ? `<img src="${u.avatar}" class="w-10 h-10 rounded-full object-cover border border-white/10" alt="${u.name}" onerror="this.outerHTML='<div class=\\\'w-10 h-10 rounded-full flex items-center justify-center text-white font-bold\\\' style=\\\'background-color: ${avatarColor}\\\'>${avatarInitials}</div>'">`
+                    : `<div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold" style="background-color: ${avatarColor}">${avatarInitials}</div>`;
 
                 return `
                 <tr class="hover:bg-white/5 transition-colors group border-b border-white/5 cursor-pointer" onclick="openUserDrawer('${u.id}')">
                     <td class="py-1 px-2 text-xs">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold" style="background-color: ${avatarColor}">
-                                ${avatarInitials}
-                            </div>
+                            ${avatarContent}
                             <div>
                                 <p class="font-bold text-on-surface">${u.name || 'Unknown'}</p>
                                 <p class="text-xs text-on-surface-variant font-mono">${u.email}</p>
@@ -3342,37 +3343,44 @@
                 if(data.success) {
                     console.log("USER_FETCH_SUCCESS", userId);
                     const u = data.user;
-                    const stats = data.stats;
+                    const stats = data.stats || {};
 
-                const avatarColor = getAvatarColor(u.email);
-                const avatarInitials = (u.name || u.email).substring(0, 2).toUpperCase();
-                document.getElementById('ud-avatar').style.backgroundColor = avatarColor;
-                document.getElementById('ud-avatar').innerText = avatarInitials;
+                    const avatarColor = getAvatarColor(u.email);
+                    const avatarInitials = (u.name || u.email).substring(0, 2).toUpperCase();
+                    const udAvatarEl = document.getElementById('ud-avatar');
+                    if (u.avatar) {
+                        udAvatarEl.style.backgroundColor = 'transparent';
+                        udAvatarEl.innerHTML = `<img src="${u.avatar}" class="w-full h-full rounded-full object-cover" alt="${u.name || 'User'}" onerror="this.parentElement.style.backgroundColor='${avatarColor}'; this.parentElement.innerText='${avatarInitials}'">`;
+                    } else {
+                        udAvatarEl.style.backgroundColor = avatarColor;
+                        udAvatarEl.innerText = avatarInitials;
+                    }
 
-                document.getElementById('ud-name').innerText = u.name || 'Unknown';
-                document.getElementById('ud-email').innerText = u.email;
-                
-                document.getElementById('ud-badge-role').innerText = u.role;
-                document.getElementById('ud-badge-plan').innerText = u.plan || 'Free';
-                document.getElementById('ud-badge-status').innerText = u.status;
+                    document.getElementById('ud-name').innerText = u.name || 'Unknown';
+                    document.getElementById('ud-email').innerText = u.email;
+                    
+                    document.getElementById('ud-badge-role').innerText = u.role || 'user';
+                    document.getElementById('ud-badge-plan').innerText = u.plan || 'Free';
+                    document.getElementById('ud-badge-status').innerText = u.status || 'active';
 
-                // Overview Stats
-                document.getElementById('ud-stat-dl').innerText = data.downloads.length;
-                document.getElementById('ud-stat-cv').innerText = data.conversions.length;
-                
-                const mbStorage = (stats.totalStorage / (1024 * 1024)).toFixed(2);
-                document.getElementById('ud-stat-storage').innerText = `${mbStorage} MB`;
-                if(u.storage_limit) {
-                    const pct = Math.min(100, (mbStorage / u.storage_limit) * 100);
-                    document.getElementById('ud-storage-bar').style.width = `${pct}%`;
-                    if(pct > 90) document.getElementById('ud-storage-bar').classList.add('bg-error');
-                } else {
-                    document.getElementById('ud-storage-bar').style.width = `0%`;
-                }
+                    // Overview Stats
+                    document.getElementById('ud-stat-dl').innerText = (data.downloads || []).length;
+                    document.getElementById('ud-stat-cv').innerText = (data.conversions || []).length;
+                    
+                    const totalStorageBytes = stats.totalStorage || 0;
+                    const mbStorage = (totalStorageBytes / (1024 * 1024)).toFixed(2);
+                    document.getElementById('ud-stat-storage').innerText = `${mbStorage} MB`;
+                    if(u.storage_limit) {
+                        const pct = Math.min(100, (mbStorage / u.storage_limit) * 100);
+                        document.getElementById('ud-storage-bar').style.width = `${pct}%`;
+                        if(pct > 90) document.getElementById('ud-storage-bar').classList.add('bg-error');
+                    } else {
+                        document.getElementById('ud-storage-bar').style.width = `0%`;
+                    }
 
-                document.getElementById('ud-stat-yt').innerText = stats.ytCount;
-                document.getElementById('ud-stat-ig').innerText = stats.igCount;
-                document.getElementById('ud-stat-fb').innerText = stats.fbCount;
+                    document.getElementById('ud-stat-yt').innerText = stats.ytCount || 0;
+                    document.getElementById('ud-stat-ig').innerText = stats.igCount || 0;
+                    document.getElementById('ud-stat-fb').innerText = stats.fbCount || 0;
 
                 // Form values (Plan & Limits)
                 const currentPlan = u.plan || 'Free';
