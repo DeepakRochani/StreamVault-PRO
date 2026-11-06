@@ -186,10 +186,11 @@ async function resolveViaInvidious(videoId: string, isAudio: boolean, quality: s
       if (audioFormats.length > 0) {
         audioFormats.sort((a: any, b: any) => (parseInt(b.bitrate || "0") - parseInt(a.bitrate || "0")));
         const chosen = audioFormats.find((f: any) => String(f.itag) === "140" || (f.type && f.type.includes("mp4"))) || audioFormats[0];
+        const aItag = String(chosen.itag || "140");
         return {
-          streamUrl: chosen.url,
+          streamUrl: `${mirror}/latest_version?id=${videoId}&itag=${aItag}&local=true`,
           mimeType: chosen.type?.split(";")[0] || "audio/mp4",
-          itag: String(chosen.itag),
+          itag: aItag,
           hasAudioCombined: true,
         };
       }
@@ -202,7 +203,7 @@ async function resolveViaInvidious(videoId: string, isAudio: boolean, quality: s
         });
         if (exactProg && exactProg.url) {
           return {
-            streamUrl: exactProg.url,
+            streamUrl: `${mirror}/latest_version?id=${videoId}&itag=${exactProg.itag}&local=true`,
             mimeType: exactProg.type?.split(";")[0] || "video/mp4",
             itag: String(exactProg.itag),
             hasAudioCombined: true,
@@ -226,11 +227,13 @@ async function resolveViaInvidious(videoId: string, isAudio: boolean, quality: s
           return resNum === targetH;
         });
         const chosenVideo = exactMatch || candidates[0];
+        const vItag = String(chosenVideo.itag || (targetH >= 1080 ? "137" : (targetH >= 720 ? "136" : "135")));
+        const aItag = String(chosenAudio?.itag || "140");
         return {
-          streamUrl: chosenVideo.url,
-          audioStreamUrl: chosenAudio?.url,
+          streamUrl: `${mirror}/latest_version?id=${videoId}&itag=${vItag}&local=true`,
+          audioStreamUrl: `${mirror}/latest_version?id=${videoId}&itag=${aItag}&local=true`,
           mimeType: chosenVideo.type?.split(";")[0] || "video/mp4",
-          itag: String(chosenVideo.itag),
+          itag: vItag,
           hasAudioCombined: false,
         };
       }
@@ -251,27 +254,34 @@ async function resolveViaInvidious(videoId: string, isAudio: boolean, quality: s
 
 // Helper: Resolve direct stream URL via Invidious & Innertube in parallel race (<1.5s resolution)
 async function resolveStreamUrl(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
-  const resolvers = [
-    resolveViaInvidious(videoId, isAudio, quality),
-    resolveViaInnertube(videoId, isAudio, quality),
-  ];
-
+  // Primary: Invidious resolver with verified local=true streams
   try {
-    const fastest = await Promise.any(resolvers);
-    if (fastest?.streamUrl) {
-      console.log(`[Stream Resolver] Direct high-speed CDN stream resolved for ${videoId}`);
-      return fastest;
+    const invidiousRes = await resolveViaInvidious(videoId, isAudio, quality);
+    if (invidiousRes?.streamUrl) {
+      console.log(`[Stream Resolver] Invidious proxy stream resolved for ${videoId}`);
+      return invidiousRes;
     }
   } catch (err: any) {
-    console.warn(`[Stream Resolver] Parallel resolution failed for ${videoId}:`, err?.message || err);
+    console.warn(`[Stream Resolver] Invidious resolution failed for ${videoId}:`, err?.message || err);
+  }
+
+  // Fallback: Innertube
+  try {
+    const innertubeRes = await resolveViaInnertube(videoId, isAudio, quality);
+    if (innertubeRes?.streamUrl) {
+      console.log(`[Stream Resolver] Innertube stream resolved for ${videoId}`);
+      return innertubeRes;
+    }
+  } catch (err: any) {
+    console.warn(`[Stream Resolver] Innertube resolution failed for ${videoId}:`, err?.message || err);
   }
 
   // Instant Fallback: Use verified direct latest_version proxy stream
   const targetH = parseInt(quality.replace(/[^0-9]/g, "") || "1080");
-  const fallbackItag = isAudio ? "140" : (targetH >= 1080 ? "299" : (targetH >= 720 ? "298" : "135"));
+  const fallbackItag = isAudio ? "140" : (targetH >= 1080 ? "137" : (targetH >= 720 ? "136" : "135"));
   return {
-    streamUrl: `https://yt.chocolatemoo53.com/latest_version?id=${videoId}&itag=${fallbackItag}`,
-    audioStreamUrl: isAudio ? undefined : `https://yt.chocolatemoo53.com/latest_version?id=${videoId}&itag=140`,
+    streamUrl: `https://yt.chocolatemoo53.com/latest_version?id=${videoId}&itag=${fallbackItag}&local=true`,
+    audioStreamUrl: isAudio ? undefined : `https://yt.chocolatemoo53.com/latest_version?id=${videoId}&itag=140&local=true`,
     mimeType: isAudio ? "audio/mp4" : "video/mp4",
     itag: fallbackItag,
     hasAudioCombined: isAudio,
@@ -306,11 +316,13 @@ serve(async (req: Request) => {
       const ytMatch = videoUrl.match(/(?:youtube[.]com\/(?:watch[?]v=|embed\/|shorts\/)|youtu[.]be\/)([a-zA-Z0-9_-]{11})/);
       const videoId = ytMatch ? ytMatch[1] : "";
 
-      if (!streamUrl && videoId) {
-        const resolved = await resolveStreamUrl(videoId, isAudio, quality);
-        if (resolved?.streamUrl) {
-          streamUrl = isAudio ? (resolved.audioStreamUrl || resolved.streamUrl) : resolved.streamUrl;
-          mimeType = resolved.mimeType;
+      if (videoId) {
+        if (!streamUrl || streamUrl.includes("googlevideo.com")) {
+          const itagMatch = streamUrl ? streamUrl.match(/[?&]itag=(\d+)/) : null;
+          const targetH = parseInt(quality.replace(/[^0-9]/g, "") || "1080");
+          const defaultItag = isAudio ? "140" : (targetH >= 1080 ? "137" : (targetH >= 720 ? "136" : "135"));
+          const itag = itagMatch ? itagMatch[1] : defaultItag;
+          streamUrl = `https://yt.chocolatemoo53.com/latest_version?id=${videoId}&itag=${itag}&local=true`;
         }
       }
 
@@ -326,16 +338,10 @@ serve(async (req: Request) => {
           });
         }
 
-        const isGoogleVideo = streamUrl.includes("googlevideo.com");
         const upstreamHeaders: Record<string, string> = {
           "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
           "Accept": "*/*",
-          "Accept-Encoding": "identity",
         };
-        if (!isGoogleVideo) {
-          upstreamHeaders["Referer"] = "https://www.youtube.com/";
-          upstreamHeaders["Origin"] = "https://www.youtube.com";
-        }
         if (req.headers.has("range")) {
           upstreamHeaders["Range"] = req.headers.get("range")!;
         }
@@ -356,19 +362,19 @@ serve(async (req: Request) => {
             const targetH = parseInt(quality.replace(/[^0-9]/g, "") || "1080");
             const itagsToTry = isAudio
               ? ["140", "139"]
-              : (targetH >= 1080 ? ["299", "137", "303"] : (targetH >= 720 ? ["298", "136", "302"] : ["135", "134"]));
+              : (targetH >= 1080 ? ["137", "299", "303"] : (targetH >= 720 ? ["136", "298", "22", "302"] : ["135", "134"]));
 
             for (const mirror of INVIDIOUS_MIRRORS) {
               for (const itag of itagsToTry) {
                 try {
-                  const proxyUrl = `${mirror}/latest_version?id=${videoId}&itag=${itag}`;
+                  const proxyUrl = `${mirror}/latest_version?id=${videoId}&itag=${itag}&local=true`;
                   const mirrorRes = await fetch(proxyUrl, {
                     headers: upstreamHeaders,
                     redirect: "follow",
                   });
                   if (mirrorRes.ok || mirrorRes.status === 206) {
                     mediaRes = mirrorRes;
-                    console.log(`[Stream Proxy] Succeeded via mirror ${mirror} itag ${itag} (status ${mirrorRes.status})`);
+                    console.log(`[Stream Proxy Fallback] Succeeded via mirror ${mirror} itag ${itag} (status ${mirrorRes.status})`);
                     break;
                   }
                 } catch (_) { }
