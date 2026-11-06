@@ -642,7 +642,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (e) {
             console.error("Failed to load pending video data:", e);
-         const startBtn = document.getElementById('btn-start-download');
+        }
+    }
+
+    const startBtn = document.getElementById('btn-start-download');
     const formatRadios = document.querySelectorAll('.format-radio');
     const qualityRadios = document.querySelectorAll('.quality-radio');
     const qualitySection = document.getElementById('quality-section');

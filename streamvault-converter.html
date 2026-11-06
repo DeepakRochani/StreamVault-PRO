@@ -16,6 +16,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script type="module" src="js/config.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="js/streamvault-ui.js"></script>
     <script src="js/lame.min.js"></script>
     <script src="settings.js"></script>
     <script src="ads.js"></script>
@@ -225,13 +226,6 @@
             if (window.supabaseClient) {
                 window.supabaseClient.auth.onAuthStateChange(() => checkConverterAuth());
             }
-                        else {
-                            const oldOnLoad = window.onSettingsLoaded;
-                            window.onSettingsLoaded = () => { if(oldOnLoad) oldOnLoad(); checkAndHidePromo(); };
-                        }
-                    }
-                }
-            }).catch(e=>{});
         </script>
     </header>
 

@@ -12,6 +12,7 @@
 <script src="js/fmp4-remuxer.js"></script>
 <script src="ads.js"></script>
 <script src="js/url-parser.js"></script>
+<script src="js/streamvault-ui.js"></script>
 <script src="settings.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&amp;family=Geist:wght@500;600&amp;family=Inter:wght@400&amp;display=swap" rel="stylesheet">
@@ -224,13 +225,25 @@
 </head>
 <body class="bg-background text-on-background min-h-screen flex flex-col pt-16 pb-24 md:pb-0 overflow-x-hidden">
 <!-- TopAppBar -->
-<header class="bg-surface/80 dark:bg-surface/80 backdrop-blur-xl fixed top-0 w-full z-50 shadow-sm border-b border-white/10 flex items-center justify-between px-margin-mobile h-16 w-full">
-<button class="nav-settings hover:bg-white/5 transition-colors active:scale-95 transition-transform p-2 rounded-full flex items-center justify-center">
-<span class="material-symbols-outlined text-primary dark:text-primary-fixed" data-icon="speed">speed</span>
-</button>
-<h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg font-extrabold text-primary dark:text-primary-container tracking-tighter">
-            StreamVault PRO
-        </h1>
+<header class="bg-surface/80 dark:bg-surface/80 backdrop-blur-2xl fixed top-0 w-full z-50 shadow-lg border-b border-white/10 flex items-center justify-between px-4 sm:px-8 h-16 w-full">
+<div class="flex items-center gap-3">
+    <button class="nav-settings hover:bg-white/10 transition-all active:scale-95 p-2 rounded-xl flex items-center justify-center border border-white/5 bg-white/[0.03]" title="App Settings">
+        <span class="material-symbols-outlined text-primary text-[22px]" data-icon="speed">speed</span>
+    </button>
+    <a href="index.html" class="flex items-center gap-2 group">
+        <span class="font-headline-lg-mobile md:font-headline-lg font-black tracking-tight bg-gradient-to-r from-white via-primary to-primary-container bg-clip-text text-transparent group-hover:opacity-90 transition-opacity">StreamVault</span>
+        <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-primary/10 border border-primary/30 text-primary uppercase tracking-widest shadow-[0_0_10px_rgba(255,85,64,0.3)]">PRO</span>
+    </a>
+</div>
+
+<!-- Center Cloud Status Badge (Desktop) -->
+<div class="hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container/70 border border-white/10 text-xs font-mono text-on-surface-variant backdrop-blur-md">
+    <span class="relative flex h-2 w-2">
+      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+      <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+    </span>
+    <span>4K Cloud Engine Online</span>
+</div>
 <div class="flex items-center gap-3">
     <!-- Notification Bell -->
     <div class="relative hidden" id="notif-container">
@@ -358,7 +371,8 @@
     window.currentUser = null;
 
     async function checkAuthSession() {
-        let user = null;
+        try {
+            let user = null;
 
         // 1. Prioritize Supabase Auth Session (Google OAuth or Email/Password)
         if (window.supabaseClient) {
@@ -562,58 +576,89 @@ if (window.supabaseClient) {
 </div>
 
 <!-- Main Content -->
-<main class="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop flex flex-col gap-4 mt-4">
-<!-- Global App Navigation -->
-<div class="flex items-center justify-center w-full mt-2 mb-2">
-    <div class="bg-surface-container-high/50 backdrop-blur-xl border border-white/10 p-1 rounded-full flex gap-1">
-        <a href="index.html" class="px-4 py-2 rounded-full bg-primary text-on-primary font-title-md text-title-md flex items-center gap-2 shadow-[0_0_15px_rgba(255,85,64,0.3)] transition-all">
-            <span class="material-symbols-outlined text-[20px]">download</span>
-            Downloader
+<main class="flex-grow w-full max-w-container-max mx-auto px-4 sm:px-6 md:px-8 flex flex-col gap-6 mt-6">
+<!-- Global Mode Switcher -->
+<div class="flex items-center justify-center w-full">
+    <div class="bg-surface-container/60 backdrop-blur-2xl border border-white/10 p-1.5 rounded-full flex gap-1 shadow-[0_8px_32px_rgba(0,0,0,0.37)]">
+        <a href="index.html" class="px-5 py-2 rounded-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold text-sm sm:text-base flex items-center gap-2 shadow-[0_0_20px_rgba(255,85,64,0.35)] transition-all">
+            <span class="material-symbols-outlined text-[18px]">cloud_download</span>
+            <span>4K Downloader</span>
         </a>
-        <a href="streamvault-converter.html" class="px-4 py-2 rounded-full text-on-surface hover:bg-white/5 font-title-md text-title-md flex items-center gap-2 transition-all">
-            <span class="material-symbols-outlined text-[20px]">movie_edit</span>
-            Converter
+        <a href="streamvault-converter.html" class="px-5 py-2 rounded-full text-on-surface-variant hover:text-white hover:bg-white/5 font-medium text-sm sm:text-base flex items-center gap-2 transition-all">
+            <span class="material-symbols-outlined text-[18px]">movie_edit</span>
+            <span>Media Converter</span>
         </a>
     </div>
 </div>
 
-<!-- Hero Input Section -->
-<section class="flex flex-col items-center text-center w-full max-w-2xl mx-auto mt-2 gap-4 relative">
-<div class="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-primary/20 blur-[100px] rounded-full pointer-events-none"></div>
+<!-- Hero Section & High-Speed Input Console -->
+<section class="flex flex-col items-center text-center w-full max-w-3xl mx-auto gap-4 relative">
+    <div class="space-y-2 mt-2">
+        <h2 class="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white">
+            Download Any Video in <span class="bg-gradient-to-r from-primary via-orange-400 to-amber-300 bg-clip-text text-transparent">4K & 8K HDR</span>
+        </h2>
+        <p class="text-sm sm:text-base text-on-surface-variant max-w-xl mx-auto font-normal">
+            Studio-grade media pipeline with botguard bypass for YouTube, Instagram Reels, Facebook Watch, and TikTok.
+        </p>
+    </div>
 
+    <!-- AD SLOT: Header (Above URL Input) -->
+    <streamvault-ad location="home_header" type="banner" class="w-full max-w-3xl mx-auto mt-1"></streamvault-ad>
 
-<!-- AD SLOT: Header (Above URL Input) -->
-<streamvault-ad location="home_header" type="banner" class="w-full max-w-3xl mx-auto mt-2"></streamvault-ad>
+    <!-- Platform Selector Tabs -->
+    <div class="flex border-b border-white/10 w-full max-w-md mx-auto mt-2 relative">
+        <div id="tab-indicator" class="absolute bottom-[-1px] left-0 h-[3px] bg-primary rounded-full transition-all duration-300 ease-out shadow-[0_0_10px_rgba(255,85,64,0.6)]" style="width: 50%;"></div>
+        
+        <button id="tab-youtube" class="flex-1 pb-3 text-center transition-colors text-sm sm:text-base text-primary font-bold tab-btn flex items-center justify-center gap-2" data-tab="youtube">
+            <span class="material-symbols-outlined text-[18px] text-red-500">play_circle</span>
+            YouTube
+        </button>
+        <button id="tab-social" class="flex-1 pb-3 text-center transition-colors text-sm sm:text-base text-on-surface-variant font-medium tab-btn flex items-center justify-center gap-2" data-tab="social">
+            <span class="material-symbols-outlined text-[18px] text-pink-500">photo_camera</span>
+            Instagram & Facebook
+        </button>
+    </div>
 
-<!-- NEW PLATFORM SELECTOR TABS -->
-<div class="flex border-b border-white/10 w-full max-w-sm mx-auto mt-4 mb-2 relative">
-    <!-- Active Indicator Line -->
-    <div id="tab-indicator" class="absolute bottom-[-1px] left-0 h-[3px] bg-primary transition-all duration-300 ease-out" style="width: 50%;"></div>
-    
-    <button id="tab-youtube" class="flex-1 pb-2 sm:pb-3 text-center transition-colors text-sm sm:text-base md:text-lg text-primary font-bold tab-btn" data-tab="youtube">
-        YouTube
-    </button>
-    <button id="tab-social" class="flex-1 pb-2 sm:pb-3 text-center transition-colors text-sm sm:text-base md:text-lg text-on-surface-variant font-normal tab-btn leading-tight" data-tab="social">
-        Instagram / Facebook
-    </button>
-</div>
+    <!-- Elevated Search Console -->
+    <div class="w-full mt-3 p-2 rounded-2xl bg-surface-container/70 border border-white/15 backdrop-blur-2xl shadow-[0_12px_40px_rgba(0,0,0,0.45)] relative overflow-hidden group focus-within:border-primary/50 focus-within:shadow-[0_0_30px_rgba(255,85,64,0.25)] transition-all duration-300">
+        <div class="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-primary/5 opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none"></div>
+        <div class="flex flex-col sm:flex-row items-center gap-2 relative z-10">
+            <div class="flex items-center gap-2 flex-grow w-full px-3 py-2">
+                <span class="material-symbols-outlined text-on-surface-variant/70 text-[22px] group-focus-within:text-primary transition-colors">link</span>
+                <input id="url-input" class="flex-grow bg-transparent border-none outline-none text-white text-base placeholder:text-on-surface-variant/60 focus:ring-0 font-medium" placeholder="Paste YouTube, Instagram, Facebook or TikTok link..." type="text" autocomplete="off" spellcheck="false">
+                <kbd class="hidden md:inline-flex items-center gap-0.5 px-2 py-0.5 text-[11px] font-mono text-white/40 bg-white/5 border border-white/10 rounded-md">⌘K</kbd>
+            </div>
+            <button id="analyze-btn" type="button" onclick="handlePasteOrAnalyze()" class="shrink-0 bg-gradient-to-r from-primary to-primary-container hover:brightness-110 text-on-primary font-bold text-sm sm:text-base w-full sm:w-44 h-12 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-[0_4px_20px_rgba(255,85,64,0.35)] cursor-pointer">
+                <span id="analyze-btn-icon" class="material-symbols-outlined text-[20px] pointer-events-none">content_paste</span>
+                <span id="analyze-btn-text" class="pointer-events-none">Paste Link</span>
+            </button>
+        </div>
+    </div>
 
-<div class="w-full mt-4 flex flex-col sm:flex-row gap-4 bg-surface-container-high/50 p-2 rounded-xl border border-white/10 backdrop-blur-xl shadow-lg relative overflow-hidden group">
-<div class="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none"></div>
-<input id="url-input" class="relative z-10 flex-grow bg-transparent border-none outline-none text-on-background font-body-lg text-body-lg px-4 py-2 placeholder:text-on-surface-variant focus:ring-0" placeholder="Paste media URL here (e.g., YouTube, Vimeo)..." type="text">
-<button id="analyze-btn" type="button" onclick="handlePasteOrAnalyze()" class="relative z-10 shrink-0 bg-primary hover:bg-primary-container text-on-primary font-title-md text-title-md w-full sm:w-40 h-12 rounded-lg flex items-center justify-center gap-2 transition-all active:scale-95 shadow-[0_0_20px_rgba(255,85,64,0.3)] cursor-pointer">
-<span id="analyze-btn-icon" class="material-symbols-outlined pointer-events-none">content_paste</span>
-<span id="analyze-btn-text" class="pointer-events-none">Paste Link</span>
-</button>
-</div>
-<!-- Error Message Container -->
-<div id="error-container" class="w-full text-left px-4 mt-2 hidden">
-    <p class="text-error font-body-sm text-body-sm flex items-center gap-2 bg-error-container/20 border border-error-container/30 px-3 py-2 rounded-lg">
-        <span class="material-symbols-outlined text-[18px] text-error">error</span>
-        <span id="error-message" class="text-error">Invalid URL. Please enter a valid video link.</span>
-    </p>
-</div>
-<!-- Quick Platforms Removed -->
+    <!-- Quick Platform Chips -->
+    <div class="flex flex-wrap items-center justify-center gap-2 mt-1">
+        <span class="text-xs text-on-surface-variant/70 font-mono uppercase tracking-wider mr-1">Supported:</span>
+        <button type="button" onclick="document.getElementById('url-input').focus()" class="px-2.5 py-1 rounded-full bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-xs text-on-surface-variant hover:text-white transition-all flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-red-500"></span> YouTube 4K/8K
+        </button>
+        <button type="button" onclick="document.getElementById('url-input').focus()" class="px-2.5 py-1 rounded-full bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-xs text-on-surface-variant hover:text-white transition-all flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-pink-500"></span> Instagram Reels
+        </button>
+        <button type="button" onclick="document.getElementById('url-input').focus()" class="px-2.5 py-1 rounded-full bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-xs text-on-surface-variant hover:text-white transition-all flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-blue-500"></span> Facebook Watch
+        </button>
+        <button type="button" onclick="document.getElementById('url-input').focus()" class="px-2.5 py-1 rounded-full bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-xs text-on-surface-variant hover:text-white transition-all flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-cyan-400"></span> TikTok Audio
+        </button>
+    </div>
+
+    <!-- Error Message Container -->
+    <div id="error-container" class="w-full text-left mt-2 hidden">
+        <p class="text-rose-400 text-sm flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 px-4 py-3 rounded-xl backdrop-blur-md">
+            <span class="material-symbols-outlined text-[18px] text-rose-400 shrink-0">error</span>
+            <span id="error-message" class="text-rose-200">Invalid URL. Please enter a valid video link.</span>
+        </p>
+    </div>
 </section>
 
 <!-- Unified Download Workflow Section -->
