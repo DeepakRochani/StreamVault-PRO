@@ -1845,25 +1845,28 @@ if (window.supabaseClient) {
             }
 
             const isBotChallenge = err.code === 'YOUTUBE_BOT_CHALLENGE' || 
-                                   (err.message && (err.message.includes('bot') || err.message.includes('verification') || err.message.includes('403')));
+                                   err.code === 'YOUTUBE_DESKTOP_PRO_REQUIRED' ||
+                                   err.platform === 'youtube' ||
+                                   (err.message && (err.message.includes('bot') || err.message.includes('BotGuard') || err.message.includes('verification') || err.message.includes('403')));
             const isDash = err.code === 'CLOUD_DOWNLOAD_UNSUPPORTED' || 
                            (err.message && (err.message.includes('separate video') || err.message.includes('audio stream') || err.message.includes('DASH')));
             
-            if (isBotChallenge) {
+            if (isBotChallenge || err.platform === 'youtube') {
                 return `
                     <div class="bg-surface-container-high/90 border border-amber-500/30 rounded-2xl p-5 text-left max-w-lg mx-auto my-2 shadow-xl backdrop-blur-md">
                         <div class="flex items-center gap-2 text-amber-300 font-bold text-base mb-2">
-                            <span class="material-symbols-outlined text-amber-400 text-[22px]">cloud_off</span> Cloud Download Unavailable
+                            <span class="material-symbols-outlined text-amber-400 text-[22px]">desktop_windows</span> Desktop Pro Authentication Required
                         </div>
                         <div class="text-xs text-on-surface-variant leading-relaxed mb-4">
-                            <p class="mb-2 text-on-surface">YouTube requires additional verification for this video.</p>
-                            <p class="mb-2">Your selected quality is supported on Web, but this particular video cannot currently be retrieved by the Cloud server.</p>
-                            <p class="text-on-surface-variant/80">Desktop Pro can use the local Desktop download engine.</p>
+                            <p class="mb-2 text-on-surface font-medium">YouTube enforces BotGuard verification on cloud servers.</p>
+                            <p class="mb-2">This high-demand or music video requires browser-level verification. Use StreamVault Desktop Pro with your local session to download in 1080p Full HD instantly.</p>
+                            <p class="text-on-surface-variant/80">StreamVault Desktop Pro runs directly on your PC/Mac with zero cloud IP restrictions.</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-white/10">
-                            <a href="streamvault-home-tall.html" class="px-3.5 py-1.5 bg-primary text-on-primary text-xs font-bold rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5 shadow-md">
-                                <span class="material-symbols-outlined text-[16px]">desktop_windows</span> Open Desktop App
-                            </a>
+                            <button type="button" onclick="showDesktopProModal('YouTube')" class="px-3.5 py-1.5 bg-gradient-to-r from-primary to-orange-500 text-on-primary text-xs font-bold rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5 shadow-md">
+                                <span class="material-symbols-outlined text-[16px]">desktop_windows</span> Launch Desktop Pro
+                            </button>
+                            <button type="button" onclick="showDesktopProModal('YouTube')" class="px-3.5 py-1.5 bg-surface-container border border-white/10 text-xs text-on-surface rounded-xl hover:bg-white/10 transition-all">Learn More</button>
                             <button type="button" onclick="resetToUrlInput()" class="px-3.5 py-1.5 bg-surface border border-white/10 text-xs text-on-surface rounded-xl hover:bg-white/10 transition-all">Try Another Video</button>
                         </div>
                     </div>
@@ -2071,14 +2074,63 @@ if (window.supabaseClient) {
 
         let isInlineDownloadRunning = false;
 
-        async function startInlineDownload(videoData, format, selectedQuality) {
-            window.__lastVideoData = videoData;
-            window.__lastFormat = format;
-            window.__lastQuality = selectedQuality;
-            return _executeInlineDownload(videoData, format, selectedQuality);
+        function resetDownloaderUI() {
+            const dlSection = document.getElementById('download-workflow-section');
+            if (dlSection) {
+                dlSection.classList.add('hidden');
+                dlSection.classList.remove('flex');
+            }
+            const progressSection = document.getElementById('inline-progress-section');
+            if (progressSection) {
+                progressSection.classList.add('hidden');
+                progressSection.classList.remove('flex');
+            }
+            const stepsContainer = document.getElementById('selection-steps-container');
+            if (stepsContainer) stepsContainer.classList.remove('hidden');
+
+            const dlHeadingIcon = document.getElementById('dl-progress-icon');
+            const dlHeadingTitle = document.getElementById('dl-progress-title');
+            const dlProgressCard = document.getElementById('dl-progress-card');
+            const dlProgressStats = document.getElementById('dl-progress-stats');
+            const dlProgressTrack = document.getElementById('dl-progress-track');
+            const statusText = document.getElementById('dl-status-text');
+            const progressBar = document.getElementById('dl-progress-bar');
+            const pctText = document.getElementById('dl-percentage');
+            const speedText = document.getElementById('dl-speed');
+            const sizeInfo = document.getElementById('dl-size-info');
+            const downloadAnotherBtn = document.getElementById('btn-download-another');
+
+            if (dlHeadingIcon) {
+                dlHeadingIcon.className = 'material-symbols-outlined text-primary animate-pulse';
+                dlHeadingIcon.textContent = 'cloud_download';
+            }
+            if (dlHeadingTitle) dlHeadingTitle.textContent = 'Downloading...';
+            if (dlProgressCard) dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-primary/30 bg-primary/5 flex flex-col gap-4';
+            if (dlProgressStats) dlProgressStats.style.display = 'flex';
+            if (dlProgressTrack) dlProgressTrack.style.display = 'block';
+
+            if (statusText) {
+                statusText.classList.replace('text-green-400', 'text-primary');
+                statusText.classList.replace('text-red-400', 'text-primary');
+            }
+            if (progressBar) {
+                progressBar.className = 'h-full rounded-full transition-all duration-300 bg-gradient-to-r from-primary to-orange-500';
+                progressBar.style.width = '0%';
+            }
+            if (pctText) pctText.textContent = '0%';
+            if (speedText) speedText.textContent = '--';
+            if (sizeInfo) sizeInfo.textContent = '--';
+            if (downloadAnotherBtn) downloadAnotherBtn.classList.add('hidden');
+
+            const uiInput = document.getElementById('url-input');
+            if (uiInput) { uiInput.value = ''; uiInput.focus(); }
+            if (typeof updateAnalyzeBtnState === 'function') updateAnalyzeBtnState();
         }
 
-        async function _executeInlineDownload(videoData, format, selectedQuality) {
+        // ============================================================
+        // ENGINE 1: YOUTUBE DOWNLOAD ENGINE (Fully Isolated)
+        // ============================================================
+        async function downloadYouTubeMedia(videoData, format, selectedQuality) {
             if (isInlineDownloadRunning) return;
             isInlineDownloadRunning = true;
             window.__lastVideoData = videoData;
@@ -2101,15 +2153,7 @@ if (window.supabaseClient) {
             const pctText          = document.getElementById('dl-percentage');
             const progressBar      = document.getElementById('dl-progress-bar');
             const downloadAnotherBtn = document.getElementById('btn-download-another');
-
-            // ── Switch UI to downloading state ───────────────
-            stepsContainer.classList.add('hidden');
-            progressSection.classList.remove('hidden');
-            progressSection.classList.add('flex');
-
-            const isAudio = format === 'mp3';
-            const qualDisplay = (selectedQuality && selectedQuality !== 'best' && selectedQuality !== 'Original') ? `${selectedQuality} • ` : '';
-            const fmtDisplay = isAudio ? 'MP3' : 'MP4';
+            if (downloadAnotherBtn) downloadAnotherBtn.onclick = resetDownloaderUI;
 
             const dlHeadingIcon = document.getElementById('dl-progress-icon');
             const dlHeadingTitle = document.getElementById('dl-progress-title');
@@ -2117,24 +2161,24 @@ if (window.supabaseClient) {
             const dlProgressStats = document.getElementById('dl-progress-stats');
             const dlProgressTrack = document.getElementById('dl-progress-track');
 
+            stepsContainer.classList.add('hidden');
+            progressSection.classList.remove('hidden');
+            progressSection.classList.add('flex');
+
             if (dlHeadingIcon) {
                 dlHeadingIcon.className = 'material-symbols-outlined text-primary animate-pulse';
                 dlHeadingIcon.textContent = 'cloud_download';
             }
-            if (dlHeadingTitle) {
-                dlHeadingTitle.textContent = 'Downloading...';
-            }
-            if (dlProgressCard) {
-                dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-primary/30 bg-primary/5 flex flex-col gap-4';
-            }
-            if (dlProgressStats) {
-                dlProgressStats.style.display = 'flex';
-            }
-            if (dlProgressTrack) {
-                dlProgressTrack.style.display = 'block';
-            }
+            if (dlHeadingTitle) dlHeadingTitle.textContent = 'Downloading YouTube...';
+            if (dlProgressCard) dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-primary/30 bg-primary/5 flex flex-col gap-4';
+            if (dlProgressStats) dlProgressStats.style.display = 'flex';
+            if (dlProgressTrack) dlProgressTrack.style.display = 'block';
 
-            statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Preparing <strong class="text-white">${qualDisplay}${fmtDisplay}</strong> stream...`;
+            const isAudio = format === 'mp3';
+            const qualDisplay = (selectedQuality && selectedQuality !== 'best' && selectedQuality !== 'Original') ? selectedQuality + ' • ' : '';
+            const fmtDisplay = isAudio ? 'MP3' : 'MP4';
+
+            statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Preparing YouTube <strong class="text-white">' + qualDisplay + fmtDisplay + '</strong> stream...';
             statusText.className = 'font-mono-sm text-[12px] text-primary flex items-center gap-1';
             speedText.textContent  = '--';
             sizeInfo.textContent   = '--';
@@ -2142,44 +2186,29 @@ if (window.supabaseClient) {
             progressBar.style.width = '5%';
             progressBar.className = 'h-full rounded-full transition-all duration-300 bg-gradient-to-r from-primary to-orange-500';
 
-            let rawTitle = (videoData.title || 'download').trim();
+            let rawTitle = (videoData.title || 'YouTube_Video').trim();
             let cleanTitle = rawTitle.replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, ' ').trim();
-            if (cleanTitle.length > 50) {
-                cleanTitle = cleanTitle.substring(0, 50).trim();
-            }
+            if (cleanTitle.length > 50) cleanTitle = cleanTitle.substring(0, 50).trim();
             let filename = cleanTitle;
             if (selectedQuality && selectedQuality !== 'best' && selectedQuality !== 'Original') {
-                filename += `_${selectedQuality}`;
+                filename += '_' + selectedQuality;
             }
             if (!filename.toLowerCase().endsWith('.mp4') && !filename.toLowerCase().endsWith('.mp3')) {
                 filename += isAudio ? '.mp3' : '.mp4';
             }
 
             try {
-                const parsedUrl = URLParser.detectPlatform(videoData.url);
-                const isSocial = parsedUrl.type === 'facebook' || parsedUrl.type === 'instagram' || parsedUrl.type === 'twitter' || parsedUrl.type === 'tiktok';
-                const dlEndpoint = '/api/download';
-                
-                let formatUrl = null;
-                let formatId = selectedQuality;
-                if (isSocial && videoData.videoFormats) {
-                    const matchedFormat = videoData.videoFormats.find(f => (f.id || f.format_id) === selectedQuality);
-                    if (matchedFormat && matchedFormat.url) formatUrl = matchedFormat.url;
-                }
-
                 const reqBody = {
-                    url:     videoData.url,
+                    platform: 'youtube',
+                    url: videoData.url,
                     quality: selectedQuality,
-                    format:  isAudio ? 'audio' : 'video',
+                    format: isAudio ? 'audio' : 'video',
                     filename: filename,
-                    id:      'dl-' + Date.now(),
-                    format_url: formatUrl,
-                    format_id: formatId
+                    id: 'yt-' + Date.now()
                 };
 
-                // Dual-endpoint resiliency: try same-origin relative endpoint first, then direct Supabase fallback
                 const endpointsToTry = [
-                    dlEndpoint,
+                    '/api/download',
                     'https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1/download'
                 ];
 
@@ -2188,10 +2217,10 @@ if (window.supabaseClient) {
 
                 for (const targetUrl of endpointsToTry) {
                     try {
-                        console.log("=== DOWNLOAD REQUEST ATTEMPT ===", targetUrl);
+                        console.log("[YouTube Engine] Endpoint attempt:", targetUrl);
                         const res = await fetch(targetUrl, {
                             method: 'POST',
-                            headers: { 
+                            headers: {
                                 'Content-Type': 'application/json',
                                 ...(window.SUPABASE_ANON_KEY && targetUrl.includes('supabase.co') ? {
                                     'apikey': window.SUPABASE_ANON_KEY,
@@ -2205,414 +2234,549 @@ if (window.supabaseClient) {
                             break;
                         } else {
                             const errBody = await res.json().catch(() => null);
-                            lastErr = errBody?.error || `HTTP ${res.status}`;
+                            lastErr = errBody?.error || ('HTTP ' + res.status);
                         }
                     } catch (netErr) {
-                        console.warn(`[StreamVault] Endpoint attempt failed for ${targetUrl}:`, netErr);
                         lastErr = netErr;
                     }
                 }
 
                 if (!dlRes) {
-                    if (lastErr && typeof lastErr === 'object') {
-                        throw {
-                            message: lastErr.message || 'Download service unavailable',
-                            desktopFallback: lastErr.desktopFallback !== undefined ? lastErr.desktopFallback : false,
-                            code: lastErr.code,
-                            platform: lastErr.platform || (isSocial ? parsedUrl.type : null)
-                        };
-                    }
-                    throw { 
-                        message: lastErr || 'Download service unavailable', 
-                        desktopFallback: false, 
-                        platform: isSocial ? parsedUrl.type : null 
+                    throw {
+                        message: (lastErr && lastErr.message) ? lastErr.message : (typeof lastErr === 'string' ? lastErr : 'YouTube cloud service unavailable'),
+                        desktopFallback: (lastErr && typeof lastErr === 'object') ? (lastErr.desktopFallback ?? true) : true,
+                        code: lastErr?.code || 'YOUTUBE_DESKTOP_PRO_REQUIRED',
+                        platform: 'youtube'
                     };
                 }
 
                 const dlData = await dlRes.json();
-                console.log("Response Body:", dlData);
+                console.log("[YouTube Engine Response]:", dlData);
 
                 if (!dlData.success) {
                     const errObj = dlData.error || {};
-                    const errMsg = (typeof errObj === 'object' ? errObj.message : errObj) || 'Download failed';
+                    const errMsg = (typeof errObj === 'object' ? errObj.message : errObj) || 'YouTube download failed';
                     const isFallback = (typeof errObj === 'object' && errObj.desktopFallback);
-                    throw { message: errMsg, desktopFallback: isFallback, code: errObj.code, platform: errObj.platform || (isSocial ? parsedUrl.type : null) };
+                    throw {
+                        message: errMsg,
+                        desktopFallback: isFallback,
+                        code: errObj.code || 'YOUTUBE_DESKTOP_PRO_REQUIRED',
+                        platform: 'youtube'
+                    };
                 }
 
-                const dlId = reqBody.id;
                 const dlFilename = dlData.filename || filename;
+                const dlId = reqBody.id;
+                saveToQueueHistory(videoData, dlFilename, dlId, format, null, true);
 
-                // ── Direct / Online Serverless Download ───────────
-                if (dlData.downloadUrl || dlData.streamUrl || dlData.url) {
-                    const directUrl = dlData.downloadUrl || dlData.streamUrl || dlData.url;
-                    console.log("TRIGGERING ONLINE STREAM DOWNLOAD: ", directUrl);
-                    
-                    saveToQueueHistory(videoData, dlFilename, dlId, format, null, true);
+                // Check stream structure:
+                // Case A: Separate Video + Audio (itag 140) adaptive streams requiring pure-JS remuxer
+                // Case B: Progressive combined stream or audio-only
+                const isVideoWithSeparateAudio = !isAudio && dlData.hasAudioCombined === false && (dlData.audioStreamUrl || dlData.fullAudioDownloadUrl || dlData.audioDownloadUrl);
 
-                    const isVideoWithSeparateAudio = !isAudio && dlData.hasAudioCombined === false && (dlData.fullAudioDownloadUrl || dlData.audioDownloadUrl || dlData.audioStreamUrl);
+                let finalBlob = null;
 
-                    let finalBlob = null;
+                if (isVideoWithSeparateAudio) {
+                    statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Downloading YouTube video & audio streams...';
+                    progressBar.style.width = '15%';
+                    pctText.textContent = '15%';
 
-                    if (isVideoWithSeparateAudio) {
-                        statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Downloading high-res video & audio...';
-                        progressBar.style.width = '15%';
-                        pctText.textContent = '15%';
+                    const videoUrl = dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl;
+                    const audioUrl = dlData.fullAudioDownloadUrl || dlData.audioDownloadUrl || dlData.audioStreamUrl;
 
-                        const videoUrl = dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl;
-                        const audioUrl = dlData.fullAudioDownloadUrl || dlData.audioDownloadUrl || dlData.audioStreamUrl;
-
-                        try {
-                            let lastProgressTime = performance.now();
-                            let lastProgressBytes = 0;
-                            const [videoBlob, audioBlob] = await Promise.all([
-                                fetchBlobWithProgress(videoUrl, dlData.streamUrl, (pct, received, total) => {
-                                    const p = Math.round(15 + pct * 75);
-                                    progressBar.style.width = `${p}%`;
-                                    pctText.textContent = `${p}%`;
-                                    if (total > 0 && received > 0) {
-                                        const recMB = (received / 1048576).toFixed(1);
-                                        const totMB = (total / 1048576).toFixed(1);
-                                        sizeInfo.textContent = `${recMB} / ${totMB} MB`;
-
-                                        const now = performance.now();
-                                        const elapsedSec = (now - lastProgressTime) / 1000;
-                                        if (elapsedSec >= 0.4) {
-                                            const speed = ((received - lastProgressBytes) / 1048576) / elapsedSec;
-                                            if (speedText && speed > 0) {
-                                                speedText.textContent = `${speed.toFixed(1)} MB/s`;
-                                            }
-                                            lastProgressTime = now;
-                                            lastProgressBytes = received;
-                                        }
-                                    }
-                                }),
-                                fetchBlobWithProgress(audioUrl, dlData.audioStreamUrl, null)
-                            ]);
-
-                            if (!videoBlob) throw new Error("Video stream returned empty data");
-
-                            statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Combining video + audio with crystal-clear sound...';
-                            progressBar.style.width = '95%';
-                            pctText.textContent = '95%';
-
-                            if (audioBlob && window.StreamVaultRemuxer) {
-                                finalBlob = await window.StreamVaultRemuxer.mergeVideoAndAudio(videoBlob, audioBlob);
-                            } else {
-                                finalBlob = videoBlob;
-                            }
-                        } catch (errMerge) {
-                            console.error('[StreamVault Audio Mux Error]:', errMerge);
-                            progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
-                            statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] text-red-400">error</span> <span class="text-red-400 font-semibold">Download interrupted.</span> <button type="button" onclick="startInlineDownload(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/80 hover:bg-primary px-3 py-1 rounded-lg shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>`;
-                            isInlineDownloadRunning = false;
-                            return;
-                        }
-                    } else {
-                        // Single combined video or pure audio stream
-                        statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Downloading <strong class="text-white">${qualDisplay}${fmtDisplay}</strong> at turbo speed...`;
-                        progressBar.style.width = '20%';
-                        pctText.textContent = '20%';
-
-                        const singleUrl = (dlData.streamUrl && !dlData.streamUrl.includes('googlevideo.com')) 
-                            ? dlData.streamUrl 
-                            : (dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl);
-                        const fallbackStreamUrl = (singleUrl === dlData.streamUrl)
-                            ? (dlData.fullDownloadUrl || dlData.downloadUrl)
-                            : dlData.streamUrl;
-
-                        try {
-                            let lastProgressTime = performance.now();
-                            let lastProgressBytes = 0;
-                            finalBlob = await fetchBlobWithProgress(singleUrl, fallbackStreamUrl, (pct, received, total) => {
-                                const p = Math.round(20 + pct * 75);
-                                progressBar.style.width = `${p}%`;
-                                pctText.textContent = `${p}%`;
+                    try {
+                        let lastProgressTime = performance.now();
+                        let lastProgressBytes = 0;
+                        const [videoBlob, audioBlob] = await Promise.all([
+                            fetchBlobWithProgress(videoUrl, dlData.streamUrl, (pct, received, total) => {
+                                const p = Math.round(15 + pct * 75);
+                                progressBar.style.width = p + '%';
+                                pctText.textContent = p + '%';
                                 if (total > 0 && received > 0) {
                                     const recMB = (received / 1048576).toFixed(1);
                                     const totMB = (total / 1048576).toFixed(1);
-                                    sizeInfo.textContent = `${recMB} / ${totMB} MB`;
+                                    sizeInfo.textContent = recMB + ' / ' + totMB + ' MB';
 
                                     const now = performance.now();
                                     const elapsedSec = (now - lastProgressTime) / 1000;
                                     if (elapsedSec >= 0.4) {
                                         const speed = ((received - lastProgressBytes) / 1048576) / elapsedSec;
-                                        if (speedText && speed > 0) {
-                                            speedText.textContent = `${speed.toFixed(1)} MB/s`;
-                                        }
+                                        if (speedText && speed > 0) speedText.textContent = speed.toFixed(1) + ' MB/s';
                                         lastProgressTime = now;
                                         lastProgressBytes = received;
                                     }
                                 }
-                            });
-                            if (!finalBlob) throw new Error("Stream returned empty data");
-                        } catch (singleErr) {
-                            console.error('[StreamVault Single Download Error]:', singleErr);
-                            // Ultimate Resilient Native Browser Anchor Fallback
-                            const directFallbackUrl = dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl;
-                            if (directFallbackUrl) {
-                                try {
-                                    console.log('[StreamVault] Triggering native browser download fallback:', directFallbackUrl);
-                                    const a = document.createElement('a');
-                                    a.style.display = 'none';
-                                    a.href = directFallbackUrl;
-                                    a.setAttribute('download', dlFilename);
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    setTimeout(() => {
-                                        try { document.body.removeChild(a); } catch(_) {}
-                                    }, 5000);
-                                    progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
-                                    progressBar.style.width = '100%';
-                                    pctText.textContent = '100%';
-                                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download initiated directly in browser! <button type="button" onclick="triggerFastBrowserDownload()" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/40 hover:bg-primary/60 px-3 py-1 rounded-lg border border-primary/50 shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">download</span> Save Again</button>`;
-                                    statusText.classList.replace('text-primary', 'text-green-400');
-                                    downloadAnotherBtn.classList.remove('hidden');
-                                    isInlineDownloadRunning = false;
-                                    return;
-                                } catch (_) {}
-                            }
-                            progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
-                            statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] text-red-400">error</span> <span class="text-red-400 font-semibold">Download interrupted.</span> <button type="button" onclick="startInlineDownload(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/80 hover:bg-primary px-3 py-1 rounded-lg shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>`;
-                            isInlineDownloadRunning = false;
-                            return;
-                        }
-                    }
+                            }),
+                            fetchBlobWithProgress(audioUrl, dlData.audioStreamUrl, null)
+                        ]);
 
-                    if (!finalBlob) {
-                        progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
-                        statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] text-red-400">error</span> <span class="text-red-400 font-semibold">Could not process media stream.</span> <button type="button" onclick="startInlineDownload(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/80 hover:bg-primary px-3 py-1 rounded-lg shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>`;
+                        if (!videoBlob) throw new Error("YouTube video stream returned empty data");
+
+                        statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Combining YouTube video + audio with crystal-clear sound...';
+                        progressBar.style.width = '95%';
+                        pctText.textContent = '95%';
+
+                        if (audioBlob && window.StreamVaultRemuxer) {
+                            finalBlob = await window.StreamVaultRemuxer.mergeVideoAndAudio(videoBlob, audioBlob);
+                        } else {
+                            finalBlob = videoBlob;
+                        }
+                    } catch (errMerge) {
+                        console.error('[YouTube Audio Mux Error]:', errMerge);
+                        // Fallback 1: Try direct browser download if URL exists
+                        const directFallbackUrl = dlData.fullDownloadUrl || dlData.downloadUrl;
+                        if (directFallbackUrl) {
+                            try {
+                                const a = document.createElement('a');
+                                a.style.display = 'none';
+                                a.href = directFallbackUrl;
+                                a.setAttribute('download', dlFilename);
+                                document.body.appendChild(a);
+                                a.click();
+                                setTimeout(() => {
+                                    try { document.body.removeChild(a); } catch(_) {}
+                                }, 5000);
+
+                                progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
+                                progressBar.style.width = '100%';
+                                pctText.textContent = '100%';
+                                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> YouTube download initiated directly in browser! <button type="button" onclick="showDesktopProModal(\'YouTube\')" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-gradient-to-r from-primary to-orange-500 px-3 py-1 rounded-lg text-xs shadow-md"><span class="material-symbols-outlined text-[14px]">desktop_windows</span> Desktop Pro</button>';
+                                statusText.classList.replace('text-primary', 'text-green-400');
+                                downloadAnotherBtn.classList.remove('hidden');
+                                isInlineDownloadRunning = false;
+                                return;
+                            } catch (_) {}
+                        }
+
+                        progressBar.classList.replace('bg-gradient-to-r', 'bg-amber-500');
+                        statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] text-amber-400">warning</span> <span class="text-amber-400 font-semibold">YouTube stream protected by BotGuard.</span> <button type="button" onclick="showDesktopProModal(\'YouTube\')" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-gradient-to-r from-primary to-orange-500 px-3 py-1 rounded-lg text-xs shadow-md"><span class="material-symbols-outlined text-[14px]">desktop_windows</span> Launch Desktop Pro</button> <button type="button" onclick="downloadYouTubeMedia(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-1 bg-surface-container border border-white/10 px-3 py-1 rounded-lg text-xs"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>';
+                        downloadAnotherBtn.classList.remove('hidden');
                         isInlineDownloadRunning = false;
                         return;
                     }
+                } else {
+                    // Progressive or single audio stream
+                    statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Downloading <strong class="text-white">' + qualDisplay + fmtDisplay + '</strong> at turbo speed...';
+                    progressBar.style.width = '20%';
+                    pctText.textContent = '20%';
 
-                    progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
-                    progressBar.style.width = '100%';
-                    pctText.textContent = '100%';
-                    
-                    window.__lastDownloadedBlob = finalBlob;
-                    window.__lastDownloadedFilename = dlFilename;
+                    const singleUrl = dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl;
+                    try {
+                        let lastProgressTime = performance.now();
+                        let lastProgressBytes = 0;
+                        finalBlob = await fetchBlobWithProgress(singleUrl, dlData.streamUrl, (pct, received, total) => {
+                            const p = Math.round(20 + pct * 75);
+                            progressBar.style.width = p + '%';
+                            pctText.textContent = p + '%';
+                            if (total > 0 && received > 0) {
+                                const recMB = (received / 1048576).toFixed(1);
+                                const totMB = (total / 1048576).toFixed(1);
+                                sizeInfo.textContent = recMB + ' / ' + totMB + ' MB';
 
-                    // DIRECT DOWNLOAD TRIGGER (Clean Blob URL save, NO external tab navigation!)
-                    const blobUrl = URL.createObjectURL(finalBlob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = blobUrl;
-                    a.setAttribute('download', dlFilename);
-                    document.body.appendChild(a);
-                    a.click();
-                    setTimeout(() => {
-                        try { document.body.removeChild(a); } catch(_) {}
-                        URL.revokeObjectURL(blobUrl);
-                    }, 10000);
+                                const now = performance.now();
+                                const elapsedSec = (now - lastProgressTime) / 1000;
+                                if (elapsedSec >= 0.4) {
+                                    const speed = ((received - lastProgressBytes) / 1048576) / elapsedSec;
+                                    if (speedText && speed > 0) speedText.textContent = speed.toFixed(1) + ' MB/s';
+                                    lastProgressTime = now;
+                                    lastProgressBytes = received;
+                                }
+                            }
+                        });
+                        if (!finalBlob) throw new Error("YouTube stream returned empty data");
+                    } catch (singleErr) {
+                        console.error('[YouTube Stream Error]:', singleErr);
+                        const directFallbackUrl = dlData.fullDownloadUrl || dlData.downloadUrl;
+                        if (directFallbackUrl) {
+                            try {
+                                const a = document.createElement('a');
+                                a.style.display = 'none';
+                                a.href = directFallbackUrl;
+                                a.setAttribute('download', dlFilename);
+                                document.body.appendChild(a);
+                                a.click();
+                                setTimeout(() => {
+                                    try { document.body.removeChild(a); } catch(_) {}
+                                }, 5000);
 
-                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Complete! Saved with sound. <button type="button" onclick="triggerFastBrowserDownload()" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/40 hover:bg-primary/60 px-3 py-1 rounded-lg border border-primary/50 shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">download</span> Save Again</button>`;
-                    statusText.classList.replace('text-primary', 'text-green-400');
-                    speedText.textContent  = '';
-                    sizeInfo.textContent   = '';
+                                progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
+                                progressBar.style.width = '100%';
+                                pctText.textContent = '100%';
+                                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> YouTube download initiated directly in browser! <button type="button" onclick="showDesktopProModal(\'YouTube\')" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-gradient-to-r from-primary to-orange-500 px-3 py-1 rounded-lg text-xs shadow-md"><span class="material-symbols-outlined text-[14px]">desktop_windows</span> Desktop Pro</button>';
+                                statusText.classList.replace('text-primary', 'text-green-400');
+                                downloadAnotherBtn.classList.remove('hidden');
+                                isInlineDownloadRunning = false;
+                                return;
+                            } catch (_) {}
+                        }
+
+                        progressBar.classList.replace('bg-gradient-to-r', 'bg-amber-500');
+                        statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] text-amber-400">warning</span> <span class="text-amber-400 font-semibold">YouTube stream protected by BotGuard.</span> <button type="button" onclick="showDesktopProModal(\'YouTube\')" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-gradient-to-r from-primary to-orange-500 px-3 py-1 rounded-lg text-xs shadow-md"><span class="material-symbols-outlined text-[14px]">desktop_windows</span> Launch Desktop Pro</button> <button type="button" onclick="downloadYouTubeMedia(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-1 bg-surface-container border border-white/10 px-3 py-1 rounded-lg text-xs"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>';
+                        downloadAnotherBtn.classList.remove('hidden');
+                        isInlineDownloadRunning = false;
+                        return;
+                    }
+                }
+
+                if (!finalBlob) {
+                    progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
+                    statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] text-red-400">error</span> <span class="text-red-400 font-semibold">Could not process YouTube media stream.</span> <button type="button" onclick="downloadYouTubeMedia(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/80 hover:bg-primary px-3 py-1 rounded-lg shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>';
                     downloadAnotherBtn.classList.remove('hidden');
-
                     isInlineDownloadRunning = false;
                     return;
                 }
 
-                // ── Poll for Local Download Status (Desktop Mode) ───────────
-                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Downloading to PC...';
-                progressBar.style.width = '0%';
-                
-                const pollInterval = setInterval(async () => {
-                    try {
-                        const statusRes = await fetch((window.API_BASE_URL || '') + `/api/download-status?id=${dlId}`);
-                        if (statusRes.ok) {
-                            const st = await statusRes.json();
-                            
-                            if (st.status === 'completed') {
-                                clearInterval(pollInterval);
-                                
-                                const filePath = st.path || dlData.path || '';
-                                const serveUrl = (window.API_BASE_URL || '') + `/api/serve-file?path=${encodeURIComponent(filePath)}&filename=${encodeURIComponent(dlFilename)}`;
-                                
-                                // Verify File Exists and Size > 0
-                                try {
-                                    const verifyRes = await fetch((window.API_BASE_URL || '') + '/api/verify-file', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ path: filePath })
-                                    });
-                                    const verifyData = await verifyRes.json();
-                                    
-                                    console.log("=== DOWNLOAD VERIFICATION ===");
-                                    console.log("File path:", filePath);
-                                    console.log("File name:", dlFilename);
-                                    console.log("File size:", verifyData.size || 0);
-                                    console.log("HTTP response:", verifyRes.status);
-                                    console.log("Download URL:", serveUrl);
+                // Successful completion
+                progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
+                progressBar.style.width = '100%';
+                pctText.textContent = '100%';
 
-                                    if (!verifyData.success) {
-                                        if (verifyData.error && verifyData.error.includes('0 bytes')) {
-                                            throw new Error("Invalid file generated.");
-                                        } else {
-                                            throw new Error("File was not created.");
-                                        }
-                                    }
-                                } catch(ve) {
-                                    throw ve;
-                                }
+                window.__lastDownloadedBlob = finalBlob;
+                window.__lastDownloadedFilename = dlFilename;
 
-                                // Save to queue history
-                                saveToQueueHistory(videoData, dlFilename, dlId, format, null, true);
-                                
-                                console.log("TRIGGERING NATIVE DOWNLOAD: ", serveUrl);
-                                const a = document.createElement('a');
-                                a.style.display = 'none';
-                                a.href = serveUrl;
-                                a.setAttribute('download', dlFilename);
-                                document.body.appendChild(a);
-                                a.click();
-                                setTimeout(() => { try { document.body.removeChild(a); } catch(_) {} }, 2000);
+                const blobUrl = URL.createObjectURL(finalBlob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = blobUrl;
+                a.setAttribute('download', dlFilename);
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    try { document.body.removeChild(a); } catch(_) {}
+                    URL.revokeObjectURL(blobUrl);
+                }, 10000);
 
-                                // Update UI to success with explicit Save File link
-                                setTimeout(() => {
-                                    progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
-                                    progressBar.style.width = '100%';
-                                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download Complete! <a href="${serveUrl}" download="${dlFilename}" class="inline-flex items-center gap-1 underline font-semibold text-white ml-2 bg-primary/20 hover:bg-primary/40 px-2 py-0.5 rounded border border-primary/30 transition-all"><span class="material-symbols-outlined text-[12px]">download</span> Save File</a>`;
-                                    statusText.classList.replace('text-primary', 'text-green-400');
-                                    speedText.textContent  = '';
-                                    sizeInfo.textContent   = '';
-                                    pctText.textContent    = '';
-                                    downloadAnotherBtn.classList.remove('hidden');
-                                }, 500);
-
-                                setTimeout(() => {
-                                    if (typeof autoResetDownloader === 'function') autoResetDownloader();
-                                }, 8000);
-                            } else if (st.status === 'failed') {
-                                clearInterval(pollInterval);
-                                throw new Error(st.error || 'Download failed during extraction');
-                            } else {
-                                // Update progress bar
-                                progressBar.style.width = (st.progress || 0) + '%';
-                                pctText.textContent = (st.progress || 0) + '%';
-                                speedText.textContent = st.speed || '';
-                                if (st.status === 'saving') {
-                                    statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Merging Audio/Video...';
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        clearInterval(pollInterval);
-                        console.error('[StreamVault] Polling Error:', e);
-                        progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
-                        progressBar.style.width = '100%';
-                        statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">error</span> ${e.message}`;
-                        statusText.classList.replace('text-primary', 'text-red-400');
-                        downloadAnotherBtn.classList.remove('hidden');
-                    }
-                }, 1000);
+                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> YouTube Download Complete! Saved with sound. <button type="button" onclick="triggerFastBrowserDownload()" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/40 hover:bg-primary/60 px-3 py-1 rounded-lg border border-primary/50 shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">download</span> Save Again</button>';
+                statusText.classList.replace('text-primary', 'text-green-400');
+                speedText.textContent  = '';
+                sizeInfo.textContent   = '';
+                downloadAnotherBtn.classList.remove('hidden');
+                isInlineDownloadRunning = false;
 
             } catch (err) {
                 isInlineDownloadRunning = false;
-                console.log("=== ERROR TRACE ===");
-                console.log("Stack Trace:", err.stack || err);
-                console.error('[StreamVault] Download Error:', err);
-                
-                const dlHeadingIcon = document.getElementById('dl-progress-icon');
-                const dlHeadingTitle = document.getElementById('dl-progress-title');
-                const dlProgressCard = document.getElementById('dl-progress-card');
-                const dlProgressStats = document.getElementById('dl-progress-stats');
-                const dlProgressTrack = document.getElementById('dl-progress-track');
+                console.error('[YouTube Engine Error]:', err);
 
                 if (err.desktopFallback) {
                     if (dlHeadingIcon) {
                         dlHeadingIcon.className = 'material-symbols-outlined text-amber-400';
                         dlHeadingIcon.textContent = 'desktop_windows';
                     }
-                    if (dlHeadingTitle) {
-                        dlHeadingTitle.textContent = 'Desktop Authentication Required';
-                    }
-                    if (dlProgressCard) {
-                        dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-amber-500/30 bg-amber-500/5 flex flex-col gap-4';
-                    }
-                    if (dlProgressStats) {
-                        dlProgressStats.style.display = 'none';
-                    }
-                    if (dlProgressTrack) {
-                        dlProgressTrack.style.display = 'none';
-                    }
+                    if (dlHeadingTitle) dlHeadingTitle.textContent = 'Desktop Authentication Required';
+                    if (dlProgressCard) dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-amber-500/30 bg-amber-500/5 flex flex-col gap-4';
+                    if (dlProgressStats) dlProgressStats.style.display = 'none';
+                    if (dlProgressTrack) dlProgressTrack.style.display = 'none';
                     statusText.innerHTML = renderCloudFallbackUI(err);
-                    if (err.code === 'SOCIAL_DESKTOP_PRO_REQUIRED') {
-                        showDesktopProModal(err.platform === 'instagram' ? 'Instagram Reel' : (err.platform === 'facebook' ? 'Facebook Video' : 'Social Media'));
-                    }
+                    showDesktopProModal('YouTube');
                 } else {
                     if (dlHeadingIcon) {
                         dlHeadingIcon.className = 'material-symbols-outlined text-red-400';
                         dlHeadingIcon.textContent = 'error';
                     }
-                    if (dlHeadingTitle) {
-                        dlHeadingTitle.textContent = 'Download Failed';
-                    }
-                    if (dlProgressCard) {
-                        dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-red-500/30 bg-red-500/5 flex flex-col gap-4';
-                    }
-                    if (dlProgressStats) {
-                        dlProgressStats.style.display = 'none';
-                    }
+                    if (dlHeadingTitle) dlHeadingTitle.textContent = 'YouTube Download Failed';
+                    if (dlProgressCard) dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-red-500/30 bg-red-500/5 flex flex-col gap-4';
+                    if (dlProgressStats) dlProgressStats.style.display = 'none';
                     progressBar.className = 'h-full rounded-full transition-all duration-300 bg-red-500';
                     progressBar.style.width = '100%';
                     speedText.textContent = '';
                     sizeInfo.textContent = '';
                     pctText.textContent = '';
-                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">error</span> Download Failed<br><pre class='text-xs mt-2 text-left bg-black/20 p-2 rounded whitespace-pre-wrap'>${err.message || err}</pre>`;
+                    statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">error</span> YouTube Download Failed<br><pre class=\"text-xs mt-2 text-left bg-black/20 p-2 rounded whitespace-pre-wrap\">' + (err.message || err) + '</pre>';
                     statusText.classList.replace('text-primary', 'text-red-400');
                 }
                 downloadAnotherBtn.classList.remove('hidden');
             }
-
-            // ── Download Another button ───────────────────────
-            downloadAnotherBtn.onclick = () => {
-                document.getElementById('download-workflow-section').classList.add('hidden');
-                document.getElementById('download-workflow-section').classList.remove('flex');
-                progressSection.classList.add('hidden');
-                progressSection.classList.remove('flex');
-                stepsContainer.classList.remove('hidden');
-
-                const dlHeadingIcon = document.getElementById('dl-progress-icon');
-                const dlHeadingTitle = document.getElementById('dl-progress-title');
-                const dlProgressCard = document.getElementById('dl-progress-card');
-                const dlProgressStats = document.getElementById('dl-progress-stats');
-                const dlProgressTrack = document.getElementById('dl-progress-track');
-
-                if (dlHeadingIcon) {
-                    dlHeadingIcon.className = 'material-symbols-outlined text-primary animate-pulse';
-                    dlHeadingIcon.textContent = 'cloud_download';
-                }
-                if (dlHeadingTitle) {
-                    dlHeadingTitle.textContent = 'Downloading...';
-                }
-                if (dlProgressCard) {
-                    dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-primary/30 bg-primary/5 flex flex-col gap-4';
-                }
-                if (dlProgressStats) {
-                    dlProgressStats.style.display = 'flex';
-                }
-                if (dlProgressTrack) {
-                    dlProgressTrack.style.display = 'block';
-                }
-
-                // Reset status colours
-                statusText.classList.replace('text-green-400', 'text-primary');
-                statusText.classList.replace('text-red-400',   'text-primary');
-                progressBar.className = 'h-full rounded-full transition-all duration-300 bg-gradient-to-r from-primary to-orange-500';
-                progressBar.style.width = '0%';
-                pctText.textContent = '0%';
-                speedText.textContent = '--';
-                sizeInfo.textContent = '--';
-                downloadAnotherBtn.classList.add('hidden');
-
-                const uiInput = document.getElementById('url-input');
-                if (uiInput) { uiInput.value = ''; uiInput.focus(); }
-                if (typeof updateAnalyzeBtnState === 'function') updateAnalyzeBtnState();
-            };
         }
+
+        // ============================================================
+        // ENGINE 2: SOCIAL MEDIA DOWNLOAD ENGINE (Instagram / Facebook / TikTok)
+        // ============================================================
+        async function downloadSocialMedia(videoData, format, selectedQuality) {
+            if (isInlineDownloadRunning) return;
+            isInlineDownloadRunning = true;
+            window.__lastVideoData = videoData;
+            window.__lastFormat = format;
+            window.__lastQuality = selectedQuality;
+            if (typeof window.toggleAds === 'function') window.toggleAds(false);
+
+            const parsedUrl = URLParser.detectPlatform(videoData.url);
+            const platformName = parsedUrl.type === 'instagram' ? 'Instagram Reel' : (parsedUrl.type === 'facebook' ? 'Facebook Video' : (parsedUrl.type === 'tiktok' ? 'TikTok Video' : 'Social Media'));
+
+            const stepsContainer   = document.getElementById('selection-steps-container');
+            const progressSection  = document.getElementById('inline-progress-section');
+            const statusText       = document.getElementById('dl-status-text');
+            const speedText        = document.getElementById('dl-speed');
+            const sizeInfo         = document.getElementById('dl-size-info');
+            const pctText          = document.getElementById('dl-percentage');
+            const progressBar      = document.getElementById('dl-progress-bar');
+            const downloadAnotherBtn = document.getElementById('btn-download-another');
+            if (downloadAnotherBtn) downloadAnotherBtn.onclick = resetDownloaderUI;
+
+            const dlHeadingIcon = document.getElementById('dl-progress-icon');
+            const dlHeadingTitle = document.getElementById('dl-progress-title');
+            const dlProgressCard = document.getElementById('dl-progress-card');
+            const dlProgressStats = document.getElementById('dl-progress-stats');
+            const dlProgressTrack = document.getElementById('dl-progress-track');
+
+            stepsContainer.classList.add('hidden');
+            progressSection.classList.remove('hidden');
+            progressSection.classList.add('flex');
+
+            if (dlHeadingIcon) {
+                dlHeadingIcon.className = 'material-symbols-outlined text-primary animate-pulse';
+                dlHeadingIcon.textContent = 'cloud_download';
+            }
+            if (dlHeadingTitle) dlHeadingTitle.textContent = 'Downloading ' + platformName + '...';
+            if (dlProgressCard) dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-primary/30 bg-primary/5 flex flex-col gap-4';
+            if (dlProgressStats) dlProgressStats.style.display = 'flex';
+            if (dlProgressTrack) dlProgressTrack.style.display = 'block';
+
+            const isAudio = format === 'mp3';
+            const qualDisplay = (selectedQuality && selectedQuality !== 'best' && selectedQuality !== 'Original') ? selectedQuality + ' • ' : '';
+            const fmtDisplay = isAudio ? 'MP3' : 'MP4';
+
+            statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Connecting to ' + platformName + ' CDN...';
+            statusText.className = 'font-mono-sm text-[12px] text-primary flex items-center gap-1';
+            speedText.textContent  = '--';
+            sizeInfo.textContent   = '--';
+            pctText.textContent    = '10%';
+            progressBar.style.width = '10%';
+            progressBar.className = 'h-full rounded-full transition-all duration-300 bg-gradient-to-r from-primary to-orange-500';
+
+            let rawTitle = (videoData.title || platformName).trim();
+            let cleanTitle = rawTitle.replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, ' ').trim();
+            if (cleanTitle.length > 50) cleanTitle = cleanTitle.substring(0, 50).trim();
+            let filename = cleanTitle;
+            if (selectedQuality && selectedQuality !== 'best' && selectedQuality !== 'Original') {
+                filename += '_' + selectedQuality;
+            }
+            if (!filename.toLowerCase().endsWith('.mp4') && !filename.toLowerCase().endsWith('.mp3')) {
+                filename += isAudio ? '.mp3' : '.mp4';
+            }
+
+            try {
+                let formatUrl = null;
+                let formatId = selectedQuality;
+                if (videoData.videoFormats && Array.isArray(videoData.videoFormats)) {
+                    const matchedFormat = videoData.videoFormats.find(f => (f.id || f.format_id) === selectedQuality) || videoData.videoFormats[0];
+                    if (matchedFormat && matchedFormat.url) formatUrl = matchedFormat.url;
+                }
+
+                const reqBody = {
+                    platform: 'social',
+                    url: videoData.url,
+                    quality: selectedQuality,
+                    format: isAudio ? 'audio' : 'video',
+                    filename: filename,
+                    id: 'soc-' + Date.now(),
+                    format_url: formatUrl,
+                    format_id: formatId
+                };
+
+                const endpointsToTry = [
+                    '/api/download',
+                    'https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1/download'
+                ];
+
+                let dlRes = null;
+                let lastErr = null;
+
+                for (const targetUrl of endpointsToTry) {
+                    try {
+                        console.log("[Social Engine] Endpoint attempt:", targetUrl);
+                        const res = await fetch(targetUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                ...(window.SUPABASE_ANON_KEY && targetUrl.includes('supabase.co') ? {
+                                    'apikey': window.SUPABASE_ANON_KEY,
+                                    'Authorization': 'Bearer ' + window.SUPABASE_ANON_KEY
+                                } : {})
+                            },
+                            body: JSON.stringify(reqBody)
+                        });
+                        if (res.ok) {
+                            dlRes = res;
+                            break;
+                        } else {
+                            const errBody = await res.json().catch(() => null);
+                            lastErr = errBody?.error || ('HTTP ' + res.status);
+                        }
+                    } catch (netErr) {
+                        lastErr = netErr;
+                    }
+                }
+
+                if (!dlRes) {
+                    throw {
+                        message: (lastErr && lastErr.message) ? lastErr.message : (typeof lastErr === 'string' ? lastErr : platformName + ' service unavailable'),
+                        desktopFallback: (lastErr && typeof lastErr === 'object') ? (lastErr.desktopFallback ?? true) : true,
+                        code: lastErr?.code || 'SOCIAL_DESKTOP_PRO_REQUIRED',
+                        platform: parsedUrl.type
+                    };
+                }
+
+                const dlData = await dlRes.json();
+                console.log("[Social Engine Response - " + platformName + "]:", dlData);
+
+                if (!dlData.success) {
+                    const errObj = dlData.error || {};
+                    const errMsg = (typeof errObj === 'object' ? errObj.message : errObj) || (platformName + ' download failed');
+                    const isFallback = (typeof errObj === 'object' && errObj.desktopFallback);
+                    throw {
+                        message: errMsg,
+                        desktopFallback: isFallback !== undefined ? isFallback : true,
+                        code: errObj.code || 'SOCIAL_DESKTOP_PRO_REQUIRED',
+                        platform: parsedUrl.type
+                    };
+                }
+
+                const dlFilename = dlData.filename || filename;
+                const dlId = reqBody.id;
+                saveToQueueHistory(videoData, dlFilename, dlId, format, null, true);
+
+                // Social media media files are single progressive MP4 streams
+                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Downloading <strong class="text-white">' + qualDisplay + fmtDisplay + '</strong> at turbo speed...';
+                progressBar.style.width = '25%';
+                pctText.textContent = '25%';
+
+                const singleUrl = dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl;
+                const fallbackStreamUrl = dlData.streamUrl;
+
+                let finalBlob = null;
+                try {
+                    let lastProgressTime = performance.now();
+                    let lastProgressBytes = 0;
+                    finalBlob = await fetchBlobWithProgress(singleUrl, fallbackStreamUrl, (pct, received, total) => {
+                        const p = Math.round(25 + pct * 70);
+                        progressBar.style.width = p + '%';
+                        pctText.textContent = p + '%';
+                        if (total > 0 && received > 0) {
+                            const recMB = (received / 1048576).toFixed(1);
+                            const totMB = (total / 1048576).toFixed(1);
+                            sizeInfo.textContent = recMB + ' / ' + totMB + ' MB';
+
+                            const now = performance.now();
+                            const elapsedSec = (now - lastProgressTime) / 1000;
+                            if (elapsedSec >= 0.4) {
+                                const speed = ((received - lastProgressBytes) / 1048576) / elapsedSec;
+                                if (speedText && speed > 0) speedText.textContent = speed.toFixed(1) + ' MB/s';
+                                lastProgressTime = now;
+                                lastProgressBytes = received;
+                            }
+                        }
+                    });
+                    if (!finalBlob) throw new Error("Stream returned empty data");
+                } catch (socialErr) {
+                    console.warn("[Social Engine] Blob stream failed, initiating native direct browser download:", socialErr);
+                    const directFallbackUrl = dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl;
+                    if (directFallbackUrl) {
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = directFallbackUrl;
+                        a.setAttribute('download', dlFilename);
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => {
+                            try { document.body.removeChild(a); } catch(_) {}
+                        }, 5000);
+
+                        progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
+                        progressBar.style.width = '100%';
+                        pctText.textContent = '100%';
+                        statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> ' + platformName + ' download initiated directly! <button type="button" onclick="triggerFastBrowserDownload()" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/40 hover:bg-primary/60 px-3 py-1 rounded-lg border border-primary/50 shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">download</span> Save Again</button>';
+                        statusText.classList.replace('text-primary', 'text-green-400');
+                        downloadAnotherBtn.classList.remove('hidden');
+                        isInlineDownloadRunning = false;
+                        return;
+                    }
+
+                    progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
+                    statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] text-red-400">error</span> <span class="text-red-400 font-semibold">' + platformName + ' download interrupted.</span> <button type="button" onclick="downloadSocialMedia(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/80 hover:bg-primary px-3 py-1 rounded-lg shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>';
+                    downloadAnotherBtn.classList.remove('hidden');
+                    isInlineDownloadRunning = false;
+                    return;
+                }
+
+                progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
+                progressBar.style.width = '100%';
+                pctText.textContent = '100%';
+
+                window.__lastDownloadedBlob = finalBlob;
+                window.__lastDownloadedFilename = dlFilename;
+
+                const blobUrl = URL.createObjectURL(finalBlob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = blobUrl;
+                a.setAttribute('download', dlFilename);
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    try { document.body.removeChild(a); } catch(_) {}
+                    URL.revokeObjectURL(blobUrl);
+                }, 10000);
+
+                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> ' + platformName + ' Download Complete! Saved with sound. <button type="button" onclick="triggerFastBrowserDownload()" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/40 hover:bg-primary/60 px-3 py-1 rounded-lg border border-primary/50 shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">download</span> Save Again</button>';
+                statusText.classList.replace('text-primary', 'text-green-400');
+                speedText.textContent  = '';
+                sizeInfo.textContent   = '';
+                downloadAnotherBtn.classList.remove('hidden');
+                isInlineDownloadRunning = false;
+
+            } catch (err) {
+                isInlineDownloadRunning = false;
+                console.error("[Social Engine Error - " + platformName + "]:", err);
+
+                if (err.desktopFallback) {
+                    if (dlHeadingIcon) {
+                        dlHeadingIcon.className = 'material-symbols-outlined text-amber-400';
+                        dlHeadingIcon.textContent = 'desktop_windows';
+                    }
+                    if (dlHeadingTitle) dlHeadingTitle.textContent = 'Desktop Authentication Required';
+                    if (dlProgressCard) dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-amber-500/30 bg-amber-500/5 flex flex-col gap-4';
+                    if (dlProgressStats) dlProgressStats.style.display = 'none';
+                    if (dlProgressTrack) dlProgressTrack.style.display = 'none';
+                    statusText.innerHTML = renderCloudFallbackUI(err);
+                    showDesktopProModal(platformName);
+                } else {
+                    if (dlHeadingIcon) {
+                        dlHeadingIcon.className = 'material-symbols-outlined text-red-400';
+                        dlHeadingIcon.textContent = 'error';
+                    }
+                    if (dlHeadingTitle) dlHeadingTitle.textContent = platformName + ' Download Failed';
+                    if (dlProgressCard) dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-red-500/30 bg-red-500/5 flex flex-col gap-4';
+                    if (dlProgressStats) dlProgressStats.style.display = 'none';
+                    progressBar.className = 'h-full rounded-full transition-all duration-300 bg-red-500';
+                    progressBar.style.width = '100%';
+                    speedText.textContent = '';
+                    sizeInfo.textContent = '';
+                    pctText.textContent = '';
+                    statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">error</span> ' + platformName + ' Download Failed<br><pre class=\"text-xs mt-2 text-left bg-black/20 p-2 rounded whitespace-pre-wrap\">' + (err.message || err) + '</pre>';
+                    statusText.classList.replace('text-primary', 'text-red-400');
+                }
+                downloadAnotherBtn.classList.remove('hidden');
+            }
+        }
+
+        // ============================================================
+        // ROUTER: TOP-LEVEL DISPATCHER (Zero Interference)
+        // ============================================================
+        async function startInlineDownload(videoData, format, selectedQuality) {
+            window.__lastVideoData = videoData;
+            window.__lastFormat = format;
+            window.__lastQuality = selectedQuality;
+
+            const parsedUrl = URLParser.detectPlatform(videoData?.url || '');
+            if (parsedUrl.type === 'youtube') {
+                console.log('[Router] Routing to Dedicated YouTube Download Engine');
+                return downloadYouTubeMedia(videoData, format, selectedQuality);
+            } else {
+                console.log('[Router] Routing to Dedicated Social Media Engine (' + parsedUrl.type + ')');
+                return downloadSocialMedia(videoData, format, selectedQuality);
+            }
+        }
+
 
         function saveToQueueHistory(videoData, filename, id, format, path, success) {
             const queue = JSON.parse(localStorage.getItem('download_queue') || '[]');
