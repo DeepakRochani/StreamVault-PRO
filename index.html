@@ -1312,9 +1312,19 @@ if (window.supabaseClient) {
                 { quality: "128 kbps (Economy)", id: "128K", sizeStr: "~0.9 MB/min", recommended: false },
             ];
 
+            // Extract shortcode or identifier for social platforms if applicable
+            let defaultTitle = "Loading Stream...";
+            if (check.type === 'instagram') {
+                const igMatch = check.normalizedUrl.match(/\/(?:reel|p|tv|reels)\/([a-zA-Z0-9_-]+)/i);
+                defaultTitle = igMatch ? `Instagram Reel (${igMatch[1]})` : "Instagram Reel";
+            } else if (check.type === 'facebook') {
+                const fbMatch = check.normalizedUrl.match(/(?:videos\/|reel\/|watch\/\?v=)(\d+)/i);
+                defaultTitle = fbMatch ? `Facebook Video (${fbMatch[1]})` : "Facebook Video";
+            }
+
             // Prepare pending video object with instant thumbnail
             let pendingVideo = {
-                title: "Loading Stream...",
+                title: defaultTitle,
                 platform: check.type === 'youtube' ? 'YouTube' : check.type === 'instagram' ? 'Instagram' : check.type === 'facebook' ? 'Facebook' : 'Web Stream',
                 thumbnail: ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=400&auto=format&fit=crop",
                 url: check.normalizedUrl,
@@ -1360,6 +1370,10 @@ if (window.supabaseClient) {
                 if (data.audioFormats && data.audioFormats.length > 0) pendingVideo.audioFormats = data.audioFormats;
 
                 document.getElementById('video-title').textContent = pendingVideo.title;
+                const durEl = document.getElementById('video-duration');
+                if (durEl) {
+                    durEl.textContent = data.duration_string || data.duration || (check.type === 'instagram' ? 'Reel' : check.type === 'facebook' ? 'Social Video' : '--');
+                }
                 const finalThumb = document.getElementById('video-thumbnail');
                 if (pendingVideo.thumbnail) {
                     finalThumb.src = Array.isArray(pendingVideo.thumbnail) ? (pendingVideo.thumbnail[0]?.url || '') : pendingVideo.thumbnail;
@@ -1390,8 +1404,7 @@ if (window.supabaseClient) {
             }
 
             if (!pendingVideo.directDownload) {
-                const isSocial = check.type === 'facebook' || check.type === 'instagram';
-                const apiEndpoint = isSocial ? '/api/social/metadata' : '/api/metadata';
+                const apiEndpoint = '/api/metadata';
 
                 // Lightning Fast-Path: Client-side oEmbed for YouTube (responds in <200ms)
                 if (check.type === 'youtube') {
@@ -1445,7 +1458,8 @@ if (window.supabaseClient) {
                     } else {
                         // Resilient fallback: ensure UI renders with standard available qualities
                         markReadyAndRender({
-                            title: pendingVideo.title !== "Loading Stream..." ? pendingVideo.title : "YouTube Video"
+                            title: pendingVideo.title !== "Loading Stream..." ? pendingVideo.title : (check.type === 'instagram' ? 'Instagram Reel' : check.type === 'facebook' ? 'Facebook Video' : 'YouTube Video'),
+                            duration: check.type === 'instagram' ? 'Reel' : check.type === 'facebook' ? 'Social Video' : '--'
                         });
                     }
                 })();
@@ -1698,7 +1712,11 @@ if (window.supabaseClient) {
             const modal = document.getElementById('desktop-pro-modal');
             const desc = document.getElementById('desktop-pro-modal-desc');
             if (desc && qualityName) {
-                desc.textContent = `${qualityName} downloads require the StreamVault Desktop App.`;
+                if (String(qualityName).toLowerCase().includes('instagram') || String(qualityName).toLowerCase().includes('facebook')) {
+                    desc.textContent = `${qualityName} downloads require active user session cookies, which are securely powered by the StreamVault Desktop Pro app.`;
+                } else {
+                    desc.textContent = `${qualityName} downloads require the StreamVault Desktop App.`;
+                }
             }
             if (modal) {
                 modal.classList.remove('hidden');
@@ -1778,6 +1796,32 @@ if (window.supabaseClient) {
         }
 
         function renderCloudFallbackUI(err) {
+            const isSocial = err.code === 'SOCIAL_DESKTOP_PRO_REQUIRED' || 
+                             err.platform === 'instagram' || err.platform === 'facebook' ||
+                             (err.message && (err.message.includes('Instagram') || err.message.includes('Facebook') || err.message.includes('Meta session')));
+            if (isSocial) {
+                const platformName = err.platform === 'instagram' ? 'Instagram Reel' : (err.platform === 'facebook' ? 'Facebook Video' : 'Social Media');
+                return `
+                    <div class="bg-surface-container-high/90 border border-amber-500/30 rounded-2xl p-5 text-left max-w-lg mx-auto my-2 shadow-xl backdrop-blur-md">
+                        <div class="flex items-center gap-2 text-amber-300 font-bold text-base mb-2">
+                            <span class="material-symbols-outlined text-amber-400 text-[22px]">desktop_windows</span> Desktop Pro Authentication Required
+                        </div>
+                        <div class="text-xs text-on-surface-variant leading-relaxed mb-4">
+                            <p class="mb-2 text-on-surface font-semibold">${platformName} blocks unauthenticated cloud scraping.</p>
+                            <p class="mb-2">${err.message || 'Meta enforces session login verification on cloud servers.'}</p>
+                            <p class="text-on-surface-variant/80">StreamVault Desktop Pro uses your local browser session to download in 1080p Full HD instantly.</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-white/10">
+                            <a href="streamvault-home-tall.html" class="px-3.5 py-1.5 bg-gradient-to-r from-primary to-orange-500 text-on-primary text-xs font-bold rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5 shadow-md">
+                                <span class="material-symbols-outlined text-[16px]">desktop_windows</span> Launch Desktop Pro
+                            </a>
+                            <button type="button" onclick="showDesktopProModal('${platformName}')" class="px-3.5 py-1.5 bg-surface-container border border-white/10 text-xs text-on-surface rounded-xl hover:bg-white/10 transition-all">Learn More</button>
+                            <button type="button" onclick="resetToUrlInput()" class="px-3.5 py-1.5 bg-surface border border-white/10 text-xs text-on-surface rounded-xl hover:bg-white/10 transition-all">Try Another Link</button>
+                        </div>
+                    </div>
+                `;
+            }
+
             const isBotChallenge = err.code === 'YOUTUBE_BOT_CHALLENGE' || 
                                    (err.message && (err.message.includes('bot') || err.message.includes('verification') || err.message.includes('403')));
             const isDash = err.code === 'CLOUD_DOWNLOAD_UNSUPPORTED' || 
@@ -2062,7 +2106,7 @@ if (window.supabaseClient) {
             try {
                 const parsedUrl = URLParser.detectPlatform(videoData.url);
                 const isSocial = parsedUrl.type === 'facebook' || parsedUrl.type === 'instagram' || parsedUrl.type === 'twitter' || parsedUrl.type === 'tiktok';
-                const dlEndpoint = isSocial ? '/api/social/download' : '/api/download';
+                const dlEndpoint = '/api/download';
                 
                 let formatUrl = null;
                 let formatId = selectedQuality;
@@ -2129,7 +2173,7 @@ if (window.supabaseClient) {
                     const errObj = dlData.error || {};
                     const errMsg = (typeof errObj === 'object' ? errObj.message : errObj) || 'Download failed';
                     const isFallback = (typeof errObj === 'object' && errObj.desktopFallback);
-                    throw { message: errMsg, desktopFallback: isFallback, code: errObj.code };
+                    throw { message: errMsg, desktopFallback: isFallback, code: errObj.code, platform: errObj.platform || (isSocial ? parsedUrl.type : null) };
                 }
 
                 const dlId = reqBody.id;
@@ -2195,6 +2239,19 @@ if (window.supabaseClient) {
                             }
                         } catch (errMerge) {
                             console.error('[StreamVault Audio Mux Error]:', errMerge);
+                            if (isSocial) {
+                                progressBar.classList.replace('bg-gradient-to-r', 'bg-amber-500');
+                                progressBar.style.width = '100%';
+                                statusText.innerHTML = renderCloudFallbackUI({
+                                    code: 'SOCIAL_DESKTOP_PRO_REQUIRED',
+                                    message: `${parsedUrl.type === 'instagram' ? 'Instagram' : 'Facebook'} enforces session authentication on cloud servers. Use StreamVault Desktop Pro with your local browser session.`,
+                                    desktopFallback: true,
+                                    platform: parsedUrl.type
+                                });
+                                showDesktopProModal(parsedUrl.type === 'instagram' ? 'Instagram Reel' : 'Facebook Video');
+                                isInlineDownloadRunning = false;
+                                return;
+                            }
                             progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
                             statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] text-red-400">error</span> <span class="text-red-400 font-semibold">Download interrupted.</span> <button type="button" onclick="startInlineDownload(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/80 hover:bg-primary px-3 py-1 rounded-lg shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>`;
                             isInlineDownloadRunning = false;
@@ -2234,6 +2291,19 @@ if (window.supabaseClient) {
                             if (!finalBlob) throw new Error("Stream returned empty data");
                         } catch (singleErr) {
                             console.error('[StreamVault Single Download Error]:', singleErr);
+                            if (isSocial) {
+                                progressBar.classList.replace('bg-gradient-to-r', 'bg-amber-500');
+                                progressBar.style.width = '100%';
+                                statusText.innerHTML = renderCloudFallbackUI({
+                                    code: 'SOCIAL_DESKTOP_PRO_REQUIRED',
+                                    message: `${parsedUrl.type === 'instagram' ? 'Instagram' : 'Facebook'} enforces session authentication on cloud servers. Use StreamVault Desktop Pro with your local browser session.`,
+                                    desktopFallback: true,
+                                    platform: parsedUrl.type
+                                });
+                                showDesktopProModal(parsedUrl.type === 'instagram' ? 'Instagram Reel' : 'Facebook Video');
+                                isInlineDownloadRunning = false;
+                                return;
+                            }
                             progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
                             statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] text-red-400">error</span> <span class="text-red-400 font-semibold">Download interrupted.</span> <button type="button" onclick="startInlineDownload(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/80 hover:bg-primary px-3 py-1 rounded-lg shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>`;
                             isInlineDownloadRunning = false;
@@ -2382,6 +2452,9 @@ if (window.supabaseClient) {
                     progressBar.classList.replace('bg-gradient-to-r', 'bg-amber-500');
                     progressBar.style.width = '100%';
                     statusText.innerHTML = renderCloudFallbackUI(err);
+                    if (isSocial || err.code === 'SOCIAL_DESKTOP_PRO_REQUIRED') {
+                        showDesktopProModal(err.platform === 'instagram' ? 'Instagram Reel' : (err.platform === 'facebook' ? 'Facebook Video' : 'Social Media'));
+                    }
                 } else {
                     progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
                     progressBar.style.width = '100%';

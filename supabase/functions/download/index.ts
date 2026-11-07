@@ -425,6 +425,25 @@ serve(async (req: Request) => {
         });
       }
 
+      if (!videoId && !streamUrl) {
+        const isIg = /instagram\.com/i.test(videoUrl);
+        const isFb = /facebook\.com|fb\.watch/i.test(videoUrl);
+        if (isIg || isFb) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: {
+              code: "SOCIAL_DESKTOP_PRO_REQUIRED",
+              message: `${isIg ? "Instagram" : "Facebook"} enforces active session authentication and IP rate limits on cloud servers. Use StreamVault Desktop Pro with your local browser session.`,
+              desktopFallback: true,
+              platform: isIg ? "instagram" : "facebook",
+            },
+          }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
       return new Response(JSON.stringify({
         success: false,
         error: {
@@ -469,6 +488,10 @@ serve(async (req: Request) => {
       let audioDirectStream: string | undefined = undefined;
       let hasAudioCombined = true;
 
+      const isInstagram = /instagram\.com/i.test(url);
+      const isFacebook = /facebook\.com|fb\.watch/i.test(url);
+      const isSocial = isInstagram || isFacebook;
+
       const ytMatch = url.match(/(?:youtube[.]com\/(?:watch[?]v=|embed\/|shorts\/)|youtu[.]be\/)([a-zA-Z0-9_-]{11})/);
       const videoId = ytMatch ? ytMatch[1] : "";
 
@@ -483,6 +506,22 @@ serve(async (req: Request) => {
         } catch (resolveErr) {
           console.warn("[Stream Resolver Error]:", resolveErr);
         }
+      }
+
+      // If social URL and no direct stream could be scraped by cloud IP (due to Meta login/bot wall)
+      if (isSocial && !directStream) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: {
+            code: "SOCIAL_DESKTOP_PRO_REQUIRED",
+            message: `${isInstagram ? "Instagram" : "Facebook"} enforces Meta session authentication and IP security on cloud servers. Use StreamVault Desktop Pro with your local browser session.`,
+            desktopFallback: true,
+            platform: isInstagram ? "instagram" : "facebook",
+          },
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       // Generate clean download endpoints
