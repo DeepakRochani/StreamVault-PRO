@@ -1730,15 +1730,25 @@ if (window.supabaseClient) {
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
 
+        function parseQualityHeight(q) {
+            const s = String(q || '').toLowerCase();
+            if (s.includes('8k') || s.includes('4320')) return 4320;
+            if (s.includes('4k') || s.includes('2160')) return 2160;
+            if (s.includes('1440') || s.includes('2k')) return 1440;
+            if (s.includes('1080')) return 1080;
+            if (s.includes('720')) return 720;
+            if (s.includes('480')) return 480;
+            if (s.includes('360')) return 360;
+            const match = s.match(/(\d{3,4})p?/);
+            return match ? parseInt(match[1], 10) : 1080;
+        }
+
         function showDesktopProModal(qualityName) {
             const modal = document.getElementById('desktop-pro-modal');
             const desc = document.getElementById('desktop-pro-modal-desc');
-            if (desc && qualityName) {
-                if (String(qualityName).toLowerCase().includes('instagram') || String(qualityName).toLowerCase().includes('facebook')) {
-                    desc.textContent = `${qualityName} downloads require active user session cookies, which are securely powered by the StreamVault Desktop Pro app.`;
-                } else {
-                    desc.textContent = `${qualityName} downloads require the StreamVault Desktop App.`;
-                }
+            if (desc) {
+                const q = (qualityName || '4K').toUpperCase();
+                desc.textContent = `Resolutions above 1080p (${q}) require StreamVault Desktop Pro. Online web downloads are fully supported up to 1080p Full HD.`;
             }
             if (modal) {
                 modal.classList.remove('hidden');
@@ -2138,10 +2148,13 @@ if (window.supabaseClient) {
             window.__lastQuality = selectedQuality;
             if (typeof window.toggleAds === 'function') window.toggleAds(false);
 
-            // Entitlement Gate: Locked quality check before initiating download
-            if (window.StreamVaultEntitlements && window.StreamVaultEntitlements.isDesktopProRequired(selectedQuality, format)) {
+            // Entitlement Gate: Only resolutions strictly above 1080p (1440p, 4K, 8K) require Desktop Pro
+            const isAudioOnly = format === 'mp3' || format === 'audio';
+            const targetH = parseQualityHeight(selectedQuality);
+            const isAbove1080 = !isAudioOnly && targetH > 1080;
+            if (isAbove1080) {
                 isInlineDownloadRunning = false;
-                showDesktopProModal(selectedQuality);
+                showDesktopProModal(selectedQuality || '4K');
                 return;
             }
 
@@ -2243,9 +2256,9 @@ if (window.supabaseClient) {
 
                 if (!dlRes) {
                     throw {
-                        message: (lastErr && lastErr.message) ? lastErr.message : (typeof lastErr === 'string' ? lastErr : 'YouTube cloud service unavailable'),
-                        desktopFallback: (lastErr && typeof lastErr === 'object') ? (lastErr.desktopFallback ?? true) : true,
-                        code: lastErr?.code || 'YOUTUBE_DESKTOP_PRO_REQUIRED',
+                        message: (lastErr && lastErr.message) ? lastErr.message : (typeof lastErr === 'string' ? lastErr : 'YouTube cloud service temporarily busy'),
+                        desktopFallback: (lastErr && typeof lastErr === 'object') ? (lastErr.desktopFallback ?? false) : false,
+                        code: lastErr?.code || 'YOUTUBE_STREAM_RETRY',
                         platform: 'youtube'
                     };
                 }
@@ -2259,8 +2272,8 @@ if (window.supabaseClient) {
                     const isFallback = (typeof errObj === 'object' && errObj.desktopFallback);
                     throw {
                         message: errMsg,
-                        desktopFallback: isFallback,
-                        code: errObj.code || 'YOUTUBE_DESKTOP_PRO_REQUIRED',
+                        desktopFallback: isFallback || false,
+                        code: errObj.code || 'YOUTUBE_STREAM_RETRY',
                         platform: 'youtube'
                     };
                 }
@@ -2340,7 +2353,7 @@ if (window.supabaseClient) {
                                 progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
                                 progressBar.style.width = '100%';
                                 pctText.textContent = '100%';
-                                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> YouTube download initiated directly in browser! <button type="button" onclick="showDesktopProModal(\'YouTube\')" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-gradient-to-r from-primary to-orange-500 px-3 py-1 rounded-lg text-xs shadow-md"><span class="material-symbols-outlined text-[14px]">desktop_windows</span> Desktop Pro</button>';
+                                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> YouTube download initiated directly in browser!';
                                 statusText.classList.replace('text-primary', 'text-green-400');
                                 downloadAnotherBtn.classList.remove('hidden');
                                 isInlineDownloadRunning = false;
@@ -2349,7 +2362,7 @@ if (window.supabaseClient) {
                         }
 
                         progressBar.classList.replace('bg-gradient-to-r', 'bg-amber-500');
-                        statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] text-amber-400">warning</span> <span class="text-amber-400 font-semibold">YouTube stream protected by BotGuard.</span> <button type="button" onclick="showDesktopProModal(\'YouTube\')" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-gradient-to-r from-primary to-orange-500 px-3 py-1 rounded-lg text-xs shadow-md"><span class="material-symbols-outlined text-[14px]">desktop_windows</span> Launch Desktop Pro</button> <button type="button" onclick="downloadYouTubeMedia(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-1 bg-surface-container border border-white/10 px-3 py-1 rounded-lg text-xs"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>';
+                        statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] text-amber-400">warning</span> <span class="text-amber-400 font-semibold">YouTube stream temporarily busy.</span> <button type="button" onclick="downloadYouTubeMedia(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary px-3 py-1 rounded-lg text-xs shadow-md"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>';
                         downloadAnotherBtn.classList.remove('hidden');
                         isInlineDownloadRunning = false;
                         return;
@@ -2402,7 +2415,7 @@ if (window.supabaseClient) {
                                 progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
                                 progressBar.style.width = '100%';
                                 pctText.textContent = '100%';
-                                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> YouTube download initiated directly in browser! <button type="button" onclick="showDesktopProModal(\'YouTube\')" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-gradient-to-r from-primary to-orange-500 px-3 py-1 rounded-lg text-xs shadow-md"><span class="material-symbols-outlined text-[14px]">desktop_windows</span> Desktop Pro</button>';
+                                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> YouTube download initiated directly in browser!';
                                 statusText.classList.replace('text-primary', 'text-green-400');
                                 downloadAnotherBtn.classList.remove('hidden');
                                 isInlineDownloadRunning = false;
@@ -2411,7 +2424,7 @@ if (window.supabaseClient) {
                         }
 
                         progressBar.classList.replace('bg-gradient-to-r', 'bg-amber-500');
-                        statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] text-amber-400">warning</span> <span class="text-amber-400 font-semibold">YouTube stream protected by BotGuard.</span> <button type="button" onclick="showDesktopProModal(\'YouTube\')" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-gradient-to-r from-primary to-orange-500 px-3 py-1 rounded-lg text-xs shadow-md"><span class="material-symbols-outlined text-[14px]">desktop_windows</span> Launch Desktop Pro</button> <button type="button" onclick="downloadYouTubeMedia(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-1 bg-surface-container border border-white/10 px-3 py-1 rounded-lg text-xs"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>';
+                        statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] text-amber-400">warning</span> <span class="text-amber-400 font-semibold">YouTube stream temporarily busy.</span> <button type="button" onclick="downloadYouTubeMedia(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary px-3 py-1 rounded-lg text-xs shadow-md"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>';
                         downloadAnotherBtn.classList.remove('hidden');
                         isInlineDownloadRunning = false;
                         return;
@@ -2467,7 +2480,6 @@ if (window.supabaseClient) {
                     if (dlProgressStats) dlProgressStats.style.display = 'none';
                     if (dlProgressTrack) dlProgressTrack.style.display = 'none';
                     statusText.innerHTML = renderCloudFallbackUI(err);
-                    showDesktopProModal('YouTube');
                 } else {
                     if (dlHeadingIcon) {
                         dlHeadingIcon.className = 'material-symbols-outlined text-red-400';
@@ -2610,8 +2622,8 @@ if (window.supabaseClient) {
                 if (!dlRes) {
                     throw {
                         message: (lastErr && lastErr.message) ? lastErr.message : (typeof lastErr === 'string' ? lastErr : platformName + ' service unavailable'),
-                        desktopFallback: (lastErr && typeof lastErr === 'object') ? (lastErr.desktopFallback ?? true) : true,
-                        code: lastErr?.code || 'SOCIAL_DESKTOP_PRO_REQUIRED',
+                        desktopFallback: (lastErr && typeof lastErr === 'object') ? (lastErr.desktopFallback ?? false) : false,
+                        code: lastErr?.code || 'SOCIAL_STREAM_RETRY',
                         platform: parsedUrl.type
                     };
                 }
@@ -2625,8 +2637,8 @@ if (window.supabaseClient) {
                     const isFallback = (typeof errObj === 'object' && errObj.desktopFallback);
                     throw {
                         message: errMsg,
-                        desktopFallback: isFallback !== undefined ? isFallback : true,
-                        code: errObj.code || 'SOCIAL_DESKTOP_PRO_REQUIRED',
+                        desktopFallback: isFallback || false,
+                        code: errObj.code || 'SOCIAL_STREAM_RETRY',
                         platform: parsedUrl.type
                     };
                 }
@@ -2738,7 +2750,6 @@ if (window.supabaseClient) {
                     if (dlProgressStats) dlProgressStats.style.display = 'none';
                     if (dlProgressTrack) dlProgressTrack.style.display = 'none';
                     statusText.innerHTML = renderCloudFallbackUI(err);
-                    showDesktopProModal(platformName);
                 } else {
                     if (dlHeadingIcon) {
                         dlHeadingIcon.className = 'material-symbols-outlined text-red-400';

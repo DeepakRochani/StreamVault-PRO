@@ -112,13 +112,11 @@ function normalizeYouTubeCookies(rawCookie?: string | null): { cookieHeader: str
   return { cookieHeader: "", count: 0, valid: false };
 }
 
-const DEFAULT_YOUTUBE_COOKIE = "PREF=hl=en&tz=UTC; SOCS=CAI; VISITOR_INFO1_LIVE=zjW6Y_RzRUI; VISITOR_PRIVACY_METADATA=CgJJThIEGgAgGg%3D%3D; YSC=JNKtOAO-9B4; __Secure-ROLLOUT_TOKEN=CMS3w9CquMO7HBDkkLrOjZiVAxi3-KrE3PWXAw%3D%3D; __Secure-YNID=CvcBCAUSqQEBDB6PDDiOk2VZAnAERv2h5xSOYxQjdeMjOBfl4C0tfFXsSmXuer1r_5ZQz1HIh1keKC_JP_8KmBfxsNAjgS4G_fvsM86vbOtsT9cphmguOquTqgMlidcFcDKo4gG5onAm0GB4Zu_Myi5Tig_j9iP7eLKQG41idmjdaUcWxEJbfGuIeoMIvWjhjgQDrTgCSLLaIzkvbp3vi3rCyNZIrOE_jV3Nx8bO208lKAUyRQEcWPVquTkaGpujh1pFmImeHGY-ADypXl4Bv0TEfFM-x3iozR3YljYgJeYd_SZYKaZfkrHcSEFKS6y55RtBpKa8orIuCg; GPS=1";
-
 let cachedYouTubeSession: any = null;
 async function getYouTubeInnertube() {
   if (!cachedYouTubeSession) {
-    const rawCookie = Deno.env.get("YOUTUBE_COOKIE") || DEFAULT_YOUTUBE_COOKIE;
-    const normalized = normalizeYouTubeCookies(rawCookie);
+    const rawCookie = Deno.env.get("YOUTUBE_COOKIE");
+    const normalized = rawCookie ? normalizeYouTubeCookies(rawCookie) : { valid: false, cookieHeader: "" };
     try {
       cachedYouTubeSession = await Innertube.create({
         cache: new UniversalCache(false),
@@ -136,10 +134,10 @@ async function getYouTubeInnertube() {
 }
 
 // Fast active Invidious mirrors as auxiliary fallback for YouTube
-const INVIDIOUS_MIRRORS: string[] = [];
+const INVIDIOUS_MIRRORS: string[] = ["https://yt.chocolatemoo53.com"];
 
 async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
-  const targetH = parseInt(quality.replace(/[^0-9]/g, "") || "1080");
+  const targetH = parseQualityHeight(quality);
 
   const mirrorPromises = INVIDIOUS_MIRRORS.map(async (mirror) => {
     const res = await fetch(`${mirror}/api/v1/videos/${videoId}`, {
@@ -216,7 +214,7 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
       console.log(`[YouTube Engine] Invidious mirror race succeeded`);
       return mirrorResult;
     }
-  } catch (_) {}
+  } catch (_) { }
 
   return null;
 }
@@ -227,8 +225,8 @@ async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, qua
   let video: any = null;
   const clientErrors: Record<string, string> = {};
 
-  // Optimized client order: TV and IOS bypass botguard effectively
-  const clientsToTry = ["TV", "IOS", "ANDROID", "MWEB", "WEB", "TV_EMBEDDED"] as const;
+  // Prioritize TV_EMBEDDED and WEB_EMBEDDED (which bypass BotGuard login challenges) followed by mobile clients
+  const clientsToTry = ["TV_EMBEDDED", "WEB_EMBEDDED", "IOS", "ANDROID", "MWEB", "YTMUSIC", "WEB", "TV"] as const;
 
   for (const client of clientsToTry) {
     try {
@@ -244,6 +242,28 @@ async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, qua
       clientErrors[client] = err?.message || String(err);
       console.warn(`[YouTube Client ${client} Error]:`, err?.message || err);
     }
+  }
+
+  // If cached session failed, attempt a clean guest session on the fly
+  if (!video) {
+    try {
+      console.log(`[YouTube Engine] Retrying ${videoId} with fresh session...`);
+      const freshYt = await Innertube.create({
+        cache: new UniversalCache(false),
+        generate_session_locally: true,
+      });
+      for (const client of ["TV_EMBEDDED", "WEB_EMBEDDED", "IOS", "ANDROID", "MWEB", "YTMUSIC"]) {
+        try {
+          const candidate: any = await freshYt.getBasicInfo(videoId, { client: client as any });
+          if (candidate?.streaming_data?.formats?.length || candidate?.streaming_data?.adaptive_formats?.length) {
+            video = candidate;
+            cachedYouTubeSession = freshYt; // update cache
+            console.log(`[YouTube Engine] Resolved via fresh session (${client})`);
+            break;
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
   }
 
   const streamingData = video?.streaming_data;
@@ -263,7 +283,7 @@ async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, qua
     chosenFmt = audioFormats.find((f: any) => f.itag === 140) || audioFormats[0] || formats.find((f: any) => f.has_audio);
     hasAudioCombined = true;
   } else {
-    const targetH = parseInt(quality.replace(/[^0-9]/g, "") || "1080");
+    const targetH = parseQualityHeight(quality);
 
     // Progressive format check for <= 720p (combined video + audio)
     const prog = formats.filter((f: any) => f.has_video && f.has_audio);
@@ -280,7 +300,11 @@ async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, qua
     if (!chosenFmt) {
       // Modern adaptive video format (1080p, 720p, etc.)
       const vAdaptive = adaptive.filter((f: any) => f.has_video);
-      chosenFmt = vAdaptive.find((f: any) => f.height === targetH) || vAdaptive[0];
+      vAdaptive.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
+      chosenFmt = vAdaptive.find((f: any) => f.height === targetH) ||
+                  vAdaptive.find((f: any) => (f.quality_label || "").includes(String(targetH))) ||
+                  vAdaptive.find((f: any) => (f.height || 0) <= targetH) ||
+                  vAdaptive[0];
 
       // High-quality audio format (prefer itag 140 or itag 139)
       const aAdaptive = adaptive.filter((f: any) => f.has_audio);
@@ -344,6 +368,18 @@ async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: 
   return null;
 }
 
+function parseQualityHeight(q: string): number {
+  const s = (q || "").toLowerCase();
+  if (s.includes("8k") || s.includes("4320")) return 4320;
+  if (s.includes("4k") || s.includes("2160")) return 2160;
+  if (s.includes("1440") || s.includes("2k")) return 1440;
+  if (s.includes("1080")) return 1080;
+  if (s.includes("720")) return 720;
+  if (s.includes("480")) return 480;
+  if (s.includes("360")) return 360;
+  return parseInt(s.replace(/[^0-9]/g, "") || "1080");
+}
+
 // Handler for YouTube POST requests
 async function handleYouTubePost(body: any, reqUrl: URL): Promise<Response> {
   const url = body.url || "";
@@ -366,16 +402,34 @@ async function handleYouTubePost(body: any, reqUrl: URL): Promise<Response> {
     }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
+  const targetH = parseQualityHeight(quality);
+
+  // Only resolutions strictly ABOVE 1080p (e.g. 1440p / 2K, 4K, 8K) require Desktop Pro
+  if (!isAudio && targetH > 1080) {
+    return new Response(JSON.stringify({
+      success: false,
+      error: {
+        code: "DESKTOP_PRO_REQUIRED",
+        message: "Resolutions above 1080p (1440p, 4K, 8K) require StreamVault Desktop Pro. Online web downloads support up to 1080p Full HD.",
+        desktopFallback: true,
+        platform: "youtube",
+      },
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const resolved = await resolveYouTubeStream(videoId, isAudio, quality);
 
-  // If cloud IP cannot scrape due to YouTube BotGuard / LOGIN_REQUIRED
+  // If stream resolution failed, do NOT lock user out with Desktop Pro. Provide clean retryable error.
   if (!resolved || !resolved.streamUrl) {
     return new Response(JSON.stringify({
       success: false,
       error: {
-        code: "YOUTUBE_DESKTOP_PRO_REQUIRED",
-        message: "YouTube enforces BotGuard protection on cloud servers. Use StreamVault Desktop Pro with your local browser session to download in 1080p Full HD instantly.",
-        desktopFallback: true,
+        code: "YOUTUBE_STREAM_RETRY",
+        message: "YouTube media stream temporarily busy. Please retry or choose another quality.",
+        desktopFallback: false,
         platform: "youtube",
       },
     }), {
@@ -481,7 +535,7 @@ async function handleYouTubeGet(req: Request, reqUrl: URL): Promise<Response> {
   // If direct stream returned 403 or failed, try Invidious fallback mirrors
   if (!mediaRes || (!mediaRes.ok && mediaRes.status !== 206)) {
     if (videoId) {
-      const targetH = parseInt(quality.replace(/[^0-9]/g, "") || "1080");
+      const targetH = parseQualityHeight(quality);
       const itag = isAudio ? "140" : (targetH >= 1080 ? "137" : (targetH >= 720 ? "136" : "135"));
       for (const mirror of INVIDIOUS_MIRRORS) {
         try {
@@ -693,14 +747,14 @@ async function handleSocialPost(body: any, reqUrl: URL): Promise<Response> {
     }
   }
 
-  // If social URL and no direct stream could be scraped by cloud IP (due to Meta login/bot wall)
+  // If social URL and no direct stream could be scraped by cloud IP
   if (!directStream) {
     return new Response(JSON.stringify({
       success: false,
       error: {
-        code: "SOCIAL_DESKTOP_PRO_REQUIRED",
-        message: `${isInstagram ? "Instagram" : "Facebook"} enforces Meta session authentication and IP security on cloud servers. Use StreamVault Desktop Pro with your local browser session.`,
-        desktopFallback: true,
+        code: "SOCIAL_STREAM_RETRY",
+        message: `${isInstagram ? "Instagram" : "Facebook"} media stream temporarily busy. Please retry or verify link is public.`,
+        desktopFallback: false,
         platform: isInstagram ? "instagram" : "facebook",
       },
     }), {
@@ -753,13 +807,13 @@ async function handleSocialGet(req: Request, reqUrl: URL): Promise<Response> {
     return new Response(JSON.stringify({
       success: false,
       error: {
-        code: "SOCIAL_DESKTOP_PRO_REQUIRED",
-        message: `${isInstagram ? "Instagram" : "Facebook"} enforces active session authentication and IP rate limits on cloud servers. Use StreamVault Desktop Pro with your local browser session.`,
-        desktopFallback: true,
+        code: "SOCIAL_STREAM_RETRY",
+        message: `${isInstagram ? "Instagram" : "Facebook"} media stream temporarily busy. Please try again.`,
+        desktopFallback: false,
         platform: isInstagram ? "instagram" : "facebook",
       },
     }), {
-      status: 403,
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
