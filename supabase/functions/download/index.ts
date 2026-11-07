@@ -29,7 +29,7 @@ if (Platform && Platform.shim) {
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, range",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
 
@@ -288,6 +288,135 @@ async function resolveStreamUrl(videoId: string, isAudio: boolean, quality: stri
   };
 }
 
+// Fast SnapSave payload decoder & decryptor for Instagram Reels & Facebook Videos
+function decodeSnapApp(args: string[]): string {
+  const [h, u, n, t, e, r] = args;
+  const tNum = Number(t);
+  const eNum = Number(e);
+  function decode(d: string, eVal: number, fVal: number): string {
+    const g = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/".split("");
+    const hArr = g.slice(0, eVal);
+    const iArr = g.slice(0, fVal);
+    const j = d.split("").reverse().reduce((a, b, c) => {
+      const idx = hArr.indexOf(b);
+      if (idx !== -1) return a + idx * Math.pow(eVal, c);
+      return a;
+    }, 0);
+    let k = "";
+    let tempJ = j;
+    while (tempJ > 0) {
+      k = iArr[tempJ % fVal] + k;
+      tempJ = Math.floor(tempJ / fVal);
+    }
+    return k || "0";
+  }
+  let result = "";
+  for (let i = 0, len = h.length; i < len;) {
+    let s = "";
+    while (i < len && h[i] !== n[eNum]) {
+      s += h[i];
+      i++;
+    }
+    i++;
+    for (let j = 0; j < n.length; j++) {
+      s = s.replace(new RegExp(n[j], "g"), j.toString());
+    }
+    result += String.fromCharCode(Number(decode(s, eNum, 10)) - tNum);
+  }
+  try {
+    const bytes = new Uint8Array(result.split("").map((c) => c.charCodeAt(0)));
+    return new TextDecoder("utf-8").decode(bytes);
+  } catch (_) {
+    return result;
+  }
+}
+
+function decryptSnapSave(data: string): string | null {
+  try {
+    if (!data.includes("decodeURIComponent(escape(r))}(")) return data;
+    const part1 = data.split("decodeURIComponent(escape(r))}(")[1];
+    if (!part1) return null;
+    const part2 = part1.split("))")[0];
+    if (!part2) return null;
+    const rawArgs = part2.split(",").map((v) => v.replace(/"/g, "").trim());
+    const decoded = decodeSnapApp(rawArgs);
+    if (decoded.includes("getElementById(\"download-section\").innerHTML = \"")) {
+      const section = decoded.split("getElementById(\"download-section\").innerHTML = \"")[1];
+      const html = section.split("\"; document.getElementById(\"inputData\").remove(); ")[0] || section.split("\";")[0];
+      return html.replace(/\\(\\)?/g, "");
+    }
+    return decoded;
+  } catch (e) {
+    console.warn("[SnapSave Decrypt Warning]:", e);
+    return null;
+  }
+}
+
+async function resolveViaSnapSave(url: string): Promise<{ directUrl: string; thumbnail?: string; formats: Array<{ quality: string; url: string }> } | null> {
+  try {
+    const res = await fetch("https://snapsave.app/action.php?lang=en", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "origin": "https://snapsave.app",
+        "referer": "https://snapsave.app/",
+      },
+      body: "url=" + encodeURIComponent(url),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) return null;
+    const text = await res.text();
+    const html = decryptSnapSave(text);
+    if (!html) return null;
+
+    let thumb = "";
+    const thumbMatch = html.match(/<img[^>]+src=["\x27](https:\/\/[^"\x27]+)["\x27]/i);
+    if (thumbMatch && !thumbMatch[1].includes("icon")) {
+      thumb = thumbMatch[1];
+    }
+
+    const formats: Array<{ quality: string; url: string }> = [];
+    const rowRegex = /<tr[^>]*>[\s\S]*?<td[^>]*class=["\x27]video-quality["\x27][^>]*>([^<]+)<\/td>[\s\S]*?<a[^>]*href=["\x27]([^"\x27]+)["\x27]/gi;
+    let match;
+    while ((match = rowRegex.exec(html)) !== null) {
+      const quality = match[1].trim();
+      const href = match[2];
+      if (href.startsWith("http") && !href.includes("play.google.com")) {
+        formats.push({ quality, url: href });
+      }
+    }
+
+    const btnRegex = /<div[^>]*class=["\x27]download-items__btn["\x27][^>]*>[\s\S]*?<a[^>]*href=["\x27]([^"\x27]+)["\x27]/gi;
+    while ((match = btnRegex.exec(html)) !== null) {
+      const href = match[1];
+      if (href.startsWith("http") && !href.includes("play.google.com")) {
+        formats.push({ quality: "Original HD", url: href });
+      }
+    }
+
+    if (formats.length === 0) {
+      const generalRegex = /href=["\x27](https:\/\/[^"\x27]*(?:rapidcdn|fbcdn|cdninstagram|snapsave)[^"\x27]*)["\x27]/gi;
+      while ((match = generalRegex.exec(html)) !== null) {
+        const href = match[1];
+        if (!href.includes("play.google.com") && !formats.some((f) => f.url === href)) {
+          formats.push({ quality: "HD", url: href });
+        }
+      }
+    }
+
+    if (formats.length === 0) return null;
+    return {
+      directUrl: formats[0].url,
+      thumbnail: thumb,
+      formats,
+    };
+  } catch (err: any) {
+    console.warn("[SnapSave Resolver Warning]:", err?.message || err);
+    return null;
+  }
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -323,6 +452,20 @@ serve(async (req: Request) => {
           const defaultItag = isAudio ? "140" : (targetH >= 1080 ? "137" : (targetH >= 720 ? "136" : "135"));
           const itag = itagMatch ? itagMatch[1] : defaultItag;
           streamUrl = `https://yt.chocolatemoo53.com/latest_version?id=${videoId}&itag=${itag}&local=true`;
+        }
+      } else if (!streamUrl) {
+        const isIg = /instagram\.com|instagr\.am/i.test(videoUrl);
+        const isFb = /facebook\.com|fb\.watch/i.test(videoUrl);
+        if (isIg || isFb) {
+          try {
+            const snap = await resolveViaSnapSave(videoUrl);
+            if (snap?.directUrl) {
+              streamUrl = snap.directUrl;
+              console.log(`[Stream Proxy] SnapSave resolved direct URL for GET social link`);
+            }
+          } catch (snapErr) {
+            console.warn("[Stream Proxy SnapSave Error]:", snapErr);
+          }
         }
       }
 
@@ -425,23 +568,21 @@ serve(async (req: Request) => {
         });
       }
 
-      if (!videoId && !streamUrl) {
-        const isIg = /instagram\.com|instagr\.am/i.test(videoUrl);
-        const isFb = /facebook\.com|fb\.watch/i.test(videoUrl);
-        if (isIg || isFb) {
-          return new Response(JSON.stringify({
-            success: false,
-            error: {
-              code: "SOCIAL_DESKTOP_PRO_REQUIRED",
-              message: `${isIg ? "Instagram" : "Facebook"} enforces active session authentication and IP rate limits on cloud servers. Use StreamVault Desktop Pro with your local browser session.`,
-              desktopFallback: true,
-              platform: isIg ? "instagram" : "facebook",
-            },
-          }), {
-            status: 403,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+      const isIg = /instagram\.com|instagr\.am/i.test(videoUrl);
+      const isFb = /facebook\.com|fb\.watch/i.test(videoUrl);
+      if (isIg || isFb) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: {
+            code: "SOCIAL_DESKTOP_PRO_REQUIRED",
+            message: `${isIg ? "Instagram" : "Facebook"} enforces active session authentication and IP rate limits on cloud servers. Use StreamVault Desktop Pro with your local browser session.`,
+            desktopFallback: true,
+            platform: isIg ? "instagram" : "facebook",
+          },
+        }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       return new Response(JSON.stringify({
@@ -505,6 +646,21 @@ serve(async (req: Request) => {
           }
         } catch (resolveErr) {
           console.warn("[Stream Resolver Error]:", resolveErr);
+        }
+      }
+
+      if (isSocial) {
+        if (!directStream) {
+          console.log(`[Stream Resolver] Resolving social video via SnapSave: ${url}`);
+          const snapRes = await resolveViaSnapSave(url);
+          if (snapRes?.directUrl) {
+            directStream = snapRes.directUrl;
+            hasAudioCombined = true;
+            audioDirectStream = undefined;
+            console.log(`[Stream Resolver] Successfully resolved direct stream for ${url}`);
+          }
+        } else {
+          hasAudioCombined = true;
         }
       }
 

@@ -30,7 +30,7 @@ if (Platform && Platform.shim) {
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, range",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -202,6 +202,134 @@ function parseIsoDuration(iso: string): string {
   return `${min}:${String(s).padStart(2, "0")}`;
 }
 
+function decodeSnapApp(args: string[]): string {
+  const [h, u, n, t, e, r] = args;
+  const tNum = Number(t);
+  const eNum = Number(e);
+  function decode(d: string, eVal: number, fVal: number): string {
+    const g = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/".split("");
+    const hArr = g.slice(0, eVal);
+    const iArr = g.slice(0, fVal);
+    const j = d.split("").reverse().reduce((a, b, c) => {
+      const idx = hArr.indexOf(b);
+      if (idx !== -1) return a + idx * Math.pow(eVal, c);
+      return a;
+    }, 0);
+    let k = "";
+    let tempJ = j;
+    while (tempJ > 0) {
+      k = iArr[tempJ % fVal] + k;
+      tempJ = Math.floor(tempJ / fVal);
+    }
+    return k || "0";
+  }
+  let result = "";
+  for (let i = 0, len = h.length; i < len;) {
+    let s = "";
+    while (i < len && h[i] !== n[eNum]) {
+      s += h[i];
+      i++;
+    }
+    i++;
+    for (let j = 0; j < n.length; j++) {
+      s = s.replace(new RegExp(n[j], "g"), j.toString());
+    }
+    result += String.fromCharCode(Number(decode(s, eNum, 10)) - tNum);
+  }
+  try {
+    const bytes = new Uint8Array(result.split("").map((c) => c.charCodeAt(0)));
+    return new TextDecoder("utf-8").decode(bytes);
+  } catch (_) {
+    return result;
+  }
+}
+
+function decryptSnapSave(data: string): string | null {
+  try {
+    if (!data.includes("decodeURIComponent(escape(r))}(")) return data;
+    const part1 = data.split("decodeURIComponent(escape(r))}(")[1];
+    if (!part1) return null;
+    const part2 = part1.split("))")[0];
+    if (!part2) return null;
+    const rawArgs = part2.split(",").map((v) => v.replace(/"/g, "").trim());
+    const decoded = decodeSnapApp(rawArgs);
+    if (decoded.includes("getElementById(\"download-section\").innerHTML = \"")) {
+      const section = decoded.split("getElementById(\"download-section\").innerHTML = \"")[1];
+      const html = section.split("\"; document.getElementById(\"inputData\").remove(); ")[0] || section.split("\";")[0];
+      return html.replace(/\\(\\)?/g, "");
+    }
+    return decoded;
+  } catch (e) {
+    console.warn("[SnapSave Decrypt Warning]:", e);
+    return null;
+  }
+}
+
+async function resolveViaSnapSave(url: string): Promise<{ directUrl: string; thumbnail?: string; formats: Array<{ quality: string; url: string }> } | null> {
+  try {
+    const res = await fetch("https://snapsave.app/action.php?lang=en", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "origin": "https://snapsave.app",
+        "referer": "https://snapsave.app/",
+      },
+      body: "url=" + encodeURIComponent(url),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) return null;
+    const text = await res.text();
+    const html = decryptSnapSave(text);
+    if (!html) return null;
+
+    let thumb = "";
+    const thumbMatch = html.match(/<img[^>]+src=["\x27](https:\/\/[^"\x27]+)["\x27]/i);
+    if (thumbMatch && !thumbMatch[1].includes("icon")) {
+      thumb = thumbMatch[1];
+    }
+
+    const formats: Array<{ quality: string; url: string }> = [];
+    const rowRegex = /<tr[^>]*>[\s\S]*?<td[^>]*class=["\x27]video-quality["\x27][^>]*>([^<]+)<\/td>[\s\S]*?<a[^>]*href=["\x27]([^"\x27]+)["\x27]/gi;
+    let match;
+    while ((match = rowRegex.exec(html)) !== null) {
+      const quality = match[1].trim();
+      const href = match[2];
+      if (href.startsWith("http") && !href.includes("play.google.com")) {
+        formats.push({ quality, url: href });
+      }
+    }
+
+    const btnRegex = /<div[^>]*class=["\x27]download-items__btn["\x27][^>]*>[\s\S]*?<a[^>]*href=["\x27]([^"\x27]+)["\x27]/gi;
+    while ((match = btnRegex.exec(html)) !== null) {
+      const href = match[1];
+      if (href.startsWith("http") && !href.includes("play.google.com")) {
+        formats.push({ quality: "Original HD", url: href });
+      }
+    }
+
+    if (formats.length === 0) {
+      const generalRegex = /href=["\x27](https:\/\/[^"\x27]*(?:rapidcdn|fbcdn|cdninstagram|snapsave)[^"\x27]*)["\x27]/gi;
+      while ((match = generalRegex.exec(html)) !== null) {
+        const href = match[1];
+        if (!href.includes("play.google.com") && !formats.some((f) => f.url === href)) {
+          formats.push({ quality: "HD", url: href });
+        }
+      }
+    }
+
+    if (formats.length === 0) return null;
+    return {
+      directUrl: formats[0].url,
+      thumbnail: thumb,
+      formats,
+    };
+  } catch (err: any) {
+    console.warn("[SnapSave Resolver Warning]:", err?.message || err);
+    return null;
+  }
+}
+
 // ── Main Handler ─────────────────────────────────────────────
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -240,6 +368,16 @@ serve(async (req: Request) => {
         : `Instagram Reel (${shortcode})`;
       let thumbnail = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80";
 
+      let resolvedDirectUrl: string | undefined = undefined;
+      let resolvedThumbnail: string | undefined = undefined;
+      try {
+        const snap = await resolveViaSnapSave(url);
+        if (snap?.directUrl) {
+          resolvedDirectUrl = snap.directUrl;
+          if (snap.thumbnail) resolvedThumbnail = snap.thumbnail;
+        }
+      } catch (_) {}
+
       try {
         const oembedCtrl = new AbortController();
         const oembedTimeout = setTimeout(() => oembedCtrl.abort(), 1200);
@@ -256,14 +394,16 @@ serve(async (req: Request) => {
         }
       } catch (_) {}
 
+      if (resolvedThumbnail) thumbnail = resolvedThumbnail;
+
       const videoFormats = [
-        { height: 1080, quality: "1080p HD (Original)", id: "1080p", sizeStr: "~15 MB", recommended: true },
-        { height: 720, quality: "720p HD", id: "720p", sizeStr: "~8 MB", recommended: false },
-        { height: 480, quality: "480p SD", id: "480p", sizeStr: "~4 MB", recommended: false },
+        { height: 1080, quality: "1080p HD (Original)", id: "1080p", sizeStr: "~15 MB", recommended: true, url: resolvedDirectUrl },
+        { height: 720, quality: "720p HD", id: "720p", sizeStr: "~8 MB", recommended: false, url: resolvedDirectUrl },
+        { height: 480, quality: "480p SD", id: "480p", sizeStr: "~4 MB", recommended: false, url: resolvedDirectUrl },
       ];
       const audioFormats = [
-        { quality: "Original Audio (MP3)", id: "320K", sizeStr: "~2.5 MB", recommended: true },
-        { quality: "128 kbps (Standard)", id: "128K", sizeStr: "~1.2 MB", recommended: false },
+        { quality: "Original Audio (MP3)", id: "320K", sizeStr: "~2.5 MB", recommended: true, url: resolvedDirectUrl },
+        { quality: "128 kbps (Standard)", id: "128K", sizeStr: "~1.2 MB", recommended: false, url: resolvedDirectUrl },
       ];
 
       return new Response(JSON.stringify({
@@ -294,6 +434,16 @@ serve(async (req: Request) => {
         : `Facebook Video (${fbId})`;
       let thumbnail = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80";
 
+      let resolvedDirectUrl: string | undefined = undefined;
+      let resolvedThumbnail: string | undefined = undefined;
+      try {
+        const snap = await resolveViaSnapSave(url);
+        if (snap?.directUrl) {
+          resolvedDirectUrl = snap.directUrl;
+          if (snap.thumbnail) resolvedThumbnail = snap.thumbnail;
+        }
+      } catch (_) {}
+
       try {
         const oembedCtrl = new AbortController();
         const oembedTimeout = setTimeout(() => oembedCtrl.abort(), 1200);
@@ -310,14 +460,16 @@ serve(async (req: Request) => {
         }
       } catch (_) {}
 
+      if (resolvedThumbnail) thumbnail = resolvedThumbnail;
+
       const videoFormats = [
-        { height: 1080, quality: "HD Quality (1080p)", id: "1080p", sizeStr: "~35 MB", recommended: true },
-        { height: 720, quality: "SD Quality (720p)", id: "720p", sizeStr: "~18 MB", recommended: false },
-        { height: 480, quality: "Standard (480p)", id: "480p", sizeStr: "~10 MB", recommended: false },
+        { height: 1080, quality: "HD Quality (1080p)", id: "1080p", sizeStr: "~35 MB", recommended: true, url: resolvedDirectUrl },
+        { height: 720, quality: "SD Quality (720p)", id: "720p", sizeStr: "~18 MB", recommended: false, url: resolvedDirectUrl },
+        { height: 480, quality: "Standard (480p)", id: "480p", sizeStr: "~10 MB", recommended: false, url: resolvedDirectUrl },
       ];
       const audioFormats = [
-        { quality: "Audio Only (MP3)", id: "320K", sizeStr: "~3.5 MB", recommended: true },
-        { quality: "128 kbps (Standard)", id: "128K", sizeStr: "~1.5 MB", recommended: false },
+        { quality: "Audio Only (MP3)", id: "320K", sizeStr: "~3.5 MB", recommended: true, url: resolvedDirectUrl },
+        { quality: "128 kbps (Standard)", id: "128K", sizeStr: "~1.5 MB", recommended: false, url: resolvedDirectUrl },
       ];
 
       return new Response(JSON.stringify({

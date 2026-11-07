@@ -1910,51 +1910,57 @@ if (window.supabaseClient) {
         // StreamVault Fast Pure-JS Remuxer Engine loaded via js/fmp4-remuxer.js
 
         async function fetchBlobWithProgress(primaryUrl, fallbackUrl, onProgress) {
-            const authHeaders = { 'Accept': '*/*' };
-            if (window.SUPABASE_ANON_KEY && (primaryUrl.includes('supabase.co') || primaryUrl.includes('/api/download'))) {
-                authHeaders['apikey'] = window.SUPABASE_ANON_KEY;
-                authHeaders['Authorization'] = 'Bearer ' + window.SUPABASE_ANON_KEY;
+            function getHeadersForUrl(u) {
+                const h = { 'Accept': '*/*' };
+                if (window.SUPABASE_ANON_KEY && (u.includes('supabase.co') || u.startsWith('/api/'))) {
+                    h['apikey'] = window.SUPABASE_ANON_KEY;
+                    h['Authorization'] = 'Bearer ' + window.SUPABASE_ANON_KEY;
+                }
+                return h;
             }
 
-            // 1. Probe total size and Range support with a fast Range probe (bytes=0-0)
+            // 1. Probe total size and Range support
             let total = 0;
             let mimeType = 'video/mp4';
             let targetUrl = primaryUrl;
             let supportsRange = false;
+            const isExternalCdn = targetUrl.includes('rapidcdn.app') || targetUrl.includes('fbcdn.net') || targetUrl.includes('cdninstagram.com');
 
-            try {
-                let probeRes = await fetch(primaryUrl, {
-                    headers: { ...authHeaders, 'Range': 'bytes=0-0' }
-                });
-                if (!probeRes.ok && fallbackUrl && fallbackUrl !== primaryUrl && !fallbackUrl.includes('googlevideo.com')) {
-                    targetUrl = fallbackUrl;
-                    probeRes = await fetch(fallbackUrl, {
-                        headers: { ...authHeaders, 'Range': 'bytes=0-0' }
+            if (!isExternalCdn) {
+                try {
+                    let probeRes = await fetch(primaryUrl, {
+                        headers: { ...getHeadersForUrl(primaryUrl), 'Range': 'bytes=0-0' }
                     });
-                }
-                if (probeRes.ok || probeRes.status === 206) {
-                    mimeType = probeRes.headers.get('content-type') || mimeType;
-                    const cr = probeRes.headers.get('content-range');
-                    if (cr) {
-                        const m = cr.match(/\/(\d+)/);
-                        if (m) {
-                            total = parseInt(m[1], 10);
-                            supportsRange = true;
+                    if (!probeRes.ok && fallbackUrl && fallbackUrl !== primaryUrl && !fallbackUrl.includes('googlevideo.com')) {
+                        targetUrl = fallbackUrl;
+                        probeRes = await fetch(fallbackUrl, {
+                            headers: { ...getHeadersForUrl(fallbackUrl), 'Range': 'bytes=0-0' }
+                        });
+                    }
+                    if (probeRes.ok || probeRes.status === 206) {
+                        mimeType = probeRes.headers.get('content-type') || mimeType;
+                        const cr = probeRes.headers.get('content-range');
+                        if (cr) {
+                            const m = cr.match(/\/(\d+)/);
+                            if (m) {
+                                total = parseInt(m[1], 10);
+                                supportsRange = true;
+                            }
+                        }
+                        if (!total) {
+                            const cl = probeRes.headers.get('content-length');
+                            if (cl) total = parseInt(cl, 10);
                         }
                     }
-                    if (!total) {
-                        const cl = probeRes.headers.get('content-length');
-                        if (cl) total = parseInt(cl, 10);
-                    }
+                } catch (probeErr) {
+                    console.warn("[Turbo Downloader] Probe warning, continuing:", probeErr);
                 }
-            } catch (probeErr) {
-                console.warn("[Turbo Downloader] Probe warning, continuing:", probeErr);
             }
 
             // For small files (e.g. audio track <= 8MB), a single stream fetch is fastest and uses zero worker overhead
             if (total > 0 && total <= 8 * 1024 * 1024) {
                 try {
-                    const res = await fetch(targetUrl, { headers: authHeaders });
+                    const res = await fetch(targetUrl, { headers: getHeadersForUrl(targetUrl) });
                     if (res.ok) {
                         return await res.blob();
                     }
@@ -1988,7 +1994,7 @@ if (window.supabaseClient) {
                         while (retries > 0 && !success) {
                             try {
                                 const chunkRes = await fetch(targetUrl, {
-                                    headers: { ...authHeaders, 'Range': `bytes=${start}-${end}` }
+                                    headers: { ...getHeadersForUrl(targetUrl), 'Range': `bytes=${start}-${end}` }
                                 });
                                 if (chunkRes.ok || chunkRes.status === 206) {
                                     const buf = await chunkRes.arrayBuffer();
@@ -2032,11 +2038,11 @@ if (window.supabaseClient) {
             // 3. Resilient Fallback: Standard Sequential Stream
             let res = null;
             try {
-                res = await fetch(targetUrl, { headers: authHeaders });
+                res = await fetch(targetUrl, { headers: getHeadersForUrl(targetUrl) });
             } catch (_) {}
             if (!res || !res.ok) {
                 if (fallbackUrl && fallbackUrl !== targetUrl && !fallbackUrl.includes('googlevideo.com')) {
-                    try { res = await fetch(fallbackUrl, { headers: authHeaders }); } catch (_) {}
+                    try { res = await fetch(fallbackUrl, { headers: getHeadersForUrl(fallbackUrl) }); } catch (_) {}
                 }
             }
             if (!res || !res.ok) {
@@ -2211,14 +2217,14 @@ if (window.supabaseClient) {
                     if (lastErr && typeof lastErr === 'object') {
                         throw {
                             message: lastErr.message || 'Download service unavailable',
-                            desktopFallback: lastErr.desktopFallback !== undefined ? lastErr.desktopFallback : isSocial,
+                            desktopFallback: lastErr.desktopFallback !== undefined ? lastErr.desktopFallback : false,
                             code: lastErr.code,
                             platform: lastErr.platform || (isSocial ? parsedUrl.type : null)
                         };
                     }
                     throw { 
                         message: lastErr || 'Download service unavailable', 
-                        desktopFallback: isSocial, 
+                        desktopFallback: false, 
                         platform: isSocial ? parsedUrl.type : null 
                     };
                 }
@@ -2296,35 +2302,6 @@ if (window.supabaseClient) {
                             }
                         } catch (errMerge) {
                             console.error('[StreamVault Audio Mux Error]:', errMerge);
-                            if (isSocial) {
-                                const dlHeadingIcon = document.getElementById('dl-progress-icon');
-                                const dlHeadingTitle = document.getElementById('dl-progress-title');
-                                const dlProgressCard = document.getElementById('dl-progress-card');
-                                const dlProgressStats = document.getElementById('dl-progress-stats');
-                                const dlProgressTrack = document.getElementById('dl-progress-track');
-                                if (dlHeadingIcon) {
-                                    dlHeadingIcon.className = 'material-symbols-outlined text-amber-400';
-                                    dlHeadingIcon.textContent = 'desktop_windows';
-                                }
-                                if (dlHeadingTitle) {
-                                    dlHeadingTitle.textContent = 'Desktop Authentication Required';
-                                }
-                                if (dlProgressCard) {
-                                    dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-amber-500/30 bg-amber-500/5 flex flex-col gap-4';
-                                }
-                                if (dlProgressStats) dlProgressStats.style.display = 'none';
-                                if (dlProgressTrack) dlProgressTrack.style.display = 'none';
-                                statusText.innerHTML = renderCloudFallbackUI({
-                                    code: 'SOCIAL_DESKTOP_PRO_REQUIRED',
-                                    message: `${parsedUrl.type === 'instagram' ? 'Instagram' : 'Facebook'} enforces session authentication on cloud servers. Use StreamVault Desktop Pro with your local browser session.`,
-                                    desktopFallback: true,
-                                    platform: parsedUrl.type
-                                });
-                                showDesktopProModal(parsedUrl.type === 'instagram' ? 'Instagram Reel' : 'Facebook Video');
-                                downloadAnotherBtn.classList.remove('hidden');
-                                isInlineDownloadRunning = false;
-                                return;
-                            }
                             progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
                             statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] text-red-400">error</span> <span class="text-red-400 font-semibold">Download interrupted.</span> <button type="button" onclick="startInlineDownload(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/80 hover:bg-primary px-3 py-1 rounded-lg shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>`;
                             isInlineDownloadRunning = false;
@@ -2336,11 +2313,17 @@ if (window.supabaseClient) {
                         progressBar.style.width = '20%';
                         pctText.textContent = '20%';
 
-                        const singleUrl = dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl;
+                        const singleUrl = (dlData.streamUrl && !dlData.streamUrl.includes('googlevideo.com')) 
+                            ? dlData.streamUrl 
+                            : (dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl);
+                        const fallbackStreamUrl = (singleUrl === dlData.streamUrl)
+                            ? (dlData.fullDownloadUrl || dlData.downloadUrl)
+                            : dlData.streamUrl;
+
                         try {
                             let lastProgressTime = performance.now();
                             let lastProgressBytes = 0;
-                            finalBlob = await fetchBlobWithProgress(singleUrl, dlData.streamUrl, (pct, received, total) => {
+                            finalBlob = await fetchBlobWithProgress(singleUrl, fallbackStreamUrl, (pct, received, total) => {
                                 const p = Math.round(20 + pct * 75);
                                 progressBar.style.width = `${p}%`;
                                 pctText.textContent = `${p}%`;
@@ -2364,34 +2347,29 @@ if (window.supabaseClient) {
                             if (!finalBlob) throw new Error("Stream returned empty data");
                         } catch (singleErr) {
                             console.error('[StreamVault Single Download Error]:', singleErr);
-                            if (isSocial) {
-                                const dlHeadingIcon = document.getElementById('dl-progress-icon');
-                                const dlHeadingTitle = document.getElementById('dl-progress-title');
-                                const dlProgressCard = document.getElementById('dl-progress-card');
-                                const dlProgressStats = document.getElementById('dl-progress-stats');
-                                const dlProgressTrack = document.getElementById('dl-progress-track');
-                                if (dlHeadingIcon) {
-                                    dlHeadingIcon.className = 'material-symbols-outlined text-amber-400';
-                                    dlHeadingIcon.textContent = 'desktop_windows';
-                                }
-                                if (dlHeadingTitle) {
-                                    dlHeadingTitle.textContent = 'Desktop Authentication Required';
-                                }
-                                if (dlProgressCard) {
-                                    dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-amber-500/30 bg-amber-500/5 flex flex-col gap-4';
-                                }
-                                if (dlProgressStats) dlProgressStats.style.display = 'none';
-                                if (dlProgressTrack) dlProgressTrack.style.display = 'none';
-                                statusText.innerHTML = renderCloudFallbackUI({
-                                    code: 'SOCIAL_DESKTOP_PRO_REQUIRED',
-                                    message: `${parsedUrl.type === 'instagram' ? 'Instagram' : 'Facebook'} enforces session authentication on cloud servers. Use StreamVault Desktop Pro with your local browser session.`,
-                                    desktopFallback: true,
-                                    platform: parsedUrl.type
-                                });
-                                showDesktopProModal(parsedUrl.type === 'instagram' ? 'Instagram Reel' : 'Facebook Video');
-                                downloadAnotherBtn.classList.remove('hidden');
-                                isInlineDownloadRunning = false;
-                                return;
+                            // Ultimate Resilient Native Browser Anchor Fallback
+                            const directFallbackUrl = dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl;
+                            if (directFallbackUrl) {
+                                try {
+                                    console.log('[StreamVault] Triggering native browser download fallback:', directFallbackUrl);
+                                    const a = document.createElement('a');
+                                    a.style.display = 'none';
+                                    a.href = directFallbackUrl;
+                                    a.setAttribute('download', dlFilename);
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    setTimeout(() => {
+                                        try { document.body.removeChild(a); } catch(_) {}
+                                    }, 5000);
+                                    progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
+                                    progressBar.style.width = '100%';
+                                    pctText.textContent = '100%';
+                                    statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span> Download initiated directly in browser! <button type="button" onclick="triggerFastBrowserDownload()" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/40 hover:bg-primary/60 px-3 py-1 rounded-lg border border-primary/50 shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">download</span> Save Again</button>`;
+                                    statusText.classList.replace('text-primary', 'text-green-400');
+                                    downloadAnotherBtn.classList.remove('hidden');
+                                    isInlineDownloadRunning = false;
+                                    return;
+                                } catch (_) {}
                             }
                             progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
                             statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] text-red-400">error</span> <span class="text-red-400 font-semibold">Download interrupted.</span> <button type="button" onclick="startInlineDownload(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/80 hover:bg-primary px-3 py-1 rounded-lg shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>`;
@@ -2561,7 +2539,7 @@ if (window.supabaseClient) {
                         dlProgressTrack.style.display = 'none';
                     }
                     statusText.innerHTML = renderCloudFallbackUI(err);
-                    if (isSocial || err.code === 'SOCIAL_DESKTOP_PRO_REQUIRED') {
+                    if (err.code === 'SOCIAL_DESKTOP_PRO_REQUIRED') {
                         showDesktopProModal(err.platform === 'instagram' ? 'Instagram Reel' : (err.platform === 'facebook' ? 'Facebook Video' : 'Social Media'));
                     }
                 } else {
