@@ -426,7 +426,7 @@ serve(async (req: Request) => {
       }
 
       if (!videoId && !streamUrl) {
-        const isIg = /instagram\.com/i.test(videoUrl);
+        const isIg = /instagram\.com|instagr\.am/i.test(videoUrl);
         const isFb = /facebook\.com|fb\.watch/i.test(videoUrl);
         if (isIg || isFb) {
           return new Response(JSON.stringify({
@@ -488,7 +488,7 @@ serve(async (req: Request) => {
       let audioDirectStream: string | undefined = undefined;
       let hasAudioCombined = true;
 
-      const isInstagram = /instagram\.com/i.test(url);
+      const isInstagram = /instagram\.com|instagr\.am/i.test(url);
       const isFacebook = /facebook\.com|fb\.watch/i.test(url);
       const isSocial = isInstagram || isFacebook;
 

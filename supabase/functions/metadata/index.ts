@@ -145,15 +145,33 @@ function extractVideoId(url: string): string | null {
   return null;
 }
 
-function extractPlatform(url: string): { type: "youtube" | "instagram" | "facebook" | "tiktok" | "direct" | "generic"; id?: string } {
+function extractPlatform(url: string): { type: "youtube" | "instagram" | "facebook" | "tiktok" | "direct" | "generic"; id?: string; channel?: string } {
   const ytMatch = url.match(/(?:youtube\.com\/watch\?(?:.*&)?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
   if (ytMatch) return { type: "youtube", id: ytMatch[1] };
 
-  const igMatch = url.match(/(?:instagram\.com\/(?:reel|p|tv|reels)\/([a-zA-Z0-9_-]+))/i);
-  if (igMatch) return { type: "instagram", id: igMatch[1] };
+  if (/(?:instagram\.com|instagr\.am)/i.test(url)) {
+    const codeMatch = url.match(/\/(?:reel|reels|p|tv)\/([a-zA-Z0-9_-]+)/i);
+    const shortcode = codeMatch ? codeMatch[1] : undefined;
+    const userMatch = url.match(/(?:instagram\.com|instagr\.am)\/([a-zA-Z0-9_.]+)\/(?:reel|reels|p|tv)\//i);
+    let username = userMatch ? userMatch[1] : undefined;
+    if (username && ["share", "p", "reel", "reels", "tv"].includes(username.toLowerCase())) {
+      username = undefined;
+    }
+    const channel = username ? `@${username}` : undefined;
+    return { type: "instagram", id: shortcode, channel };
+  }
 
-  const fbMatch = url.match(/(?:facebook\.com\/(?:watch\/?\?v=|reel\/|videos\/)|fb\.watch\/)([0-9a-zA-Z_-]+)/i);
-  if (fbMatch) return { type: "facebook", id: fbMatch[1] };
+  if (/(?:facebook\.com|fb\.watch)/i.test(url)) {
+    const idMatch = url.match(/(?:watch\/?\?v=|reel\/|reels\/|videos\/|share\/r\/|share\/v\/|fb\.watch\/)([0-9a-zA-Z_-]+)/i);
+    const videoId = idMatch ? idMatch[1] : undefined;
+    const userMatch = url.match(/facebook\.com\/([a-zA-Z0-9_.]+)\/(?:videos|reel|reels)\//i);
+    let username = userMatch ? userMatch[1] : undefined;
+    if (username && ["watch", "share", "reel", "reels", "videos"].includes(username.toLowerCase())) {
+      username = undefined;
+    }
+    const channel = username ? `@${username}` : undefined;
+    return { type: "facebook", id: videoId, channel };
+  }
 
   const ttMatch = url.match(/tiktok\.com\/(?:@[\w.-]+\/video\/|v\/|t\/)(\d+)/i);
   if (ttMatch) return { type: "tiktok", id: ttMatch[1] };
@@ -216,8 +234,10 @@ serve(async (req: Request) => {
     // ── 0A. Handle Instagram ─────────────────────────────────────
     if (platform.type === "instagram") {
       const shortcode = platform.id || "Reel";
-      let title = `Instagram Reel (${shortcode})`;
-      let channel = "Instagram Creator";
+      let channel = platform.channel || "Instagram Creator";
+      let title = platform.channel 
+        ? `Instagram Reel (${platform.channel} • ${shortcode})`
+        : `Instagram Reel (${shortcode})`;
       let thumbnail = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80";
 
       try {
@@ -268,8 +288,10 @@ serve(async (req: Request) => {
     // ── 0B. Handle Facebook ──────────────────────────────────────
     if (platform.type === "facebook") {
       const fbId = platform.id || "Video";
-      let title = `Facebook Video (${fbId})`;
-      let channel = "Facebook Creator";
+      let channel = platform.channel || "Facebook Creator";
+      let title = platform.channel 
+        ? `Facebook Video (${platform.channel} • ${fbId})`
+        : `Facebook Video (${fbId})`;
       let thumbnail = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80";
 
       try {

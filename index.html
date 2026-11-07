@@ -768,12 +768,12 @@ if (window.supabaseClient) {
 
         <!-- Inline Downloading Progress Area (Hidden Initially) -->
         <div id="inline-progress-section" class="hidden flex-col gap-4 mt-4 w-full h-full justify-center">
-            <h3 class="font-title-md text-title-md text-on-surface flex items-center gap-2">
-                <span class="material-symbols-outlined text-primary animate-pulse">cloud_download</span>
-                Downloading...
+            <h3 id="dl-progress-heading" class="font-title-md text-title-md text-on-surface flex items-center gap-2">
+                <span id="dl-progress-icon" class="material-symbols-outlined text-primary animate-pulse">cloud_download</span>
+                <span id="dl-progress-title">Downloading...</span>
             </h3>
-            <div class="glass-panel rounded-xl p-4 border-2 border-primary/30 bg-primary/5 flex flex-col gap-4">
-                <div class="flex justify-between items-end">
+            <div id="dl-progress-card" class="glass-panel rounded-xl p-4 border-2 border-primary/30 bg-primary/5 flex flex-col gap-4">
+                <div id="dl-progress-stats" class="flex justify-between items-end">
                     <span id="dl-speed" class="font-mono-sm text-mono-sm text-secondary-container">0 MB/s</span>
                     <div class="flex gap-3 text-right">
                         <span id="dl-size-info" class="font-mono-sm text-mono-sm text-on-surface-variant">0 MB / --</span>
@@ -781,7 +781,7 @@ if (window.supabaseClient) {
                     </div>
                 </div>
                 <!-- Progress Track -->
-                <div class="w-full h-2 rounded-full bg-surface-container-highest overflow-hidden">
+                <div id="dl-progress-track" class="w-full h-2 rounded-full bg-surface-container-highest overflow-hidden">
                     <div id="dl-progress-bar" class="h-full rounded-full bg-gradient-to-r from-primary to-secondary-container relative transition-all duration-300" style="width: 0%">
                         <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
                     </div>
@@ -1314,17 +1314,33 @@ if (window.supabaseClient) {
 
             // Extract shortcode or identifier for social platforms if applicable
             let defaultTitle = "Loading Stream...";
+            let defaultChannel = "";
+            let defaultDuration = "--:--";
             if (check.type === 'instagram') {
-                const igMatch = check.normalizedUrl.match(/\/(?:reel|p|tv|reels)\/([a-zA-Z0-9_-]+)/i);
-                defaultTitle = igMatch ? `Instagram Reel (${igMatch[1]})` : "Instagram Reel";
+                const igCodeMatch = check.normalizedUrl.match(/\/(?:reel|reels|p|tv)\/([a-zA-Z0-9_-]+)/i);
+                const igUserMatch = check.normalizedUrl.match(/(?:instagram\.com|instagr\.am)\/([a-zA-Z0-9_.]+)\/(?:reel|reels|p|tv)\//i);
+                let igUser = igUserMatch ? igUserMatch[1] : null;
+                if (igUser && ["share", "p", "reel", "reels", "tv"].includes(igUser.toLowerCase())) igUser = null;
+                const shortcode = igCodeMatch ? igCodeMatch[1] : "Reel";
+                defaultTitle = igUser ? `Instagram Reel (@${igUser} • ${shortcode})` : `Instagram Reel (${shortcode})`;
+                defaultChannel = igUser ? `@${igUser}` : "Instagram Creator";
+                defaultDuration = "Reel";
             } else if (check.type === 'facebook') {
-                const fbMatch = check.normalizedUrl.match(/(?:videos\/|reel\/|watch\/\?v=)(\d+)/i);
-                defaultTitle = fbMatch ? `Facebook Video (${fbMatch[1]})` : "Facebook Video";
+                const fbIdMatch = check.normalizedUrl.match(/(?:watch\/?\?v=|reel\/|reels\/|videos\/|share\/r\/|share\/v\/|fb\.watch\/)([0-9a-zA-Z_-]+)/i);
+                const fbUserMatch = check.normalizedUrl.match(/facebook\.com\/([a-zA-Z0-9_.]+)\/(?:videos|reel|reels)\//i);
+                let fbUser = fbUserMatch ? fbUserMatch[1] : null;
+                if (fbUser && ["watch", "share", "reel", "reels", "videos"].includes(fbUser.toLowerCase())) fbUser = null;
+                const videoId = fbIdMatch ? fbIdMatch[1] : "Video";
+                defaultTitle = fbUser ? `Facebook Video (@${fbUser} • ${videoId})` : `Facebook Video (${videoId})`;
+                defaultChannel = fbUser ? `@${fbUser}` : "Facebook Creator";
+                defaultDuration = "Social Video";
             }
 
             // Prepare pending video object with instant thumbnail
             let pendingVideo = {
                 title: defaultTitle,
+                channel: defaultChannel,
+                duration: defaultDuration,
                 platform: check.type === 'youtube' ? 'YouTube' : check.type === 'instagram' ? 'Instagram' : check.type === 'facebook' ? 'Facebook' : 'Web Stream',
                 thumbnail: ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=400&auto=format&fit=crop",
                 url: check.normalizedUrl,
@@ -1338,6 +1354,10 @@ if (window.supabaseClient) {
             // Progressive UI Loading: Show Workflow Section Immediately with real thumbnail!
             document.getElementById('video-title').textContent = pendingVideo.title;
             document.getElementById('video-platform-badge').textContent = pendingVideo.platform || 'Web';
+            const durElInit = document.getElementById('video-duration');
+            if (durElInit) {
+                durElInit.textContent = pendingVideo.duration;
+            }
             
             const thumbImg = document.getElementById('video-thumbnail');
             if (pendingVideo.thumbnail) {
@@ -1372,7 +1392,9 @@ if (window.supabaseClient) {
                 document.getElementById('video-title').textContent = pendingVideo.title;
                 const durEl = document.getElementById('video-duration');
                 if (durEl) {
-                    durEl.textContent = data.duration_string || data.duration || (check.type === 'instagram' ? 'Reel' : check.type === 'facebook' ? 'Social Video' : '--');
+                    const socialDefault = check.type === 'instagram' ? 'Reel' : (check.type === 'facebook' ? 'Social Video' : '--');
+                    const cleanDur = data.duration_string || data.duration;
+                    durEl.textContent = (cleanDur && cleanDur !== '--:--') ? cleanDur : socialDefault;
                 }
                 const finalThumb = document.getElementById('video-thumbnail');
                 if (pendingVideo.thumbnail) {
@@ -2083,7 +2105,31 @@ if (window.supabaseClient) {
             const qualDisplay = (selectedQuality && selectedQuality !== 'best' && selectedQuality !== 'Original') ? `${selectedQuality} • ` : '';
             const fmtDisplay = isAudio ? 'MP3' : 'MP4';
 
+            const dlHeadingIcon = document.getElementById('dl-progress-icon');
+            const dlHeadingTitle = document.getElementById('dl-progress-title');
+            const dlProgressCard = document.getElementById('dl-progress-card');
+            const dlProgressStats = document.getElementById('dl-progress-stats');
+            const dlProgressTrack = document.getElementById('dl-progress-track');
+
+            if (dlHeadingIcon) {
+                dlHeadingIcon.className = 'material-symbols-outlined text-primary animate-pulse';
+                dlHeadingIcon.textContent = 'cloud_download';
+            }
+            if (dlHeadingTitle) {
+                dlHeadingTitle.textContent = 'Downloading...';
+            }
+            if (dlProgressCard) {
+                dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-primary/30 bg-primary/5 flex flex-col gap-4';
+            }
+            if (dlProgressStats) {
+                dlProgressStats.style.display = 'flex';
+            }
+            if (dlProgressTrack) {
+                dlProgressTrack.style.display = 'block';
+            }
+
             statusText.innerHTML = `<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Preparing <strong class="text-white">${qualDisplay}${fmtDisplay}</strong> stream...`;
+            statusText.className = 'font-mono-sm text-[12px] text-primary flex items-center gap-1';
             speedText.textContent  = '--';
             sizeInfo.textContent   = '--';
             pctText.textContent    = '5%';
@@ -2162,8 +2208,19 @@ if (window.supabaseClient) {
                 }
 
                 if (!dlRes) {
-                    const errMsg = (typeof lastErr === 'object' ? lastErr.message : lastErr) || 'Download service unavailable';
-                    throw { message: errMsg, desktopFallback: false };
+                    if (lastErr && typeof lastErr === 'object') {
+                        throw {
+                            message: lastErr.message || 'Download service unavailable',
+                            desktopFallback: lastErr.desktopFallback !== undefined ? lastErr.desktopFallback : isSocial,
+                            code: lastErr.code,
+                            platform: lastErr.platform || (isSocial ? parsedUrl.type : null)
+                        };
+                    }
+                    throw { 
+                        message: lastErr || 'Download service unavailable', 
+                        desktopFallback: isSocial, 
+                        platform: isSocial ? parsedUrl.type : null 
+                    };
                 }
 
                 const dlData = await dlRes.json();
@@ -2240,8 +2297,23 @@ if (window.supabaseClient) {
                         } catch (errMerge) {
                             console.error('[StreamVault Audio Mux Error]:', errMerge);
                             if (isSocial) {
-                                progressBar.classList.replace('bg-gradient-to-r', 'bg-amber-500');
-                                progressBar.style.width = '100%';
+                                const dlHeadingIcon = document.getElementById('dl-progress-icon');
+                                const dlHeadingTitle = document.getElementById('dl-progress-title');
+                                const dlProgressCard = document.getElementById('dl-progress-card');
+                                const dlProgressStats = document.getElementById('dl-progress-stats');
+                                const dlProgressTrack = document.getElementById('dl-progress-track');
+                                if (dlHeadingIcon) {
+                                    dlHeadingIcon.className = 'material-symbols-outlined text-amber-400';
+                                    dlHeadingIcon.textContent = 'desktop_windows';
+                                }
+                                if (dlHeadingTitle) {
+                                    dlHeadingTitle.textContent = 'Desktop Authentication Required';
+                                }
+                                if (dlProgressCard) {
+                                    dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-amber-500/30 bg-amber-500/5 flex flex-col gap-4';
+                                }
+                                if (dlProgressStats) dlProgressStats.style.display = 'none';
+                                if (dlProgressTrack) dlProgressTrack.style.display = 'none';
                                 statusText.innerHTML = renderCloudFallbackUI({
                                     code: 'SOCIAL_DESKTOP_PRO_REQUIRED',
                                     message: `${parsedUrl.type === 'instagram' ? 'Instagram' : 'Facebook'} enforces session authentication on cloud servers. Use StreamVault Desktop Pro with your local browser session.`,
@@ -2249,6 +2321,7 @@ if (window.supabaseClient) {
                                     platform: parsedUrl.type
                                 });
                                 showDesktopProModal(parsedUrl.type === 'instagram' ? 'Instagram Reel' : 'Facebook Video');
+                                downloadAnotherBtn.classList.remove('hidden');
                                 isInlineDownloadRunning = false;
                                 return;
                             }
@@ -2292,8 +2365,23 @@ if (window.supabaseClient) {
                         } catch (singleErr) {
                             console.error('[StreamVault Single Download Error]:', singleErr);
                             if (isSocial) {
-                                progressBar.classList.replace('bg-gradient-to-r', 'bg-amber-500');
-                                progressBar.style.width = '100%';
+                                const dlHeadingIcon = document.getElementById('dl-progress-icon');
+                                const dlHeadingTitle = document.getElementById('dl-progress-title');
+                                const dlProgressCard = document.getElementById('dl-progress-card');
+                                const dlProgressStats = document.getElementById('dl-progress-stats');
+                                const dlProgressTrack = document.getElementById('dl-progress-track');
+                                if (dlHeadingIcon) {
+                                    dlHeadingIcon.className = 'material-symbols-outlined text-amber-400';
+                                    dlHeadingIcon.textContent = 'desktop_windows';
+                                }
+                                if (dlHeadingTitle) {
+                                    dlHeadingTitle.textContent = 'Desktop Authentication Required';
+                                }
+                                if (dlProgressCard) {
+                                    dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-amber-500/30 bg-amber-500/5 flex flex-col gap-4';
+                                }
+                                if (dlProgressStats) dlProgressStats.style.display = 'none';
+                                if (dlProgressTrack) dlProgressTrack.style.display = 'none';
                                 statusText.innerHTML = renderCloudFallbackUI({
                                     code: 'SOCIAL_DESKTOP_PRO_REQUIRED',
                                     message: `${parsedUrl.type === 'instagram' ? 'Instagram' : 'Facebook'} enforces session authentication on cloud servers. Use StreamVault Desktop Pro with your local browser session.`,
@@ -2301,6 +2389,7 @@ if (window.supabaseClient) {
                                     platform: parsedUrl.type
                                 });
                                 showDesktopProModal(parsedUrl.type === 'instagram' ? 'Instagram Reel' : 'Facebook Video');
+                                downloadAnotherBtn.classList.remove('hidden');
                                 isInlineDownloadRunning = false;
                                 return;
                             }
@@ -2448,16 +2537,52 @@ if (window.supabaseClient) {
                 console.log("Stack Trace:", err.stack || err);
                 console.error('[StreamVault] Download Error:', err);
                 
+                const dlHeadingIcon = document.getElementById('dl-progress-icon');
+                const dlHeadingTitle = document.getElementById('dl-progress-title');
+                const dlProgressCard = document.getElementById('dl-progress-card');
+                const dlProgressStats = document.getElementById('dl-progress-stats');
+                const dlProgressTrack = document.getElementById('dl-progress-track');
+
                 if (err.desktopFallback) {
-                    progressBar.classList.replace('bg-gradient-to-r', 'bg-amber-500');
-                    progressBar.style.width = '100%';
+                    if (dlHeadingIcon) {
+                        dlHeadingIcon.className = 'material-symbols-outlined text-amber-400';
+                        dlHeadingIcon.textContent = 'desktop_windows';
+                    }
+                    if (dlHeadingTitle) {
+                        dlHeadingTitle.textContent = 'Desktop Authentication Required';
+                    }
+                    if (dlProgressCard) {
+                        dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-amber-500/30 bg-amber-500/5 flex flex-col gap-4';
+                    }
+                    if (dlProgressStats) {
+                        dlProgressStats.style.display = 'none';
+                    }
+                    if (dlProgressTrack) {
+                        dlProgressTrack.style.display = 'none';
+                    }
                     statusText.innerHTML = renderCloudFallbackUI(err);
                     if (isSocial || err.code === 'SOCIAL_DESKTOP_PRO_REQUIRED') {
                         showDesktopProModal(err.platform === 'instagram' ? 'Instagram Reel' : (err.platform === 'facebook' ? 'Facebook Video' : 'Social Media'));
                     }
                 } else {
-                    progressBar.classList.replace('bg-gradient-to-r', 'bg-red-500');
+                    if (dlHeadingIcon) {
+                        dlHeadingIcon.className = 'material-symbols-outlined text-red-400';
+                        dlHeadingIcon.textContent = 'error';
+                    }
+                    if (dlHeadingTitle) {
+                        dlHeadingTitle.textContent = 'Download Failed';
+                    }
+                    if (dlProgressCard) {
+                        dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-red-500/30 bg-red-500/5 flex flex-col gap-4';
+                    }
+                    if (dlProgressStats) {
+                        dlProgressStats.style.display = 'none';
+                    }
+                    progressBar.className = 'h-full rounded-full transition-all duration-300 bg-red-500';
                     progressBar.style.width = '100%';
+                    speedText.textContent = '';
+                    sizeInfo.textContent = '';
+                    pctText.textContent = '';
                     statusText.innerHTML = `<span class="material-symbols-outlined text-[14px]">error</span> Download Failed<br><pre class='text-xs mt-2 text-left bg-black/20 p-2 rounded whitespace-pre-wrap'>${err.message || err}</pre>`;
                     statusText.classList.replace('text-primary', 'text-red-400');
                 }
@@ -2472,13 +2597,37 @@ if (window.supabaseClient) {
                 progressSection.classList.remove('flex');
                 stepsContainer.classList.remove('hidden');
 
+                const dlHeadingIcon = document.getElementById('dl-progress-icon');
+                const dlHeadingTitle = document.getElementById('dl-progress-title');
+                const dlProgressCard = document.getElementById('dl-progress-card');
+                const dlProgressStats = document.getElementById('dl-progress-stats');
+                const dlProgressTrack = document.getElementById('dl-progress-track');
+
+                if (dlHeadingIcon) {
+                    dlHeadingIcon.className = 'material-symbols-outlined text-primary animate-pulse';
+                    dlHeadingIcon.textContent = 'cloud_download';
+                }
+                if (dlHeadingTitle) {
+                    dlHeadingTitle.textContent = 'Downloading...';
+                }
+                if (dlProgressCard) {
+                    dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-primary/30 bg-primary/5 flex flex-col gap-4';
+                }
+                if (dlProgressStats) {
+                    dlProgressStats.style.display = 'flex';
+                }
+                if (dlProgressTrack) {
+                    dlProgressTrack.style.display = 'block';
+                }
+
                 // Reset status colours
                 statusText.classList.replace('text-green-400', 'text-primary');
                 statusText.classList.replace('text-red-400',   'text-primary');
-                progressBar.classList.replace('bg-green-500',  'bg-gradient-to-r');
-                progressBar.classList.replace('bg-red-500',    'bg-gradient-to-r');
+                progressBar.className = 'h-full rounded-full transition-all duration-300 bg-gradient-to-r from-primary to-orange-500';
                 progressBar.style.width = '0%';
                 pctText.textContent = '0%';
+                speedText.textContent = '--';
+                sizeInfo.textContent = '--';
                 downloadAnotherBtn.classList.add('hidden');
 
                 const uiInput = document.getElementById('url-input');
