@@ -511,6 +511,9 @@ async function handleYouTubeGet(req: Request, reqUrl: URL): Promise<Response> {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     "Accept": "*/*",
   };
+  if (streamUrl.includes("chocolatemoo53.com")) {
+    upstreamHeaders["Referer"] = "https://yt.chocolatemoo53.com/";
+  }
   if (req.headers.has("range")) {
     upstreamHeaders["Range"] = req.headers.get("range")!;
   }
@@ -525,15 +528,23 @@ async function handleYouTubeGet(req: Request, reqUrl: URL): Promise<Response> {
     console.warn("[YouTube Stream Fetch Error]:", err?.message || err);
   }
 
-  // If datacenter IP returned 403 or non-200, seamlessly 302 redirect browser to streamUrl
-  // so the user's browser downloads the media directly with 0 datacenter block!
+  // If upstream fetch failed or returned non-200/206, do NOT 302 redirect browser to googlevideo.com!
+  // A 302 redirect to googlevideo.com causes CORS failure in browser fetch or opens a silent video in Chrome tab.
   if (!mediaRes || (!mediaRes.ok && mediaRes.status !== 206)) {
-    console.log(`[YouTube Stream Proxy] Datacenter fetch status ${mediaRes?.status || 'fail'}, redirecting browser to stream: ${streamUrl}`);
-    return new Response(null, {
-      status: 302,
+    console.warn(`[YouTube Stream Proxy] Upstream fetch status ${mediaRes?.status || 'fail'} for ${streamUrl}`);
+    return new Response(JSON.stringify({
+      success: false,
+      error: {
+        code: "YOUTUBE_STREAM_FAILED",
+        message: "Direct YouTube stream could not be loaded. Please choose another quality or try again.",
+        retryable: true,
+        desktopFallback: false,
+      }
+    }), {
+      status: 502,
       headers: {
         ...corsHeaders,
-        "Location": streamUrl,
+        "Content-Type": "application/json",
       },
     });
   }

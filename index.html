@@ -1888,6 +1888,17 @@ if (window.supabaseClient) {
                 return h;
             }
 
+            // Exclude direct googlevideo.com URLs in browser fetch (cross-origin CORS block)
+            if (primaryUrl && primaryUrl.includes('googlevideo.com')) {
+                primaryUrl = (fallbackUrl && !fallbackUrl.includes('googlevideo.com')) ? fallbackUrl : null;
+            }
+            if (fallbackUrl && fallbackUrl.includes('googlevideo.com')) {
+                fallbackUrl = null;
+            }
+            if (!primaryUrl) {
+                throw new Error("No CORS-enabled stream URL available for in-browser download");
+            }
+
             // 1. Probe total size and Range support
             let total = 0;
             let mimeType = 'video/mp4';
@@ -1926,92 +1937,74 @@ if (window.supabaseClient) {
                 }
             }
 
-            // For small files (e.g. audio track <= 8MB), a single stream fetch is fastest and uses zero worker overhead
+            // For small files (e.g. audio track <= 8MB), single stream fetch with Range
             if (total > 0 && total <= 8 * 1024 * 1024) {
                 try {
-                    const res = await fetch(targetUrl, { headers: getHeadersForUrl(targetUrl) });
-                    if (res.ok) {
+                    const res = await fetch(targetUrl, {
+                        headers: {
+                            ...getHeadersForUrl(targetUrl),
+                            ...(supportsRange ? { 'Range': `bytes=0-${total - 1}` } : {})
+                        }
+                    });
+                    if (res.ok || res.status === 206) {
+                        if (typeof onProgress === 'function') onProgress(1.0, total, total);
                         return await res.blob();
                     }
                 } catch (_) {}
             }
 
-            // 2. High-Speed Multi-Threaded Concurrent Range Acceleration for Large Files
-            // If the file is > 8 MB and supports HTTP Range, download with 3 concurrent workers!
+            // 2. High-Speed Range Acceleration for Large Files (e.g. 1080p video)
+            // Use sequential 4MB chunks with Range: smooth, steady, never triggers connection resets
             if (supportsRange && total > 8 * 1024 * 1024) {
-                console.log(`[Turbo Downloader] Activating 3-worker multi-thread download accelerator for ${(total / 1048576).toFixed(1)} MB`);
-                
-                // 8MB chunks for stability and blazing speed
-                const chunkSize = 8 * 1024 * 1024;
+                console.log(`[Turbo Downloader] Fast range stream for ${(total / 1048576).toFixed(1)} MB`);
+                const chunkSize = 4 * 1024 * 1024;
                 const chunkCount = Math.ceil(total / chunkSize);
                 const chunkBuffers = new Array(chunkCount);
-                
-                let nextChunkIdx = 0;
                 let downloadedBytes = 0;
-                const maxConcurrency = Math.min(3, chunkCount);
-
-                async function worker() {
-                    while (true) {
-                        const idx = nextChunkIdx++;
-                        if (idx >= chunkCount) break;
-
-                        const start = idx * chunkSize;
-                        const end = Math.min(start + chunkSize - 1, total - 1);
-                        
-                        let retries = 3;
-                        let success = false;
-                        while (retries > 0 && !success) {
-                            try {
-                                const chunkRes = await fetch(targetUrl, {
-                                    headers: { ...getHeadersForUrl(targetUrl), 'Range': `bytes=${start}-${end}` }
-                                });
-                                if (chunkRes.ok || chunkRes.status === 206) {
-                                    const buf = await chunkRes.arrayBuffer();
-                                    chunkBuffers[idx] = new Uint8Array(buf);
-                                    downloadedBytes += buf.byteLength;
-                                    success = true;
-
-                                    if (typeof onProgress === 'function') {
-                                        onProgress(downloadedBytes / total, downloadedBytes, total);
-                                    }
-                                } else {
-                                    retries--;
-                                    if (retries > 0) await new Promise(r => setTimeout(r, 300));
-                                }
-                            } catch (chunkErr) {
-                                retries--;
-                                if (retries > 0) await new Promise(r => setTimeout(r, 300));
-                            }
-                        }
-
-                        if (!success) {
-                            throw new Error(`Worker failed to download chunk ${idx} [${start}-${end}]`);
-                        }
-                    }
-                }
 
                 try {
-                    const workers = [];
-                    for (let w = 0; w < maxConcurrency; w++) {
-                        workers.push(worker());
+                    for (let idx = 0; idx < chunkCount; idx++) {
+                        const start = idx * chunkSize;
+                        const end = Math.min(start + chunkSize - 1, total - 1);
+                        const chunkRes = await fetch(targetUrl, {
+                            headers: { ...getHeadersForUrl(targetUrl), 'Range': `bytes=${start}-${end}` }
+                        });
+                        if (!chunkRes.ok && chunkRes.status !== 206) {
+                            throw new Error(`Chunk ${idx} failed with status ${chunkRes.status}`);
+                        }
+                        const buf = await chunkRes.arrayBuffer();
+                        chunkBuffers[idx] = new Uint8Array(buf);
+                        downloadedBytes += buf.byteLength;
+                        if (typeof onProgress === 'function') {
+                            onProgress(downloadedBytes / total, downloadedBytes, total);
+                        }
                     }
-                    await Promise.all(workers);
-
-                    console.log(`[Turbo Downloader] Download Completed: ${chunkCount} chunks assembled into ${(total / 1048576).toFixed(1)} MB`);
                     return new Blob(chunkBuffers, { type: mimeType });
-                } catch (turboErr) {
-                    console.warn("[Turbo Downloader] Chunk worker failed, falling back to single stream:", turboErr);
+                } catch (rangeErr) {
+                    console.warn("[Turbo Downloader] Chunk range failed, falling back to standard stream:", rangeErr);
                 }
             }
 
             // 3. Resilient Fallback: Standard Sequential Stream
             let res = null;
             try {
-                res = await fetch(targetUrl, { headers: getHeadersForUrl(targetUrl) });
+                res = await fetch(targetUrl, {
+                    headers: {
+                        ...getHeadersForUrl(targetUrl),
+                        ...(total > 0 && supportsRange ? { 'Range': `bytes=0-${total - 1}` } : {})
+                    }
+                });
             } catch (_) {}
             if (!res || !res.ok) {
                 if (fallbackUrl && fallbackUrl !== targetUrl) {
-                    try { res = await fetch(fallbackUrl, { headers: getHeadersForUrl(fallbackUrl) }); } catch (_) {}
+                    try {
+                        res = await fetch(fallbackUrl, {
+                            headers: {
+                                ...getHeadersForUrl(fallbackUrl),
+                                ...(total > 0 && supportsRange ? { 'Range': `bytes=0-${total - 1}` } : {})
+                            }
+                        });
+                    } catch (_) {}
                 }
             }
             if (!res || !res.ok) {
@@ -2250,14 +2243,14 @@ if (window.supabaseClient) {
                     progressBar.style.width = '15%';
                     pctText.textContent = '15%';
 
-                    const videoUrl = dlData.streamUrl || dlData.directCdnUrl || dlData.fullDownloadUrl;
-                    const audioUrl = dlData.audioStreamUrl || dlData.audioDirectCdnUrl || dlData.fullAudioDownloadUrl;
+                    const videoUrl = dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl;
+                    const audioUrl = dlData.fullAudioDownloadUrl || dlData.audioDownloadUrl || dlData.audioStreamUrl;
 
                     try {
                         let lastProgressTime = performance.now();
                         let lastProgressBytes = 0;
                         const [videoBlob, audioBlob] = await Promise.all([
-                            fetchBlobWithProgress(videoUrl, dlData.directCdnUrl || dlData.fullDownloadUrl, (pct, received, total) => {
+                            fetchBlobWithProgress(videoUrl, dlData.streamUrl !== videoUrl ? dlData.streamUrl : null, (pct, received, total) => {
                                 const p = Math.round(15 + pct * 75);
                                 progressBar.style.width = p + '%';
                                 pctText.textContent = p + '%';
@@ -2276,7 +2269,7 @@ if (window.supabaseClient) {
                                     }
                                 }
                             }),
-                            fetchBlobWithProgress(audioUrl, dlData.audioDirectCdnUrl || dlData.fullAudioDownloadUrl, null)
+                            fetchBlobWithProgress(audioUrl, dlData.audioStreamUrl !== audioUrl ? dlData.audioStreamUrl : null, null)
                         ]);
 
                         if (!videoBlob) throw new Error("YouTube video stream returned empty data");
@@ -2292,33 +2285,8 @@ if (window.supabaseClient) {
                         }
                     } catch (errMerge) {
                         console.error('[YouTube Audio Mux Error]:', errMerge);
-                        // Fallback 1: Try direct browser download if URL exists
-                        const directFallbackUrl = dlData.directCdnUrl || dlData.streamUrl || dlData.fullDownloadUrl;
-                        if (directFallbackUrl) {
-                            try {
-                                const a = document.createElement('a');
-                                a.style.display = 'none';
-                                a.href = directFallbackUrl;
-                                a.setAttribute('download', dlFilename);
-                                document.body.appendChild(a);
-                                a.click();
-                                setTimeout(() => {
-                                    try { document.body.removeChild(a); } catch(_) {}
-                                }, 5000);
-
-                                progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
-                                progressBar.style.width = '100%';
-                                pctText.textContent = '100%';
-                                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> YouTube download initiated directly in browser!';
-                                statusText.classList.replace('text-primary', 'text-green-400');
-                                downloadAnotherBtn.classList.remove('hidden');
-                                isInlineDownloadRunning = false;
-                                return;
-                            } catch (_) {}
-                        }
-
                         progressBar.classList.replace('bg-gradient-to-r', 'bg-amber-500');
-                        statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] text-amber-400">warning</span> <span class="text-amber-400 font-semibold">YouTube stream temporarily busy.</span> <button type="button" onclick="downloadYouTubeMedia(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary px-3 py-1 rounded-lg text-xs shadow-md"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>';
+                        statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] text-amber-400">warning</span> <span class="text-amber-400 font-semibold">YouTube stream temporarily busy.</span> <button type="button" onclick="downloadYouTubeMedia(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary px-3 py-1 rounded-lg text-xs shadow-md hover:brightness-110 transition-all"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry Download</button>';
                         downloadAnotherBtn.classList.remove('hidden');
                         isInlineDownloadRunning = false;
                         return;
@@ -2329,11 +2297,11 @@ if (window.supabaseClient) {
                     progressBar.style.width = '20%';
                     pctText.textContent = '20%';
 
-                    const singleUrl = dlData.streamUrl || dlData.directCdnUrl || dlData.fullDownloadUrl;
+                    const singleUrl = dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl;
                     try {
                         let lastProgressTime = performance.now();
                         let lastProgressBytes = 0;
-                        finalBlob = await fetchBlobWithProgress(singleUrl, dlData.directCdnUrl || dlData.fullDownloadUrl, (pct, received, total) => {
+                        finalBlob = await fetchBlobWithProgress(singleUrl, dlData.streamUrl !== singleUrl ? dlData.streamUrl : null, (pct, received, total) => {
                             const p = Math.round(20 + pct * 75);
                             progressBar.style.width = p + '%';
                             pctText.textContent = p + '%';
@@ -2355,32 +2323,8 @@ if (window.supabaseClient) {
                         if (!finalBlob) throw new Error("YouTube stream returned empty data");
                     } catch (singleErr) {
                         console.error('[YouTube Stream Error]:', singleErr);
-                        const directFallbackUrl = dlData.directCdnUrl || dlData.streamUrl || dlData.fullDownloadUrl;
-                        if (directFallbackUrl) {
-                            try {
-                                const a = document.createElement('a');
-                                a.style.display = 'none';
-                                a.href = directFallbackUrl;
-                                a.setAttribute('download', dlFilename);
-                                document.body.appendChild(a);
-                                a.click();
-                                setTimeout(() => {
-                                    try { document.body.removeChild(a); } catch(_) {}
-                                }, 5000);
-
-                                progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
-                                progressBar.style.width = '100%';
-                                pctText.textContent = '100%';
-                                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> YouTube download initiated directly in browser!';
-                                statusText.classList.replace('text-primary', 'text-green-400');
-                                downloadAnotherBtn.classList.remove('hidden');
-                                isInlineDownloadRunning = false;
-                                return;
-                            } catch (_) {}
-                        }
-
                         progressBar.classList.replace('bg-gradient-to-r', 'bg-amber-500');
-                        statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] text-amber-400">warning</span> <span class="text-amber-400 font-semibold">YouTube stream temporarily busy.</span> <button type="button" onclick="downloadYouTubeMedia(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary px-3 py-1 rounded-lg text-xs shadow-md"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry</button>';
+                        statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] text-amber-400">warning</span> <span class="text-amber-400 font-semibold">YouTube stream temporarily busy.</span> <button type="button" onclick="downloadYouTubeMedia(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary px-3 py-1 rounded-lg text-xs shadow-md hover:brightness-110 transition-all"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry Download</button>';
                         downloadAnotherBtn.classList.remove('hidden');
                         isInlineDownloadRunning = false;
                         return;
@@ -2639,7 +2583,7 @@ if (window.supabaseClient) {
                     if (!finalBlob) throw new Error("Stream returned empty data");
                 } catch (socialErr) {
                     console.warn("[Social Engine] Blob stream failed, initiating native direct browser download:", socialErr);
-                    const directFallbackUrl = dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl;
+                    const directFallbackUrl = dlData.fullDownloadUrl || dlData.downloadUrl;
                     if (directFallbackUrl) {
                         const a = document.createElement('a');
                         a.style.display = 'none';
