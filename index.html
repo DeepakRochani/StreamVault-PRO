@@ -2012,21 +2012,30 @@ if (window.supabaseClient) {
             }
 
             const streamTotal = total || parseInt(res.headers.get('content-length') || '0', 10);
-            if (!res.body || streamTotal === 0 || !onProgress) {
+            if (!res.body || !onProgress) {
                 return await res.blob();
             }
 
             const reader = res.body.getReader();
             const chunks = [];
             let received = 0;
+            let simulatedPct = 0.15;
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
                 chunks.push(value);
                 received += value.length;
-                if (streamTotal > 0 && typeof onProgress === 'function') {
-                    onProgress(received / streamTotal, received, streamTotal);
+                if (typeof onProgress === 'function') {
+                    if (streamTotal > 0) {
+                        onProgress(received / streamTotal, received, streamTotal);
+                    } else {
+                        simulatedPct = Math.min(0.92, simulatedPct + 0.04);
+                        onProgress(simulatedPct, received, 0);
+                    }
                 }
+            }
+            if (typeof onProgress === 'function') {
+                onProgress(1.0, received, streamTotal || received);
             }
             return new Blob(chunks, { type: res.headers.get('content-type') || mimeType });
         }

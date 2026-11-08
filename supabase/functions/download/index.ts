@@ -55,7 +55,7 @@ export interface ResolvedStreamResult {
 // ============================================================
 
 // ── Default YouTube Session Cookies ──────────────────────────
-const DEFAULT_YOUTUBE_COOKIE = "PREF=hl=en&tz=UTC; SOCS=CAI; VISITOR_INFO1_LIVE=zjW6Y_RzRUI; VISITOR_PRIVACY_METADATA=CgJJThIEGgAgGg%3D%3D; YSC=JNKtOAO-9B4; __Secure-ROLLOUT_TOKEN=CMS3w9CquMO7HBDkkLrOjZiVAxi3-KrE3PWXAw%3D%3D; __Secure-YNID=CvcBCAUSqQEBDB6PDDiOk2VZAnAERv2h5xSOYxQjdeMjOBfl4C0tfFXsSmXuer1r_5ZQz1HIh1keKC_JP_8KmBfxsNAjgS4G_fvsM86vbOtsT9cphmguOquTqgMlidcFcDKo4gG5onAm0GB4Zu_Myi5Tig_j9iP7eLKQG41idmjdaUcWxEJbfGuIeoMIvWjhjgQDrTgCSLLaIzkvbp3vi3rCyNZIrOE_jV3Nx8bO208lKAUyRQEcWPVquTkaGpujh1pFmImeHGY-ADypXl4Bv0TEfFM-x3iozR3YljYgJeYd_SZYKaZfkrHcSEFKS6y55RtBpKa8orIuCg; GPS=1";
+const DEFAULT_YOUTUBE_COOKIE = "";
 
 // ── Cookie Normalizer ─────────────────────────────────────────
 function normalizeYouTubeCookies(rawCookie?: string | null): { cookieHeader: string; count: number; valid: boolean } {
@@ -138,8 +138,205 @@ async function getYouTubeInnertube() {
   return cachedYouTubeSession;
 }
 
-// Fast active Invidious mirrors as auxiliary fallback for YouTube
-const INVIDIOUS_MIRRORS: string[] = ["https://yt.chocolatemoo53.com"];
+function parseQualityHeight(q: string): number {
+  const s = (q || "").toLowerCase();
+  if (s.includes("8k") || s.includes("4320")) return 4320;
+  if (s.includes("4k") || s.includes("2160")) return 2160;
+  if (s.includes("1440") || s.includes("2k")) return 1440;
+  if (s.includes("1080")) return 1080;
+  if (s.includes("720")) return 720;
+  if (s.includes("480")) return 480;
+  if (s.includes("360")) return 360;
+  return parseInt(s.replace(/[^0-9]/g, "") || "1080");
+}
+
+// ── Provider 1: Cobalt v10 High-Speed Pre-Muxed Engine ────────
+const COBALT_INSTANCES: string[] = [
+  "https://cobalt-api.kwiatekm.pl",
+  "https://api.cobalt.tools",
+  "https://cobalt.api.scip.io",
+  "https://cobalt.kwiatekm.pl",
+  "https://cobalt.synapticfire.net",
+  "https://cobalt.canine.tools",
+  "https://cobalt.ducks.party",
+];
+
+async function resolveYouTubeViaCobalt(url: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
+  const targetH = parseQualityHeight(quality);
+  const qStr = targetH >= 1080 ? "1080" : targetH >= 720 ? "720" : targetH >= 480 ? "480" : "360";
+
+  const promises = COBALT_INSTANCES.map(async (inst) => {
+    const resp = await fetch(`${inst}/`, {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        url,
+        videoQuality: qStr,
+        downloadMode: isAudio ? "audio" : "auto",
+        audioFormat: "mp3",
+      }),
+      signal: AbortSignal.timeout(3500),
+    });
+
+    if (!resp.ok) throw new Error(`${inst} status ${resp.status}`);
+    const data = await resp.json();
+    if ((data.status === "tunnel" || data.status === "redirect" || data.status === "stream") && data.url) {
+      console.log(`[YouTube Engine] Cobalt succeeded via ${inst}`);
+      return {
+        streamUrl: data.url,
+        mimeType: isAudio ? "audio/mpeg" : "video/mp4",
+        hasAudioCombined: true,
+      };
+    }
+    throw new Error(`Invalid cobalt response from ${inst}`);
+  });
+
+  try {
+    return await Promise.any(promises);
+  } catch (_) {
+    return null;
+  }
+}
+
+// ── Provider 1: BTCH High-Speed Residential Proxy Engine ───────
+async function resolveYouTubeViaBtch(videoId: string, isAudio: boolean): Promise<ResolvedStreamResult | null> {
+  const targetUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  const endpoints = [
+    `https://backend1.tioo.eu.org/api/downloader/youtube?url=${encodeURIComponent(targetUrl)}`,
+    `https://backend1.tioo.eu.org/youtube?url=${encodeURIComponent(targetUrl)}`,
+  ];
+
+  const promises = endpoints.map(async (ep) => {
+    const apiRes = await fetch(ep, {
+      signal: AbortSignal.timeout(12000),
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "btch/6.3.6",
+        "X-Client-Version": "6.3.6",
+      },
+    });
+    if (!apiRes.ok) throw new Error(`${ep} status ${apiRes.status}`);
+    const data = await apiRes.json();
+    if (!data || data.status === false) throw new Error(`${ep} status false`);
+    const mediaUrl = isAudio ? (data.mp3 || data.audio) : (data.mp4 || data.url);
+    if (!mediaUrl) throw new Error(`${ep} no media url`);
+
+    console.log(`[YouTube Engine] BTCH API succeeded via ${ep}`);
+    return {
+      streamUrl: mediaUrl,
+      directCdnUrl: mediaUrl,
+      mimeType: isAudio ? "audio/mp4" : "video/mp4",
+      hasAudioCombined: true,
+    };
+  });
+
+  try {
+    return await Promise.any(promises);
+  } catch (err: any) {
+    console.warn("[YouTube Engine] BTCH API pool warning:", err?.message || err);
+    return null;
+  }
+}
+
+// ── Provider 3: Piped API Engine Pool ─────────────────────────
+const PIPED_INSTANCES: string[] = [
+  "https://pipedapi.kavin.rocks",
+  "https://pipedapi.adminforge.de",
+  "https://api.piped.private.coffee",
+  "https://api.piped.yt",
+  "https://pipedapi.ducks.party",
+];
+
+async function resolveYouTubeViaPiped(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
+  const targetH = parseQualityHeight(quality);
+
+  const promises = PIPED_INSTANCES.map(async (piped) => {
+    const res = await fetch(`${piped}/streams/${videoId}`, {
+      headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(3500),
+    });
+    if (!res.ok) throw new Error(`Piped ${piped} status ${res.status}`);
+    const data = await res.json();
+    if (!data) throw new Error("Empty data");
+
+    if (isAudio) {
+      const audioStreams = data.audioStreams || [];
+      if (audioStreams.length === 0) throw new Error("No audio streams");
+      audioStreams.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
+      const chosen = audioStreams.find((s: any) => s.mimeType?.includes("mp4") || s.mimeType?.includes("m4a")) || audioStreams[0];
+      if (!chosen?.url) throw new Error("No audio url");
+      return {
+        streamUrl: chosen.url,
+        mimeType: chosen.mimeType?.split(";")[0] || "audio/mp4",
+        hasAudioCombined: true,
+      };
+    } else {
+      const videoStreams = data.videoStreams || [];
+      if (videoStreams.length === 0) throw new Error("No video streams");
+
+      // Progressive format check (combined video + audio <= 720p)
+      if (targetH <= 720) {
+        const prog = videoStreams.filter((s: any) => !s.videoOnly && s.url);
+        const exactProg = prog.find((s: any) => {
+          const h = parseInt(String(s.quality || "").replace(/[^0-9]/g, "") || "0");
+          return h === targetH;
+        });
+        if (exactProg) {
+          return {
+            streamUrl: exactProg.url,
+            mimeType: exactProg.mimeType?.split(";")[0] || "video/mp4",
+            hasAudioCombined: true,
+          };
+        }
+      }
+
+      // Adaptive video stream
+      const vStreams = videoStreams.filter((s: any) => s.url);
+      vStreams.sort((a: any, b: any) => {
+        const ha = parseInt(String(a.quality || "").replace(/[^0-9]/g, "") || "0");
+        const hb = parseInt(String(b.quality || "").replace(/[^0-9]/g, "") || "0");
+        return hb - ha;
+      });
+
+      const chosenVideo = vStreams.find((s: any) => {
+        const h = parseInt(String(s.quality || "").replace(/[^0-9]/g, "") || "0");
+        return h === targetH;
+      }) || vStreams[0];
+
+      const audioStreams = (data.audioStreams || []).filter((s: any) => s.url);
+      audioStreams.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
+      const chosenAudio = audioStreams.find((s: any) => s.mimeType?.includes("mp4") || s.mimeType?.includes("m4a")) || audioStreams[0];
+
+      return {
+        streamUrl: chosenVideo.url,
+        audioStreamUrl: chosenAudio?.url,
+        mimeType: chosenVideo.mimeType?.split(";")[0] || "video/mp4",
+        hasAudioCombined: !chosenAudio || chosenVideo.videoOnly === false,
+      };
+    }
+  });
+
+  try {
+    return await Promise.any(promises);
+  } catch (_) {
+    return null;
+  }
+}
+
+// ── Provider 4: Invidious Mirrors with Range Probe Verification ──
+const INVIDIOUS_MIRRORS: string[] = [
+  "https://inv.nadeko.net",
+  "https://invidious.nerdvpn.de",
+  "https://invidious.tiekoetter.com",
+  "https://invidious.privacydev.net",
+  "https://vid.priv.au",
+  "https://yt.artemislena.eu",
+  "https://invidious.flokinet.to",
+];
 
 async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
   const targetH = parseQualityHeight(quality);
@@ -166,8 +363,23 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
         audioFormats.sort((a: any, b: any) => (parseInt(b.bitrate || "0") - parseInt(a.bitrate || "0")));
         const chosen = audioFormats.find((f: any) => String(f.itag) === "140" || (f.type && f.type.includes("mp4"))) || audioFormats[0];
         const aItag = String(chosen.itag || "140");
+        const candidateUrl = `${mirror}/latest_version?id=${videoId}&itag=${aItag}&local=true`;
+
+        // Probe verify candidate before returning
+        const probe = await fetch(candidateUrl, {
+          method: "GET",
+          headers: {
+            "User-Agent": "Mozilla/5.0",
+            "Range": "bytes=0-10",
+            "Referer": `${mirror}/`,
+          },
+          signal: AbortSignal.timeout(2500),
+          redirect: "follow",
+        });
+        if (!probe.ok && probe.status !== 206) throw new Error(`Mirror ${mirror} audio probe failed ${probe.status}`);
+
         return {
-          streamUrl: `${mirror}/latest_version?id=${videoId}&itag=${aItag}&local=true`,
+          streamUrl: candidateUrl,
           directCdnUrl: chosen.url,
           mimeType: chosen.type?.split(";")[0] || "audio/mp4",
           itag: aItag,
@@ -181,8 +393,17 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
           return resNum === targetH;
         });
         if (exactProg && (exactProg.url || exactProg.itag)) {
+          const candidateUrl = `${mirror}/latest_version?id=${videoId}&itag=${exactProg.itag}&local=true`;
+          const probe = await fetch(candidateUrl, {
+            method: "GET",
+            headers: { "User-Agent": "Mozilla/5.0", "Range": "bytes=0-10", "Referer": `${mirror}/` },
+            signal: AbortSignal.timeout(2500),
+            redirect: "follow",
+          });
+          if (!probe.ok && probe.status !== 206) throw new Error(`Mirror ${mirror} prog probe failed ${probe.status}`);
+
           return {
-            streamUrl: `${mirror}/latest_version?id=${videoId}&itag=${exactProg.itag}&local=true`,
+            streamUrl: candidateUrl,
             directCdnUrl: exactProg.url,
             mimeType: exactProg.type?.split(";")[0] || "video/mp4",
             itag: String(exactProg.itag),
@@ -206,8 +427,18 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
         const chosenVideo = exactMatch || candidates[0];
         const vItag = String(chosenVideo.itag || (targetH >= 1080 ? "137" : (targetH >= 720 ? "136" : "135")));
         const aItag = String(chosenAudio?.itag || "140");
+
+        const candidateUrl = `${mirror}/latest_version?id=${videoId}&itag=${vItag}&local=true`;
+        const probe = await fetch(candidateUrl, {
+          method: "GET",
+          headers: { "User-Agent": "Mozilla/5.0", "Range": "bytes=0-10", "Referer": `${mirror}/` },
+          signal: AbortSignal.timeout(2500),
+          redirect: "follow",
+        });
+        if (!probe.ok && probe.status !== 206) throw new Error(`Mirror ${mirror} video probe failed ${probe.status}`);
+
         return {
-          streamUrl: `${mirror}/latest_version?id=${videoId}&itag=${vItag}&local=true`,
+          streamUrl: candidateUrl,
           audioStreamUrl: `${mirror}/latest_version?id=${videoId}&itag=${aItag}&local=true`,
           directCdnUrl: chosenVideo.url,
           audioDirectCdnUrl: chosenAudio?.url,
@@ -223,7 +454,7 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
   try {
     const mirrorResult = await Promise.any(mirrorPromises);
     if (mirrorResult?.streamUrl) {
-      console.log(`[YouTube Engine] Invidious mirror race succeeded`);
+      console.log(`[YouTube Engine] Invidious verified mirror race succeeded`);
       return mirrorResult;
     }
   } catch (_) { }
@@ -237,8 +468,8 @@ async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, qua
   let video: any = null;
   const clientErrors: Record<string, string> = {};
 
-  // Try IOS and ANDROID with 3.5s timeout each
-  for (const client of ["IOS", "ANDROID"] as const) {
+  // Try TV, TV_EMBEDDED, IOS and ANDROID with 3.5s timeout each
+  for (const client of ["TV", "TV_EMBEDDED", "IOS", "ANDROID"] as const) {
     try {
       const candidatePromise = yt.getBasicInfo(videoId, { client });
       const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3500));
@@ -338,35 +569,64 @@ async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, qua
 }
 
 async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
-  // 1. Try Invidious fast mirror race (< 1s resolution)
+  const fullYtUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+  // 1. First Priority: BTCH Residential Proxy Engine (Fastest, pre-muxed combined MP4 with audio, CORS open)
+  try {
+    const btchRes = await resolveYouTubeViaBtch(videoId, isAudio);
+    if (btchRes?.streamUrl) {
+      console.log(`[YouTube Engine] Resolved via BTCH: hasAudioCombined=${btchRes.hasAudioCombined}`);
+      return btchRes;
+    }
+  } catch (err: any) {
+    console.warn(`[YouTube Engine] BTCH API error for ${videoId}:`, err?.message || err);
+  }
+
+  // 2. Second Priority: Verified Invidious mirrors (with live HTTP 200/206 probe verification)
   try {
     const invRes = await resolveYouTubeViaInvidious(videoId, isAudio, quality);
-    if (invRes?.streamUrl) return invRes;
+    if (invRes?.streamUrl) {
+      console.log(`[YouTube Engine] Resolved via Invidious (probe passed): hasAudioCombined=${invRes.hasAudioCombined}`);
+      return invRes;
+    }
   } catch (invErr: any) {
     console.warn(`[YouTube Engine] Invidious error for ${videoId}:`, invErr?.message || invErr);
   }
 
-  // 2. Try Innertube as second layer
+  // 3. Third Priority: Piped API pool (Verified streaming instances)
+  try {
+    const pipedRes = await resolveYouTubeViaPiped(videoId, isAudio, quality);
+    if (pipedRes?.streamUrl) {
+      console.log(`[YouTube Engine] Resolved via Piped: hasAudioCombined=${pipedRes.hasAudioCombined}`);
+      return pipedRes;
+    }
+  } catch (err: any) {
+    console.warn(`[YouTube Engine] Piped pool error for ${videoId}:`, err?.message || err);
+  }
+
+  // 4. Fourth Priority: Innertube TV & Mobile fallback
   try {
     const res = await resolveYouTubeViaInnertube(videoId, isAudio, quality);
-    if (res?.streamUrl) return res;
+    if (res?.streamUrl) {
+      console.log(`[YouTube Engine] Resolved via Innertube: hasAudioCombined=${res.hasAudioCombined}`);
+      return res;
+    }
   } catch (err: any) {
     console.warn(`[YouTube Engine] Innertube error for ${videoId}:`, err?.message || err);
   }
 
-  return null;
-}
+  // 5. Fifth Priority: Cobalt v10 engine
+  try {
+    const cobaltRes = await resolveYouTubeViaCobalt(fullYtUrl, isAudio, quality);
+    if (cobaltRes?.streamUrl) {
+      console.log(`[YouTube Engine] Resolved via Cobalt: hasAudioCombined=${cobaltRes.hasAudioCombined}`);
+      return cobaltRes;
+    }
+  } catch (err: any) {
+    console.warn(`[YouTube Engine] Cobalt pool error for ${videoId}:`, err?.message || err);
+  }
 
-function parseQualityHeight(q: string): number {
-  const s = (q || "").toLowerCase();
-  if (s.includes("8k") || s.includes("4320")) return 4320;
-  if (s.includes("4k") || s.includes("2160")) return 2160;
-  if (s.includes("1440") || s.includes("2k")) return 1440;
-  if (s.includes("1080")) return 1080;
-  if (s.includes("720")) return 720;
-  if (s.includes("480")) return 480;
-  if (s.includes("360")) return 360;
-  return parseInt(s.replace(/[^0-9]/g, "") || "1080");
+  return null;
 }
 
 // Handler for YouTube POST requests
@@ -506,32 +766,74 @@ async function handleYouTubeGet(req: Request, reqUrl: URL): Promise<Response> {
     });
   }
 
-  // Fast direct stream attempt
-  const upstreamHeaders: Record<string, string> = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    "Accept": "*/*",
-  };
-  if (streamUrl.includes("chocolatemoo53.com")) {
-    upstreamHeaders["Referer"] = "https://yt.chocolatemoo53.com/";
-  }
-  if (req.headers.has("range")) {
-    upstreamHeaders["Range"] = req.headers.get("range")!;
+  // Helper function to fetch media from upstream with redirect and cookie preservation
+  async function fetchUpstream(targetUrl: string): Promise<Response | null> {
+    let currentUrl = targetUrl;
+    let res: Response | null = null;
+    let cookieJar = "";
+
+    for (let hop = 0; hop < 6; hop++) {
+      const hopHeaders: Record<string, string> = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "*/*",
+      };
+      if (req.headers.has("range")) {
+        hopHeaders["Range"] = req.headers.get("range")!;
+      }
+      try {
+        const u = new URL(currentUrl);
+        hopHeaders["Referer"] = `${u.protocol}//${u.host}/`;
+      } catch (_) {}
+      if (cookieJar) {
+        hopHeaders["Cookie"] = cookieJar;
+      }
+
+      try {
+        res = await fetch(currentUrl, {
+          headers: hopHeaders,
+          redirect: "manual",
+        });
+
+        if (res.headers.has("set-cookie")) {
+          const sc = res.headers.get("set-cookie")!;
+          cookieJar += (cookieJar ? "; " : "") + sc.split(";")[0];
+        }
+
+        if (res.status >= 300 && res.status < 400 && res.headers.has("location")) {
+          const nextLoc = res.headers.get("location")!;
+          currentUrl = new URL(nextLoc, currentUrl).href;
+          continue;
+        }
+
+        break;
+      } catch (err: any) {
+        console.warn(`[YouTube Stream Proxy] Hop ${hop} Error:`, err?.message || err);
+        return null;
+      }
+    }
+    return res;
   }
 
   let mediaRes: Response | null = null;
-  try {
-    mediaRes = await fetch(streamUrl, {
-      headers: upstreamHeaders,
-      redirect: "follow",
-    });
-  } catch (err: any) {
-    console.warn("[YouTube Stream Fetch Error]:", err?.message || err);
+  if (streamUrl) {
+    mediaRes = await fetchUpstream(streamUrl);
   }
 
-  // If upstream fetch failed or returned non-200/206, do NOT 302 redirect browser to googlevideo.com!
-  // A 302 redirect to googlevideo.com causes CORS failure in browser fetch or opens a silent video in Chrome tab.
+  // Auto-healing fallback: If initial streamUrl was absent or failed upstream, resolve a fresh stream!
   if (!mediaRes || (!mediaRes.ok && mediaRes.status !== 206)) {
-    console.warn(`[YouTube Stream Proxy] Upstream fetch status ${mediaRes?.status || 'fail'} for ${streamUrl}`);
+    if (videoId) {
+      console.log(`[YouTube Stream Proxy] Upstream streamUrl failed or missing. Auto-healing fresh stream for ${videoId}...`);
+      const fresh = await resolveYouTubeStream(videoId, isAudio, quality);
+      if (fresh?.streamUrl) {
+        streamUrl = fresh.streamUrl;
+        mediaRes = await fetchUpstream(streamUrl);
+      }
+    }
+  }
+
+  // If upstream fetch failed or returned non-200/206, return clean error (NEVER 302 redirect browser to googlevideo.com!)
+  if (!mediaRes || (!mediaRes.ok && mediaRes.status !== 206)) {
+    console.warn(`[YouTube Stream Proxy] Stream resolution exhausted for ${videoId || videoUrl}`);
     return new Response(JSON.stringify({
       success: false,
       error: {
