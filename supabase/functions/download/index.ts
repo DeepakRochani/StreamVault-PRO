@@ -201,44 +201,62 @@ async function resolveYouTubeViaCobalt(url: string, isAudio: boolean, quality: s
   }
 }
 
-// ── Provider 1: BTCH High-Speed Residential Proxy Engine ───────
+// ── Provider 1: BTCH High-Speed Residential Proxy Engine Pool ───────
 async function resolveYouTubeViaBtch(videoId: string, isAudio: boolean): Promise<ResolvedStreamResult | null> {
   const targetUrl = `https://www.youtube.com/watch?v=${videoId}`;
-  const endpoints = [
-    `https://backend1.tioo.eu.org/api/downloader/youtube?url=${encodeURIComponent(targetUrl)}`,
-    `https://backend1.tioo.eu.org/youtube?url=${encodeURIComponent(targetUrl)}`,
+  const backends = [
+    "https://backend2.tioo.eu.org",
+    "https://backend3.tioo.eu.org",
+    "https://backend1.tioo.eu.org",
+    "https://backend4.tioo.eu.org",
   ];
 
-  const promises = endpoints.map(async (ep) => {
+  const endpoints = backends.map((b) => `${b}/api/downloader/youtube?url=${encodeURIComponent(targetUrl)}`);
+
+  const fetchAttempt = async (ep: string) => {
     const apiRes = await fetch(ep, {
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(9000),
       headers: {
         "Accept": "application/json",
         "Content-Type": "application/json",
-        "User-Agent": "btch/6.3.6",
-        "X-Client-Version": "6.3.6",
+        "User-Agent": "btch/6.4.0",
+        "X-Client-Version": "6.4.0",
       },
     });
     if (!apiRes.ok) throw new Error(`${ep} status ${apiRes.status}`);
     const data = await apiRes.json();
     if (!data || data.status === false) throw new Error(`${ep} status false`);
-    const mediaUrl = isAudio ? (data.mp3 || data.audio) : (data.mp4 || data.url);
+
+    // For audio: prefer dedicated mp3/audio stream; if missing, fallback to mp4 containing AAC stereo
+    const audioUrl = data.mp3 || data.audio;
+    const videoUrl = data.mp4 || data.url;
+
+    let mediaUrl = isAudio ? audioUrl : videoUrl;
+    if (isAudio && !mediaUrl && videoUrl) {
+      mediaUrl = videoUrl;
+    }
     if (!mediaUrl) throw new Error(`${ep} no media url`);
 
     console.log(`[YouTube Engine] BTCH API succeeded via ${ep}`);
     return {
       streamUrl: mediaUrl,
       directCdnUrl: mediaUrl,
-      mimeType: isAudio ? "audio/mp4" : "video/mp4",
+      mimeType: isAudio ? (audioUrl ? "audio/mp4" : "video/mp4") : "video/mp4",
       hasAudioCombined: true,
     };
-  });
+  };
 
   try {
-    return await Promise.any(promises);
+    return await Promise.any(endpoints.map((ep) => fetchAttempt(ep)));
   } catch (err: any) {
-    console.warn("[YouTube Engine] BTCH API pool warning:", err?.message || err);
-    return null;
+    console.warn("[YouTube Engine] BTCH round 1 warning, retrying pool:", err?.message || err);
+    try {
+      await new Promise((r) => setTimeout(r, 600));
+      return await Promise.any(endpoints.slice(0, 3).map((ep) => fetchAttempt(ep)));
+    } catch (retryErr: any) {
+      console.warn("[YouTube Engine] BTCH pool exhausted:", retryErr?.message || retryErr);
+      return null;
+    }
   }
 }
 
@@ -468,23 +486,26 @@ async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, qua
   let video: any = null;
   const clientErrors: Record<string, string> = {};
 
-  // Try TV, TV_EMBEDDED, IOS and ANDROID with 3.5s timeout each
-  for (const client of ["TV", "TV_EMBEDDED", "IOS", "ANDROID"] as const) {
+  // Parallel race for TV, TV_EMBEDDED, IOS and ANDROID (max 4.5s total)
+  const clientPromises = (["ANDROID", "TV", "IOS", "TV_EMBEDDED"] as const).map(async (client) => {
     try {
       const candidatePromise = yt.getBasicInfo(videoId, { client });
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3500));
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 4000));
       const candidate: any = await Promise.race([candidatePromise, timeoutPromise]);
       if (candidate?.streaming_data?.formats?.length || candidate?.streaming_data?.adaptive_formats?.length) {
-        video = candidate;
         console.log(`[YouTube Engine] Successfully resolved formats via client: ${client}`);
-        break;
-      } else {
-        clientErrors[client] = `status: ${candidate?.playability_status?.status}`;
+        return candidate;
       }
+      throw new Error(`Client ${client} status: ${candidate?.playability_status?.status}`);
     } catch (err: any) {
       clientErrors[client] = err?.message || String(err);
+      throw err;
     }
-  }
+  });
+
+  try {
+    video = await Promise.any(clientPromises);
+  } catch (_) {}
 
   const streamingData = video?.streaming_data;
   if (!streamingData) {
