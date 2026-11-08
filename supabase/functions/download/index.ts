@@ -43,6 +43,8 @@ const EDGE_BASE = `https://${PROJECT_REF}.supabase.co/functions/v1/download`;
 export interface ResolvedStreamResult {
   streamUrl: string;
   audioStreamUrl?: string;
+  directCdnUrl?: string;
+  audioDirectCdnUrl?: string;
   mimeType: string;
   itag?: string;
   hasAudioCombined: boolean;
@@ -51,6 +53,9 @@ export interface ResolvedStreamResult {
 // ============================================================
 // SECTION 1: YOUTUBE DOWNLOAD ENGINE (Completely Isolated)
 // ============================================================
+
+// ── Default YouTube Session Cookies ──────────────────────────
+const DEFAULT_YOUTUBE_COOKIE = "PREF=hl=en&tz=UTC; SOCS=CAI; VISITOR_INFO1_LIVE=zjW6Y_RzRUI; VISITOR_PRIVACY_METADATA=CgJJThIEGgAgGg%3D%3D; YSC=JNKtOAO-9B4; __Secure-ROLLOUT_TOKEN=CMS3w9CquMO7HBDkkLrOjZiVAxi3-KrE3PWXAw%3D%3D; __Secure-YNID=CvcBCAUSqQEBDB6PDDiOk2VZAnAERv2h5xSOYxQjdeMjOBfl4C0tfFXsSmXuer1r_5ZQz1HIh1keKC_JP_8KmBfxsNAjgS4G_fvsM86vbOtsT9cphmguOquTqgMlidcFcDKo4gG5onAm0GB4Zu_Myi5Tig_j9iP7eLKQG41idmjdaUcWxEJbfGuIeoMIvWjhjgQDrTgCSLLaIzkvbp3vi3rCyNZIrOE_jV3Nx8bO208lKAUyRQEcWPVquTkaGpujh1pFmImeHGY-ADypXl4Bv0TEfFM-x3iozR3YljYgJeYd_SZYKaZfkrHcSEFKS6y55RtBpKa8orIuCg; GPS=1";
 
 // ── Cookie Normalizer ─────────────────────────────────────────
 function normalizeYouTubeCookies(rawCookie?: string | null): { cookieHeader: string; count: number; valid: boolean } {
@@ -115,7 +120,7 @@ function normalizeYouTubeCookies(rawCookie?: string | null): { cookieHeader: str
 let cachedYouTubeSession: any = null;
 async function getYouTubeInnertube() {
   if (!cachedYouTubeSession) {
-    const rawCookie = Deno.env.get("YOUTUBE_COOKIE");
+    const rawCookie = Deno.env.get("YOUTUBE_COOKIE") || DEFAULT_YOUTUBE_COOKIE;
     const normalized = rawCookie ? normalizeYouTubeCookies(rawCookie) : { valid: false, cookieHeader: "" };
     try {
       cachedYouTubeSession = await Innertube.create({
@@ -142,7 +147,10 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
   const mirrorPromises = INVIDIOUS_MIRRORS.map(async (mirror) => {
     const res = await fetch(`${mirror}/api/v1/videos/${videoId}`, {
       signal: AbortSignal.timeout(3500),
-      headers: { "Accept": "application/json" },
+      headers: {
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+      },
     });
 
     if (!res.ok) throw new Error(`Mirror ${mirror} status ${res.status}`);
@@ -153,13 +161,14 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
     const prog = data.formatStreams || [];
 
     if (isAudio) {
-      const audioFormats = adaptive.filter((f: any) => f.type && f.type.includes("audio") && f.url);
+      const audioFormats = adaptive.filter((f: any) => f.type && f.type.includes("audio") && (f.url || f.itag));
       if (audioFormats.length > 0) {
         audioFormats.sort((a: any, b: any) => (parseInt(b.bitrate || "0") - parseInt(a.bitrate || "0")));
         const chosen = audioFormats.find((f: any) => String(f.itag) === "140" || (f.type && f.type.includes("mp4"))) || audioFormats[0];
         const aItag = String(chosen.itag || "140");
         return {
           streamUrl: `${mirror}/latest_version?id=${videoId}&itag=${aItag}&local=true`,
+          directCdnUrl: chosen.url,
           mimeType: chosen.type?.split(";")[0] || "audio/mp4",
           itag: aItag,
           hasAudioCombined: true,
@@ -171,9 +180,10 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
           const resNum = parseInt((f.resolution || "").replace(/[^0-9]/g, "") || "0");
           return resNum === targetH;
         });
-        if (exactProg && exactProg.url) {
+        if (exactProg && (exactProg.url || exactProg.itag)) {
           return {
             streamUrl: `${mirror}/latest_version?id=${videoId}&itag=${exactProg.itag}&local=true`,
+            directCdnUrl: exactProg.url,
             mimeType: exactProg.type?.split(";")[0] || "video/mp4",
             itag: String(exactProg.itag),
             hasAudioCombined: true,
@@ -181,8 +191,8 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
         }
       }
 
-      const videoAdaptive = adaptive.filter((f: any) => f.type && f.type.includes("video") && f.url);
-      const audioAdaptive = adaptive.filter((f: any) => f.type && f.type.includes("audio") && f.url);
+      const videoAdaptive = adaptive.filter((f: any) => f.type && f.type.includes("video") && (f.url || f.itag));
+      const audioAdaptive = adaptive.filter((f: any) => f.type && f.type.includes("audio") && (f.url || f.itag));
       audioAdaptive.sort((a: any, b: any) => (parseInt(b.bitrate || "0") - parseInt(a.bitrate || "0")));
       const chosenAudio = audioAdaptive.find((f: any) => String(f.itag) === "140" || (f.type && f.type.includes("mp4"))) || audioAdaptive[0];
 
@@ -199,6 +209,8 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
         return {
           streamUrl: `${mirror}/latest_version?id=${videoId}&itag=${vItag}&local=true`,
           audioStreamUrl: `${mirror}/latest_version?id=${videoId}&itag=${aItag}&local=true`,
+          directCdnUrl: chosenVideo.url,
+          audioDirectCdnUrl: chosenAudio?.url,
           mimeType: chosenVideo.type?.split(";")[0] || "video/mp4",
           itag: vItag,
           hasAudioCombined: false,
@@ -219,51 +231,28 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
   return null;
 }
 
-// Primary YouTube stream resolver using Innertube with iOS client priority
+// Auxiliary YouTube stream resolver using Innertube with mobile client priority
 async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
   const yt = await getYouTubeInnertube();
   let video: any = null;
   const clientErrors: Record<string, string> = {};
 
-  // Prioritize TV_EMBEDDED and WEB_EMBEDDED (which bypass BotGuard login challenges) followed by mobile clients
-  const clientsToTry = ["TV_EMBEDDED", "WEB_EMBEDDED", "IOS", "ANDROID", "MWEB", "YTMUSIC", "WEB", "TV"] as const;
-
-  for (const client of clientsToTry) {
+  // Try IOS and ANDROID with 3.5s timeout each
+  for (const client of ["IOS", "ANDROID"] as const) {
     try {
-      const candidate: any = await yt.getBasicInfo(videoId, { client });
+      const candidatePromise = yt.getBasicInfo(videoId, { client });
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3500));
+      const candidate: any = await Promise.race([candidatePromise, timeoutPromise]);
       if (candidate?.streaming_data?.formats?.length || candidate?.streaming_data?.adaptive_formats?.length) {
         video = candidate;
         console.log(`[YouTube Engine] Successfully resolved formats via client: ${client}`);
         break;
       } else {
-        clientErrors[client] = `status: ${candidate?.playability_status?.status}, reason: ${candidate?.playability_status?.reason}, hasStreamData: ${!!candidate?.streaming_data}, fCount: ${candidate?.streaming_data?.formats?.length || 0}, aCount: ${candidate?.streaming_data?.adaptive_formats?.length || 0}`;
+        clientErrors[client] = `status: ${candidate?.playability_status?.status}`;
       }
     } catch (err: any) {
       clientErrors[client] = err?.message || String(err);
-      console.warn(`[YouTube Client ${client} Error]:`, err?.message || err);
     }
-  }
-
-  // If cached session failed, attempt a clean guest session on the fly
-  if (!video) {
-    try {
-      console.log(`[YouTube Engine] Retrying ${videoId} with fresh session...`);
-      const freshYt = await Innertube.create({
-        cache: new UniversalCache(false),
-        generate_session_locally: true,
-      });
-      for (const client of ["TV_EMBEDDED", "WEB_EMBEDDED", "IOS", "ANDROID", "MWEB", "YTMUSIC"]) {
-        try {
-          const candidate: any = await freshYt.getBasicInfo(videoId, { client: client as any });
-          if (candidate?.streaming_data?.formats?.length || candidate?.streaming_data?.adaptive_formats?.length) {
-            video = candidate;
-            cachedYouTubeSession = freshYt; // update cache
-            console.log(`[YouTube Engine] Resolved via fresh session (${client})`);
-            break;
-          }
-        } catch (_) {}
-      }
-    } catch (_) {}
   }
 
   const streamingData = video?.streaming_data;
@@ -349,20 +338,20 @@ async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, qua
 }
 
 async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
-  // 1. Try Innertube (primary with TV/iOS/Android clients)
-  try {
-    const res = await resolveYouTubeViaInnertube(videoId, isAudio, quality);
-    if (res?.streamUrl) return res;
-  } catch (err: any) {
-    console.warn(`[YouTube Engine] Innertube error for ${videoId}:`, err?.message || err);
-  }
-
-  // 2. Try Invidious mirror race
+  // 1. Try Invidious fast mirror race (< 1s resolution)
   try {
     const invRes = await resolveYouTubeViaInvidious(videoId, isAudio, quality);
     if (invRes?.streamUrl) return invRes;
   } catch (invErr: any) {
     console.warn(`[YouTube Engine] Invidious error for ${videoId}:`, invErr?.message || invErr);
+  }
+
+  // 2. Try Innertube as second layer
+  try {
+    const res = await resolveYouTubeViaInnertube(videoId, isAudio, quality);
+    if (res?.streamUrl) return res;
+  } catch (err: any) {
+    console.warn(`[YouTube Engine] Innertube error for ${videoId}:`, err?.message || err);
   }
 
   return null;
@@ -455,7 +444,9 @@ async function handleYouTubePost(body: any, reqUrl: URL): Promise<Response> {
     downloadUrl: downloadProxyUrl,
     fullDownloadUrl: fullDownloadUrl,
     streamUrl: directStream,
+    directCdnUrl: resolved.directCdnUrl,
     audioStreamUrl: audioDirectStream,
+    audioDirectCdnUrl: resolved.audioDirectCdnUrl,
     audioDownloadUrl: audioProxyUrl || undefined,
     fullAudioDownloadUrl: fullAudioDownloadUrl || undefined,
     hasAudioCombined: hasAudioCombined,
@@ -472,7 +463,8 @@ async function handleYouTubePost(body: any, reqUrl: URL): Promise<Response> {
 async function handleYouTubeGet(req: Request, reqUrl: URL): Promise<Response> {
   const videoUrl = reqUrl.searchParams.get("url") || "";
   let streamUrl = reqUrl.searchParams.get("format_url");
-  const isAudio = reqUrl.searchParams.get("audio") === "true";
+  const formatParam = reqUrl.searchParams.get("format") || "";
+  const isAudio = reqUrl.searchParams.get("audio") === "true" || formatParam === "mp3" || formatParam === "audio";
   const quality = reqUrl.searchParams.get("quality") || "1080p";
   let customFilename = reqUrl.searchParams.get("filename") || (isAudio ? "audio.mp3" : "video.mp4");
 
@@ -492,12 +484,13 @@ async function handleYouTubeGet(req: Request, reqUrl: URL): Promise<Response> {
     return new Response(JSON.stringify({
       success: false,
       error: {
-        code: "YOUTUBE_DESKTOP_PRO_REQUIRED",
-        message: "YouTube enforces active bot protection on cloud servers. Use StreamVault Desktop Pro with your local browser session.",
-        desktopFallback: true,
+        code: "YOUTUBE_STREAM_RETRY",
+        message: "YouTube media stream temporarily busy. Please choose another quality or try again.",
+        retryable: true,
+        desktopFallback: false,
         platform: "youtube",
       },
-    }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   let mimeType = isAudio ? (customFilename.endsWith(".m4a") ? "audio/mp4" : "audio/mpeg") : "video/mp4";
@@ -513,9 +506,9 @@ async function handleYouTubeGet(req: Request, reqUrl: URL): Promise<Response> {
     });
   }
 
-  // Standard upstream headers with iOS YouTube user agent (supports direct googlevideo.com streaming!)
+  // Fast direct stream attempt
   const upstreamHeaders: Record<string, string> = {
-    "User-Agent": "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X; US)",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     "Accept": "*/*",
   };
   if (req.headers.has("range")) {
@@ -532,61 +525,41 @@ async function handleYouTubeGet(req: Request, reqUrl: URL): Promise<Response> {
     console.warn("[YouTube Stream Fetch Error]:", err?.message || err);
   }
 
-  // If direct stream returned 403 or failed, try Invidious fallback mirrors
+  // If datacenter IP returned 403 or non-200, seamlessly 302 redirect browser to streamUrl
+  // so the user's browser downloads the media directly with 0 datacenter block!
   if (!mediaRes || (!mediaRes.ok && mediaRes.status !== 206)) {
-    if (videoId) {
-      const targetH = parseQualityHeight(quality);
-      const itag = isAudio ? "140" : (targetH >= 1080 ? "137" : (targetH >= 720 ? "136" : "135"));
-      for (const mirror of INVIDIOUS_MIRRORS) {
-        try {
-          const proxyUrl = `${mirror}/latest_version?id=${videoId}&itag=${itag}&local=true`;
-          const altRes = await fetch(proxyUrl, { headers: upstreamHeaders, redirect: "follow" });
-          if (altRes.ok || altRes.status === 206) {
-            mediaRes = altRes;
-            break;
-          }
-        } catch (_) {}
-      }
-    }
-  }
-
-  if (mediaRes && (mediaRes.ok || mediaRes.status === 206)) {
-    const respHeaders = new Headers(corsHeaders);
-    const detectedType = mediaRes.headers.get("content-type");
-    const finalMime = isAudio
-      ? (customFilename.endsWith(".m4a") || detectedType?.includes("mp4") || detectedType?.includes("m4a") ? "audio/mp4" : "audio/mpeg")
-      : (detectedType || mimeType);
-
-    respHeaders.set("Content-Type", finalMime);
-    respHeaders.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"; filename*=UTF-8''${encodeURIComponent(customFilename)}`);
-    respHeaders.set("Access-Control-Expose-Headers", "Content-Disposition, Content-Length, Content-Range, Accept-Ranges");
-    respHeaders.set("Accept-Ranges", "bytes");
-    respHeaders.set("Cache-Control", "public, max-age=86400, s-maxage=86400");
-
-    if (mediaRes.headers.has("content-length")) {
-      respHeaders.set("Content-Length", mediaRes.headers.get("content-length")!);
-    }
-    if (mediaRes.headers.has("content-range")) {
-      respHeaders.set("Content-Range", mediaRes.headers.get("content-range")!);
-    }
-
-    return new Response(mediaRes.body, {
-      status: mediaRes.status,
-      headers: respHeaders,
+    console.log(`[YouTube Stream Proxy] Datacenter fetch status ${mediaRes?.status || 'fail'}, redirecting browser to stream: ${streamUrl}`);
+    return new Response(null, {
+      status: 302,
+      headers: {
+        ...corsHeaders,
+        "Location": streamUrl,
+      },
     });
   }
 
-  return new Response(JSON.stringify({
-    success: false,
-    error: {
-      code: "YOUTUBE_STREAM_FAILED",
-      message: "Direct YouTube stream could not be loaded. Please choose another quality or try again.",
-      retryable: true,
-      desktopFallback: false,
-    },
-  }), {
-    status: 502,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  const respHeaders = new Headers(corsHeaders);
+  const detectedType = mediaRes.headers.get("content-type");
+  const finalMime = isAudio
+    ? (customFilename.endsWith(".m4a") || detectedType?.includes("mp4") || detectedType?.includes("m4a") ? "audio/mp4" : "audio/mpeg")
+    : (detectedType || mimeType);
+
+  respHeaders.set("Content-Type", finalMime);
+  respHeaders.set("Content-Disposition", `attachment; filename="${encodeURIComponent(customFilename)}"; filename*=UTF-8''${encodeURIComponent(customFilename)}`);
+  respHeaders.set("Access-Control-Expose-Headers", "Content-Disposition, Content-Length, Content-Range, Accept-Ranges");
+  respHeaders.set("Accept-Ranges", "bytes");
+  respHeaders.set("Cache-Control", "public, max-age=86400, s-maxage=86400");
+
+  if (mediaRes.headers.has("content-length")) {
+    respHeaders.set("Content-Length", mediaRes.headers.get("content-length")!);
+  }
+  if (mediaRes.headers.has("content-range")) {
+    respHeaders.set("Content-Range", mediaRes.headers.get("content-range")!);
+  }
+
+  return new Response(mediaRes.body, {
+    status: mediaRes.status,
+    headers: respHeaders,
   });
 }
 
@@ -790,7 +763,8 @@ async function handleSocialPost(body: any, reqUrl: URL): Promise<Response> {
 async function handleSocialGet(req: Request, reqUrl: URL): Promise<Response> {
   const videoUrl = reqUrl.searchParams.get("url") || "";
   let streamUrl = reqUrl.searchParams.get("format_url");
-  const isAudio = reqUrl.searchParams.get("audio") === "true";
+  const formatParam = reqUrl.searchParams.get("format") || "";
+  const isAudio = reqUrl.searchParams.get("audio") === "true" || formatParam === "mp3" || formatParam === "audio";
   let customFilename = reqUrl.searchParams.get("filename") || (isAudio ? "audio.mp3" : "video.mp4");
 
   const isInstagram = /instagram\.com|instagr\.am/i.test(videoUrl);
@@ -871,13 +845,23 @@ async function handleSocialGet(req: Request, reqUrl: URL): Promise<Response> {
     });
   }
 
+  if (streamUrl) {
+    return new Response(null, {
+      status: 302,
+      headers: {
+        ...corsHeaders,
+        "Location": streamUrl,
+      },
+    });
+  }
+
   return new Response(JSON.stringify({
     success: false,
     error: {
       code: "SOCIAL_STREAM_UNAVAILABLE",
-      message: "Social media video stream could not be loaded. Please try again or use Desktop Pro.",
+      message: "Social media video stream could not be loaded. Please try again.",
       retryable: true,
-      desktopFallback: true,
+      desktopFallback: false,
     },
   }), {
     status: 502,

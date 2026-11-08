@@ -1828,93 +1828,49 @@ if (window.supabaseClient) {
         }
 
         function renderCloudFallbackUI(err) {
-            const isSocial = err.code === 'SOCIAL_DESKTOP_PRO_REQUIRED' || 
-                             err.platform === 'instagram' || err.platform === 'facebook' ||
-                             (err.message && (err.message.includes('Instagram') || err.message.includes('Facebook') || err.message.includes('Meta session')));
-            if (isSocial) {
-                const platformName = err.platform === 'instagram' ? 'Instagram Reel' : (err.platform === 'facebook' ? 'Facebook Video' : 'Social Media');
-                return `
-                    <div class="bg-surface-container-high/90 border border-amber-500/30 rounded-2xl p-5 text-left max-w-lg mx-auto my-2 shadow-xl backdrop-blur-md">
-                        <div class="flex items-center gap-2 text-amber-300 font-bold text-base mb-2">
-                            <span class="material-symbols-outlined text-amber-400 text-[22px]">desktop_windows</span> Desktop Pro Authentication Required
-                        </div>
-                        <div class="text-xs text-on-surface-variant leading-relaxed mb-4">
-                            <p class="mb-2 text-on-surface font-semibold">${platformName} blocks unauthenticated cloud scraping.</p>
-                            <p class="mb-2">${err.message || 'Meta enforces session login verification on cloud servers.'}</p>
-                            <p class="text-on-surface-variant/80">StreamVault Desktop Pro uses your local browser session to download in 1080p Full HD instantly.</p>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-white/10">
-                            <a href="streamvault-home-tall.html" class="px-3.5 py-1.5 bg-gradient-to-r from-primary to-orange-500 text-on-primary text-xs font-bold rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5 shadow-md">
-                                <span class="material-symbols-outlined text-[16px]">desktop_windows</span> Launch Desktop Pro
-                            </a>
-                            <button type="button" onclick="showDesktopProModal('${platformName}')" class="px-3.5 py-1.5 bg-surface-container border border-white/10 text-xs text-on-surface rounded-xl hover:bg-white/10 transition-all">Learn More</button>
-                            <button type="button" onclick="resetToUrlInput()" class="px-3.5 py-1.5 bg-surface border border-white/10 text-xs text-on-surface rounded-xl hover:bg-white/10 transition-all">Try Another Link</button>
-                        </div>
-                    </div>
-                `;
-            }
+            const isDesktopQuality = err.desktopFallback && (
+                err.code === 'DESKTOP_PRO_REQUIRED' ||
+                (err.quality && (err.quality.includes('4k') || err.quality.includes('2160') || err.quality.includes('1440') || err.quality.includes('8k')))
+            );
 
-            const isBotChallenge = err.code === 'YOUTUBE_BOT_CHALLENGE' || 
-                                   err.code === 'YOUTUBE_DESKTOP_PRO_REQUIRED' ||
-                                   err.platform === 'youtube' ||
-                                   (err.message && (err.message.includes('bot') || err.message.includes('BotGuard') || err.message.includes('verification') || err.message.includes('403')));
-            const isDash = err.code === 'CLOUD_DOWNLOAD_UNSUPPORTED' || 
-                           (err.message && (err.message.includes('separate video') || err.message.includes('audio stream') || err.message.includes('DASH')));
-            
-            if (isBotChallenge || err.platform === 'youtube') {
+            if (isDesktopQuality) {
+                const targetQual = err.quality || '4K Ultra HD';
                 return `
                     <div class="bg-surface-container-high/90 border border-amber-500/30 rounded-2xl p-5 text-left max-w-lg mx-auto my-2 shadow-xl backdrop-blur-md">
                         <div class="flex items-center gap-2 text-amber-300 font-bold text-base mb-2">
-                            <span class="material-symbols-outlined text-amber-400 text-[22px]">desktop_windows</span> Desktop Pro Authentication Required
+                            <span class="material-symbols-outlined text-amber-400 text-[22px]">desktop_windows</span> Desktop Pro Required for ${targetQual}
                         </div>
                         <div class="text-xs text-on-surface-variant leading-relaxed mb-4">
-                            <p class="mb-2 text-on-surface font-medium">YouTube enforces BotGuard verification on cloud servers.</p>
-                            <p class="mb-2">This high-demand or music video requires browser-level verification. Use StreamVault Desktop Pro with your local session to download in 1080p Full HD instantly.</p>
-                            <p class="text-on-surface-variant/80">StreamVault Desktop Pro runs directly on your PC/Mac with zero cloud IP restrictions.</p>
+                            <p class="mb-2 text-on-surface font-semibold">Resolutions above 1080p (1440p, 4K, 8K) require StreamVault Desktop App.</p>
+                            <p class="text-on-surface-variant/80">Online web downloads support up to 1080p Full HD with pristine sound.</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-white/10">
-                            <button type="button" onclick="showDesktopProModal('YouTube')" class="px-3.5 py-1.5 bg-gradient-to-r from-primary to-orange-500 text-on-primary text-xs font-bold rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5 shadow-md">
-                                <span class="material-symbols-outlined text-[16px]">desktop_windows</span> Launch Desktop Pro
+                            <button type="button" onclick="showDesktopProModal('${targetQual}')" class="px-3.5 py-1.5 bg-gradient-to-r from-primary to-orange-500 text-on-primary text-xs font-bold rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5 shadow-md">
+                                <span class="material-symbols-outlined text-[16px]">desktop_windows</span> Get Desktop Pro
                             </button>
-                            <button type="button" onclick="showDesktopProModal('YouTube')" class="px-3.5 py-1.5 bg-surface-container border border-white/10 text-xs text-on-surface rounded-xl hover:bg-white/10 transition-all">Learn More</button>
+                            <button type="button" onclick="selectQualityAndRetry('1080p')" class="px-3.5 py-1.5 bg-surface-container border border-white/10 text-xs text-on-surface rounded-xl hover:bg-white/10 transition-all">Download in 1080p Online</button>
                             <button type="button" onclick="resetToUrlInput()" class="px-3.5 py-1.5 bg-surface border border-white/10 text-xs text-on-surface rounded-xl hover:bg-white/10 transition-all">Try Another Video</button>
                         </div>
                     </div>
                 `;
             }
-            
-            if (isDash) {
-                return `
-                    <div class="bg-surface-container-high/90 border border-amber-500/30 rounded-2xl p-5 text-left max-w-lg mx-auto my-2 shadow-xl backdrop-blur-md">
-                        <div class="flex items-center gap-2 text-amber-300 font-bold text-base mb-2">
-                            <span class="material-symbols-outlined text-amber-400 text-[22px]">lock</span> Desktop Pro Required
-                        </div>
-                        <div class="text-xs text-on-surface-variant leading-relaxed mb-4">
-                            This quality requires local video + audio processing with Desktop Pro.
-                        </div>
-                        <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-white/10">
-                            <a href="streamvault-upgrade.html" class="px-3.5 py-1.5 bg-gradient-to-r from-primary to-orange-500 text-on-primary text-xs font-bold rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5 shadow-md">
-                                <span class="material-symbols-outlined text-[16px]">workspace_premium</span> Upgrade to Desktop Pro
-                            </a>
-                            <button type="button" onclick="selectQualityAndRetry('1080p')" class="px-3.5 py-1.5 bg-surface border border-white/10 text-xs text-on-surface rounded-xl hover:bg-white/10 transition-all">Select 1080p</button>
-                        </div>
-                    </div>
-                `;
-            }
 
+            // Clean error card for all standard downloads (no Desktop Pro lock!)
+            const platformLabel = err.platform === 'instagram' ? 'Instagram' : (err.platform === 'facebook' ? 'Facebook' : 'YouTube');
+            const retryFn = (err.platform === 'instagram' || err.platform === 'facebook') ? 'downloadSocialMedia' : 'downloadYouTubeMedia';
             return `
-                <div class="bg-surface-container-high/90 border border-amber-500/30 rounded-2xl p-5 text-left max-w-lg mx-auto my-2 shadow-xl backdrop-blur-md">
-                    <div class="flex items-center gap-2 text-amber-300 font-bold text-base mb-2">
-                        <span class="material-symbols-outlined text-amber-400 text-[22px]">desktop_windows</span> Desktop Pro Recommended
+                <div class="bg-surface-container-high/90 border border-red-500/30 rounded-2xl p-5 text-left max-w-lg mx-auto my-2 shadow-xl backdrop-blur-md">
+                    <div class="flex items-center gap-2 text-red-300 font-bold text-base mb-2">
+                        <span class="material-symbols-outlined text-red-400 text-[22px]">error</span> ${platformLabel} Download Interrupted
                     </div>
                     <div class="text-xs text-on-surface-variant leading-relaxed mb-4">
-                        ${err.message || 'This format requires local stream processing.'}
+                        <p class="mb-1 text-on-surface font-medium">${err.message || 'Media stream temporarily unavailable. Please retry.'}</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-white/10">
-                        <a href="streamvault-upgrade.html" class="px-3.5 py-1.5 bg-primary text-on-primary text-xs font-bold rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5 shadow-md">
-                            <span class="material-symbols-outlined text-[16px]">workspace_premium</span> Get Desktop Pro
-                        </a>
-                        <button type="button" onclick="resetToUrlInput()" class="px-3.5 py-1.5 bg-surface border border-white/10 text-xs text-on-surface rounded-xl hover:bg-white/10 transition-all">Try Another Video</button>
+                        <button type="button" onclick="${retryFn}(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="px-3.5 py-1.5 bg-primary text-on-primary text-xs font-bold rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5 shadow-md">
+                            <span class="material-symbols-outlined text-[16px]">refresh</span> Retry Download
+                        </button>
+                        <button type="button" onclick="resetToUrlInput()" class="px-3.5 py-1.5 bg-surface border border-white/10 text-xs text-on-surface rounded-xl hover:bg-white/10 transition-all">Try Another Link</button>
                     </div>
                 </div>
             `;
@@ -1944,7 +1900,7 @@ if (window.supabaseClient) {
                     let probeRes = await fetch(primaryUrl, {
                         headers: { ...getHeadersForUrl(primaryUrl), 'Range': 'bytes=0-0' }
                     });
-                    if (!probeRes.ok && fallbackUrl && fallbackUrl !== primaryUrl && !fallbackUrl.includes('googlevideo.com')) {
+                    if (!probeRes.ok && fallbackUrl && fallbackUrl !== primaryUrl) {
                         targetUrl = fallbackUrl;
                         probeRes = await fetch(fallbackUrl, {
                             headers: { ...getHeadersForUrl(fallbackUrl), 'Range': 'bytes=0-0' }
@@ -2054,7 +2010,7 @@ if (window.supabaseClient) {
                 res = await fetch(targetUrl, { headers: getHeadersForUrl(targetUrl) });
             } catch (_) {}
             if (!res || !res.ok) {
-                if (fallbackUrl && fallbackUrl !== targetUrl && !fallbackUrl.includes('googlevideo.com')) {
+                if (fallbackUrl && fallbackUrl !== targetUrl) {
                     try { res = await fetch(fallbackUrl, { headers: getHeadersForUrl(fallbackUrl) }); } catch (_) {}
                 }
             }
@@ -2294,14 +2250,14 @@ if (window.supabaseClient) {
                     progressBar.style.width = '15%';
                     pctText.textContent = '15%';
 
-                    const videoUrl = dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl;
-                    const audioUrl = dlData.fullAudioDownloadUrl || dlData.audioDownloadUrl || dlData.audioStreamUrl;
+                    const videoUrl = dlData.streamUrl || dlData.directCdnUrl || dlData.fullDownloadUrl;
+                    const audioUrl = dlData.audioStreamUrl || dlData.audioDirectCdnUrl || dlData.fullAudioDownloadUrl;
 
                     try {
                         let lastProgressTime = performance.now();
                         let lastProgressBytes = 0;
                         const [videoBlob, audioBlob] = await Promise.all([
-                            fetchBlobWithProgress(videoUrl, dlData.streamUrl, (pct, received, total) => {
+                            fetchBlobWithProgress(videoUrl, dlData.directCdnUrl || dlData.fullDownloadUrl, (pct, received, total) => {
                                 const p = Math.round(15 + pct * 75);
                                 progressBar.style.width = p + '%';
                                 pctText.textContent = p + '%';
@@ -2320,7 +2276,7 @@ if (window.supabaseClient) {
                                     }
                                 }
                             }),
-                            fetchBlobWithProgress(audioUrl, dlData.audioStreamUrl, null)
+                            fetchBlobWithProgress(audioUrl, dlData.audioDirectCdnUrl || dlData.fullAudioDownloadUrl, null)
                         ]);
 
                         if (!videoBlob) throw new Error("YouTube video stream returned empty data");
@@ -2337,7 +2293,7 @@ if (window.supabaseClient) {
                     } catch (errMerge) {
                         console.error('[YouTube Audio Mux Error]:', errMerge);
                         // Fallback 1: Try direct browser download if URL exists
-                        const directFallbackUrl = dlData.fullDownloadUrl || dlData.downloadUrl;
+                        const directFallbackUrl = dlData.directCdnUrl || dlData.streamUrl || dlData.fullDownloadUrl;
                         if (directFallbackUrl) {
                             try {
                                 const a = document.createElement('a');
@@ -2373,11 +2329,11 @@ if (window.supabaseClient) {
                     progressBar.style.width = '20%';
                     pctText.textContent = '20%';
 
-                    const singleUrl = dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl;
+                    const singleUrl = dlData.streamUrl || dlData.directCdnUrl || dlData.fullDownloadUrl;
                     try {
                         let lastProgressTime = performance.now();
                         let lastProgressBytes = 0;
-                        finalBlob = await fetchBlobWithProgress(singleUrl, dlData.streamUrl, (pct, received, total) => {
+                        finalBlob = await fetchBlobWithProgress(singleUrl, dlData.directCdnUrl || dlData.fullDownloadUrl, (pct, received, total) => {
                             const p = Math.round(20 + pct * 75);
                             progressBar.style.width = p + '%';
                             pctText.textContent = p + '%';
@@ -2399,7 +2355,7 @@ if (window.supabaseClient) {
                         if (!finalBlob) throw new Error("YouTube stream returned empty data");
                     } catch (singleErr) {
                         console.error('[YouTube Stream Error]:', singleErr);
-                        const directFallbackUrl = dlData.fullDownloadUrl || dlData.downloadUrl;
+                        const directFallbackUrl = dlData.directCdnUrl || dlData.streamUrl || dlData.fullDownloadUrl;
                         if (directFallbackUrl) {
                             try {
                                 const a = document.createElement('a');
@@ -2470,7 +2426,9 @@ if (window.supabaseClient) {
                 isInlineDownloadRunning = false;
                 console.error('[YouTube Engine Error]:', err);
 
-                if (err.desktopFallback) {
+                // Entitlement Gate: ONLY resolutions strictly above 1080p (1440p, 4K, 8K) can trigger Desktop Pro!
+                const isAbove1080 = !isAudio && targetH > 1080;
+                if (isAbove1080 && err.desktopFallback) {
                     if (dlHeadingIcon) {
                         dlHeadingIcon.className = 'material-symbols-outlined text-amber-400';
                         dlHeadingIcon.textContent = 'desktop_windows';
@@ -2485,7 +2443,7 @@ if (window.supabaseClient) {
                         dlHeadingIcon.className = 'material-symbols-outlined text-red-400';
                         dlHeadingIcon.textContent = 'error';
                     }
-                    if (dlHeadingTitle) dlHeadingTitle.textContent = 'YouTube Download Failed';
+                    if (dlHeadingTitle) dlHeadingTitle.textContent = 'YouTube Download';
                     if (dlProgressCard) dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-red-500/30 bg-red-500/5 flex flex-col gap-4';
                     if (dlProgressStats) dlProgressStats.style.display = 'none';
                     progressBar.className = 'h-full rounded-full transition-all duration-300 bg-red-500';
@@ -2493,7 +2451,7 @@ if (window.supabaseClient) {
                     speedText.textContent = '';
                     sizeInfo.textContent = '';
                     pctText.textContent = '';
-                    statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">error</span> YouTube Download Failed<br><pre class=\"text-xs mt-2 text-left bg-black/20 p-2 rounded whitespace-pre-wrap\">' + (err.message || err) + '</pre>';
+                    statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">error</span> ' + (err.message || 'YouTube media stream temporarily busy') + '<br><button type="button" onclick="downloadYouTubeMedia(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white mt-3 bg-primary hover:brightness-110 px-4 py-1.5 rounded-xl text-xs shadow-md transition-all"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry Download</button> <button type="button" onclick="resetToUrlInput()" class="inline-flex items-center gap-1 font-medium text-on-surface hover:text-white mt-3 ml-2 bg-surface-container border border-white/10 px-4 py-1.5 rounded-xl text-xs transition-all">Try Another Video</button>';
                     statusText.classList.replace('text-primary', 'text-red-400');
                 }
                 downloadAnotherBtn.classList.remove('hidden');
@@ -2652,8 +2610,8 @@ if (window.supabaseClient) {
                 progressBar.style.width = '25%';
                 pctText.textContent = '25%';
 
-                const singleUrl = dlData.fullDownloadUrl || dlData.downloadUrl || dlData.streamUrl;
-                const fallbackStreamUrl = dlData.streamUrl;
+                const singleUrl = dlData.streamUrl || dlData.fullDownloadUrl || dlData.downloadUrl;
+                const fallbackStreamUrl = dlData.directCdnUrl || dlData.streamUrl || dlData.fullDownloadUrl;
 
                 let finalBlob = null;
                 try {
@@ -2740,32 +2698,20 @@ if (window.supabaseClient) {
                 isInlineDownloadRunning = false;
                 console.error("[Social Engine Error - " + platformName + "]:", err);
 
-                if (err.desktopFallback) {
-                    if (dlHeadingIcon) {
-                        dlHeadingIcon.className = 'material-symbols-outlined text-amber-400';
-                        dlHeadingIcon.textContent = 'desktop_windows';
-                    }
-                    if (dlHeadingTitle) dlHeadingTitle.textContent = 'Desktop Authentication Required';
-                    if (dlProgressCard) dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-amber-500/30 bg-amber-500/5 flex flex-col gap-4';
-                    if (dlProgressStats) dlProgressStats.style.display = 'none';
-                    if (dlProgressTrack) dlProgressTrack.style.display = 'none';
-                    statusText.innerHTML = renderCloudFallbackUI(err);
-                } else {
-                    if (dlHeadingIcon) {
-                        dlHeadingIcon.className = 'material-symbols-outlined text-red-400';
-                        dlHeadingIcon.textContent = 'error';
-                    }
-                    if (dlHeadingTitle) dlHeadingTitle.textContent = platformName + ' Download Failed';
-                    if (dlProgressCard) dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-red-500/30 bg-red-500/5 flex flex-col gap-4';
-                    if (dlProgressStats) dlProgressStats.style.display = 'none';
-                    progressBar.className = 'h-full rounded-full transition-all duration-300 bg-red-500';
-                    progressBar.style.width = '100%';
-                    speedText.textContent = '';
-                    sizeInfo.textContent = '';
-                    pctText.textContent = '';
-                    statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">error</span> ' + platformName + ' Download Failed<br><pre class=\"text-xs mt-2 text-left bg-black/20 p-2 rounded whitespace-pre-wrap\">' + (err.message || err) + '</pre>';
-                    statusText.classList.replace('text-primary', 'text-red-400');
+                if (dlHeadingIcon) {
+                    dlHeadingIcon.className = 'material-symbols-outlined text-red-400';
+                    dlHeadingIcon.textContent = 'error';
                 }
+                if (dlHeadingTitle) dlHeadingTitle.textContent = platformName + ' Download';
+                if (dlProgressCard) dlProgressCard.className = 'glass-panel rounded-xl p-4 border-2 border-red-500/30 bg-red-500/5 flex flex-col gap-4';
+                if (dlProgressStats) dlProgressStats.style.display = 'none';
+                progressBar.className = 'h-full rounded-full transition-all duration-300 bg-red-500';
+                progressBar.style.width = '100%';
+                speedText.textContent = '';
+                sizeInfo.textContent = '';
+                pctText.textContent = '';
+                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">error</span> ' + (err.message || (platformName + ' stream temporarily busy')) + '<br><button type="button" onclick="downloadSocialMedia(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white mt-3 bg-primary hover:brightness-110 px-4 py-1.5 rounded-xl text-xs shadow-md transition-all"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry Download</button> <button type="button" onclick="resetToUrlInput()" class="inline-flex items-center gap-1 font-medium text-on-surface hover:text-white mt-3 ml-2 bg-surface-container border border-white/10 px-4 py-1.5 rounded-xl text-xs transition-all">Try Another Link</button>';
+                statusText.classList.replace('text-primary', 'text-red-400');
                 downloadAnotherBtn.classList.remove('hidden');
             }
         }
