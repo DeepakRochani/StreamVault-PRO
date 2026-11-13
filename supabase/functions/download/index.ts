@@ -55,7 +55,7 @@ export interface ResolvedStreamResult {
 // ============================================================
 
 // ── Default YouTube Session Cookies ──────────────────────────
-const DEFAULT_YOUTUBE_COOKIE = "";
+const DEFAULT_YOUTUBE_COOKIE = "PREF=hl=en&tz=UTC; SOCS=CAI; VISITOR_INFO1_LIVE=zjW6Y_RzRUI; VISITOR_PRIVACY_METADATA=CgJJThIEGgAgGg%3D%3D; YSC=JNKtOAO-9B4; __Secure-ROLLOUT_TOKEN=CMS3w9CquMO7HBDkkLrOjZiVAxi3-KrE3PWXAw%3D%3D; __Secure-YNID=CvcBCAUSqQEBDB6PDDiOk2VZAnAERv2h5xSOYxQjdeMjOBfl4C0tfFXsSmXuer1r_5ZQz1HIh1keKC_JP_8KmBfxsNAjgS4G_fvsM86vbOtsT9cphmguOquTqgMlidcFcDKo4gG5onAm0GB4Zu_Myi5Tig_j9iP7eLKQG41idmjdaUcWxEJbfGuIeoMIvWjhjgQDrTgCSLLaIzkvbp3vi3rCyNZIrOE_jV3Nx8bO208lKAUyRQEcWPVquTkaGpujh1pFmImeHGY-ADypXl4Bv0TEfFM-x3iozR3YljYgJeYd_SZYKaZfkrHcSEFKS6y55RtBpKa8orIuCg; GPS=1";
 
 // ── Cookie Normalizer ─────────────────────────────────────────
 function normalizeYouTubeCookies(rawCookie?: string | null): { cookieHeader: string; count: number; valid: boolean } {
@@ -150,6 +150,34 @@ function parseQualityHeight(q: string): number {
   return parseInt(s.replace(/[^0-9]/g, "") || "1080");
 }
 
+function parseFormatHeight(f: any): number {
+  if (typeof f?.height === "number" && f.height > 0) return f.height;
+  const qStr = String(f?.quality_label || f?.qualityLabel || f?.quality || "").toLowerCase();
+  const mQ = qStr.match(/(\d+)p/);
+  if (mQ) return parseInt(mQ[1], 10);
+  const rStr = String(f?.resolution || "").toLowerCase();
+  const mR = rStr.match(/x(\d+)/) || rStr.match(/(\d+)x(\d+)/);
+  if (mR) return parseInt(mR[2] || mR[1], 10);
+  const rawNum = parseInt(qStr.replace(/[^0-9]/g, "") || "0", 10);
+  return rawNum > 0 ? rawNum : 0;
+}
+
+function isVideoFormat(f: any): boolean {
+  if (typeof f?.has_video === "boolean") return f.has_video;
+  if (typeof f?.hasVideo === "boolean") return f.hasVideo;
+  if (typeof f?.height === "number" && f.height > 0) return true;
+  const mime = String(f?.mime_type || f?.mimeType || f?.type || "").toLowerCase();
+  return mime.startsWith("video") || mime.includes("video/");
+}
+
+function isAudioFormat(f: any): boolean {
+  if (typeof f?.has_audio === "boolean") return f.has_audio;
+  if (typeof f?.hasAudio === "boolean") return f.hasAudio;
+  const mime = String(f?.mime_type || f?.mimeType || f?.type || "").toLowerCase();
+  return mime.startsWith("audio") || mime.includes("audio/");
+}
+
+
 // ── Provider 1: Cobalt v10 High-Speed Pre-Muxed Engine ────────
 const COBALT_INSTANCES: string[] = [
   "https://cobalt-api.kwiatekm.pl",
@@ -189,6 +217,7 @@ async function resolveYouTubeViaCobalt(url: string, isAudio: boolean, quality: s
         streamUrl: data.url,
         mimeType: isAudio ? "audio/mpeg" : "video/mp4",
         hasAudioCombined: true,
+        resolvedQuality: isAudio ? "MP3" : `${qStr}p`,
       };
     }
     throw new Error(`Invalid cobalt response from ${inst}`);
@@ -243,6 +272,7 @@ async function resolveYouTubeViaBtch(videoId: string, isAudio: boolean): Promise
       directCdnUrl: mediaUrl,
       mimeType: isAudio ? (audioUrl ? "audio/mp4" : "video/mp4") : "video/mp4",
       hasAudioCombined: true,
+      resolvedQuality: isAudio ? "MP3" : "360p",
     };
   };
 
@@ -299,41 +329,37 @@ async function resolveYouTubeViaPiped(videoId: string, isAudio: boolean, quality
       // Progressive format check (combined video + audio <= 720p)
       if (targetH <= 720) {
         const prog = videoStreams.filter((s: any) => !s.videoOnly && s.url);
-        const exactProg = prog.find((s: any) => {
-          const h = parseInt(String(s.quality || "").replace(/[^0-9]/g, "") || "0");
-          return h === targetH;
-        });
+        const exactProg = prog.find((s: any) => parseFormatHeight(s) === targetH);
         if (exactProg) {
+          const progH = parseFormatHeight(exactProg);
           return {
             streamUrl: exactProg.url,
             mimeType: exactProg.mimeType?.split(";")[0] || "video/mp4",
             hasAudioCombined: true,
+            resolvedQuality: progH > 0 ? `${progH}p` : `${targetH}p`,
           };
         }
       }
 
       // Adaptive video stream
       const vStreams = videoStreams.filter((s: any) => s.url);
-      vStreams.sort((a: any, b: any) => {
-        const ha = parseInt(String(a.quality || "").replace(/[^0-9]/g, "") || "0");
-        const hb = parseInt(String(b.quality || "").replace(/[^0-9]/g, "") || "0");
-        return hb - ha;
-      });
+      vStreams.sort((a: any, b: any) => parseFormatHeight(b) - parseFormatHeight(a));
 
-      const chosenVideo = vStreams.find((s: any) => {
-        const h = parseInt(String(s.quality || "").replace(/[^0-9]/g, "") || "0");
-        return h === targetH;
-      }) || vStreams[0];
+      const chosenVideo = vStreams.find((s: any) => parseFormatHeight(s) === targetH) ||
+                          vStreams.find((s: any) => parseFormatHeight(s) <= targetH) ||
+                          vStreams[0];
 
       const audioStreams = (data.audioStreams || []).filter((s: any) => s.url);
       audioStreams.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
       const chosenAudio = audioStreams.find((s: any) => s.mimeType?.includes("mp4") || s.mimeType?.includes("m4a")) || audioStreams[0];
 
+      const resH = parseFormatHeight(chosenVideo);
       return {
         streamUrl: chosenVideo.url,
         audioStreamUrl: chosenAudio?.url,
         mimeType: chosenVideo.mimeType?.split(";")[0] || "video/mp4",
         hasAudioCombined: !chosenAudio || chosenVideo.videoOnly === false,
+        resolvedQuality: resH > 0 ? `${resH}p` : `${targetH}p`,
       };
     }
   });
@@ -406,10 +432,7 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
       }
     } else {
       if (prog && prog.length > 0 && targetH <= 720) {
-        const exactProg = prog.find((f: any) => {
-          const resNum = parseInt((f.resolution || "").replace(/[^0-9]/g, "") || "0");
-          return resNum === targetH;
-        });
+        const exactProg = prog.find((f: any) => parseFormatHeight(f) === targetH);
         if (exactProg && (exactProg.url || exactProg.itag)) {
           const candidateUrl = `${mirror}/latest_version?id=${videoId}&itag=${exactProg.itag}&local=true`;
           const probe = await fetch(candidateUrl, {
@@ -420,29 +443,29 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
           });
           if (!probe.ok && probe.status !== 206) throw new Error(`Mirror ${mirror} prog probe failed ${probe.status}`);
 
+          const progH = parseFormatHeight(exactProg);
           return {
             streamUrl: candidateUrl,
             directCdnUrl: exactProg.url,
             mimeType: exactProg.type?.split(";")[0] || "video/mp4",
             itag: String(exactProg.itag),
             hasAudioCombined: true,
+            resolvedQuality: progH > 0 ? `${progH}p` : `${targetH}p`,
           };
         }
       }
 
-      const videoAdaptive = adaptive.filter((f: any) => f.type && f.type.includes("video") && (f.url || f.itag));
-      const audioAdaptive = adaptive.filter((f: any) => f.type && f.type.includes("audio") && (f.url || f.itag));
+      const videoAdaptive = adaptive.filter((f: any) => isVideoFormat(f) && (f.url || f.itag));
+      const audioAdaptive = adaptive.filter((f: any) => isAudioFormat(f) && (f.url || f.itag));
       audioAdaptive.sort((a: any, b: any) => (parseInt(b.bitrate || "0") - parseInt(a.bitrate || "0")));
       const chosenAudio = audioAdaptive.find((f: any) => String(f.itag) === "140" || (f.type && f.type.includes("mp4"))) || audioAdaptive[0];
 
       if (videoAdaptive.length > 0) {
         const mp4Videos = videoAdaptive.filter((f: any) => f.type && f.type.includes("mp4"));
         const candidates = mp4Videos.length > 0 ? mp4Videos : videoAdaptive;
-        const exactMatch = candidates.find((f: any) => {
-          const resNum = parseInt((f.resolution || f.qualityLabel || "").replace(/[^0-9]/g, "") || "0");
-          return resNum === targetH;
-        });
-        const chosenVideo = exactMatch || candidates[0];
+        candidates.sort((a: any, b: any) => parseFormatHeight(b) - parseFormatHeight(a));
+        const exactMatch = candidates.find((f: any) => parseFormatHeight(f) === targetH);
+        const chosenVideo = exactMatch || candidates.find((f: any) => parseFormatHeight(f) <= targetH) || candidates[0];
         const vItag = String(chosenVideo.itag || (targetH >= 1080 ? "137" : (targetH >= 720 ? "136" : "135")));
         const aItag = String(chosenAudio?.itag || "140");
 
@@ -455,6 +478,7 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
         });
         if (!probe.ok && probe.status !== 206) throw new Error(`Mirror ${mirror} video probe failed ${probe.status}`);
 
+        const actualH = parseFormatHeight(chosenVideo);
         return {
           streamUrl: candidateUrl,
           audioStreamUrl: `${mirror}/latest_version?id=${videoId}&itag=${aItag}&local=true`,
@@ -463,6 +487,7 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
           mimeType: chosenVideo.type?.split(";")[0] || "video/mp4",
           itag: vItag,
           hasAudioCombined: false,
+          resolvedQuality: actualH > 0 ? `${actualH}p` : `${targetH}p`,
         };
       }
     }
@@ -527,32 +552,31 @@ async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, qua
     const targetH = parseQualityHeight(quality);
 
     // Progressive format check for <= 720p (combined video + audio)
-    const prog = formats.filter((f: any) => f.has_video && f.has_audio);
+    const prog = formats.filter((f: any) => isVideoFormat(f) && isAudioFormat(f));
     if (prog.length > 0 && targetH <= 720) {
-      prog.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
-      const exactProg = prog.find((f: any) => f.height === targetH);
+      prog.sort((a: any, b: any) => parseFormatHeight(b) - parseFormatHeight(a));
+      const exactProg = prog.find((f: any) => parseFormatHeight(f) === targetH);
       if (exactProg) {
         chosenFmt = exactProg;
         hasAudioCombined = true;
-        console.log(`[YouTube Engine] Progressive Video+Audio Format: ${chosenFmt.quality_label || chosenFmt.height + 'p'} (itag: ${chosenFmt.itag})`);
+        console.log(`[YouTube Engine] Progressive Video+Audio Format: ${chosenFmt.quality_label || parseFormatHeight(chosenFmt) + 'p'} (itag: ${chosenFmt.itag})`);
       }
     }
 
     if (!chosenFmt) {
       // Modern adaptive video format (1080p, 720p, etc.)
-      const vAdaptive = adaptive.filter((f: any) => f.has_video);
-      vAdaptive.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
-      chosenFmt = vAdaptive.find((f: any) => f.height === targetH) ||
-                  vAdaptive.find((f: any) => (f.quality_label || "").includes(String(targetH))) ||
-                  vAdaptive.find((f: any) => (f.height || 0) <= targetH) ||
+      const vAdaptive = adaptive.filter((f: any) => isVideoFormat(f));
+      vAdaptive.sort((a: any, b: any) => parseFormatHeight(b) - parseFormatHeight(a));
+      chosenFmt = vAdaptive.find((f: any) => parseFormatHeight(f) === targetH) ||
+                  vAdaptive.find((f: any) => parseFormatHeight(f) <= targetH) ||
                   vAdaptive[0];
 
       // High-quality audio format (prefer itag 140 or itag 139)
-      const aAdaptive = adaptive.filter((f: any) => f.has_audio);
+      const aAdaptive = adaptive.filter((f: any) => isAudioFormat(f));
       aAdaptive.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
       chosenAudioFmt = aAdaptive.find((f: any) => f.itag === 140) || aAdaptive.find((f: any) => f.mime_type?.includes("mp4") || f.mime_type?.includes("m4a")) || aAdaptive[0];
       hasAudioCombined = false;
-      console.log(`[YouTube Engine] Adaptive Video (${chosenFmt?.quality_label || chosenFmt?.height + 'p'}, itag ${chosenFmt?.itag}) + Audio (itag ${chosenAudioFmt?.itag})`);
+      console.log(`[YouTube Engine] Adaptive Video (${chosenFmt?.quality_label || parseFormatHeight(chosenFmt) + 'p'}, itag ${chosenFmt?.itag}) + Audio (itag ${chosenAudioFmt?.itag})`);
     }
   }
 
@@ -580,72 +604,147 @@ async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, qua
     }
   }
 
+  const resolvedH = parseFormatHeight(chosenFmt);
+  const resolvedQualityLabel = isAudio ? "MP3" : (resolvedH >= 1080 ? "1080p" : resolvedH >= 720 ? "720p" : `${resolvedH}p`);
+
   return {
     streamUrl,
     audioStreamUrl,
     mimeType: chosenFmt.mime_type?.split(";")[0] || (isAudio ? "audio/mp4" : "video/mp4"),
     itag: String(chosenFmt.itag),
     hasAudioCombined,
+    resolvedQuality: resolvedQualityLabel,
   };
 }
 
 async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
   const fullYtUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  const targetH = parseQualityHeight(quality);
 
-  // 1. First Priority: BTCH Residential Proxy Engine (Fastest, pre-muxed combined MP4 with audio, CORS open)
+  if (isAudio) {
+    // Priority for Audio:
+    // 1. BTCH (Ultra-fast dedicated audio stream / MP3)
+    try {
+      const btchRes = await resolveYouTubeViaBtch(videoId, true);
+      if (btchRes?.streamUrl) {
+        console.log(`[YouTube Engine] Resolved Audio via BTCH`);
+        return btchRes;
+      }
+    } catch (_) {}
+
+    // 2. Piped audio pool
+    try {
+      const pipedRes = await resolveYouTubeViaPiped(videoId, true, quality);
+      if (pipedRes?.streamUrl) return pipedRes;
+    } catch (_) {}
+
+    // 3. Invidious audio pool
+    try {
+      const invRes = await resolveYouTubeViaInvidious(videoId, true, quality);
+      if (invRes?.streamUrl) return invRes;
+    } catch (_) {}
+
+    // 4. Innertube audio
+    try {
+      const res = await resolveYouTubeViaInnertube(videoId, true, quality);
+      if (res?.streamUrl) return res;
+    } catch (_) {}
+
+    // 5. Cobalt audio
+    try {
+      const cobaltRes = await resolveYouTubeViaCobalt(fullYtUrl, true, quality);
+      if (cobaltRes?.streamUrl) return cobaltRes;
+    } catch (_) {}
+
+    return null;
+  }
+
+  // ==========================================
+  // FOR VIDEO:
+  // ==========================================
+
+  // High-Definition / Full HD Video (>= 720p, such as 1080p):
+  // We MUST prioritize engines capable of genuine 1080p / 720p video streams.
+  // We NEVER call BTCH for >= 720p because BTCH is hard-capped at 360p / 480p!
+  if (targetH >= 720) {
+    // 1. First Priority: Cobalt v10 engine (Pre-muxed high quality combined MP4 with pristine sound)
+    try {
+      const cobaltRes = await resolveYouTubeViaCobalt(fullYtUrl, false, quality);
+      if (cobaltRes?.streamUrl) {
+        console.log(`[YouTube Engine] Resolved ${quality} via Cobalt: hasAudioCombined=${cobaltRes.hasAudioCombined}`);
+        return cobaltRes;
+      }
+    } catch (err: any) {
+      console.warn(`[YouTube Engine] Cobalt pool error for ${videoId}:`, err?.message || err);
+    }
+
+    // 2. Second Priority: Verified Invidious mirrors (Full 1080p/720p adaptive video + itag 140 audio for pure-JS remuxing)
+    try {
+      const invRes = await resolveYouTubeViaInvidious(videoId, false, quality);
+      if (invRes?.streamUrl) {
+        console.log(`[YouTube Engine] Resolved ${quality} via Invidious: hasAudioCombined=${invRes.hasAudioCombined}, quality=${invRes.resolvedQuality}`);
+        return invRes;
+      }
+    } catch (invErr: any) {
+      console.warn(`[YouTube Engine] Invidious error for ${videoId}:`, invErr?.message || invErr);
+    }
+
+    // 3. Third Priority: Piped API pool (Verified 1080p/720p streaming instances)
+    try {
+      const pipedRes = await resolveYouTubeViaPiped(videoId, false, quality);
+      if (pipedRes?.streamUrl) {
+        console.log(`[YouTube Engine] Resolved ${quality} via Piped: hasAudioCombined=${pipedRes.hasAudioCombined}, quality=${pipedRes.resolvedQuality}`);
+        return pipedRes;
+      }
+    } catch (err: any) {
+      console.warn(`[YouTube Engine] Piped pool error for ${videoId}:`, err?.message || err);
+    }
+
+    // 4. Fourth Priority: Innertube TV & Mobile fallback (Adaptive 1080p/720p video + 140 audio deciphering)
+    try {
+      const res = await resolveYouTubeViaInnertube(videoId, false, quality);
+      if (res?.streamUrl) {
+        console.log(`[YouTube Engine] Resolved ${quality} via Innertube: hasAudioCombined=${res.hasAudioCombined}, quality=${res.resolvedQuality}`);
+        return res;
+      }
+    } catch (err: any) {
+      console.warn(`[YouTube Engine] Innertube error for ${videoId}:`, err?.message || err);
+    }
+
+    return null;
+  }
+
+  // Standard Definition (<= 480p, like 360p or 480p):
+  // BTCH residential pool is ideal because it delivers fast pre-muxed 360p/480p MP4
   try {
-    const btchRes = await resolveYouTubeViaBtch(videoId, isAudio);
+    const btchRes = await resolveYouTubeViaBtch(videoId, false);
     if (btchRes?.streamUrl) {
-      console.log(`[YouTube Engine] Resolved via BTCH: hasAudioCombined=${btchRes.hasAudioCombined}`);
+      console.log(`[YouTube Engine] Resolved 360p/480p via BTCH: hasAudioCombined=${btchRes.hasAudioCombined}`);
       return btchRes;
     }
   } catch (err: any) {
     console.warn(`[YouTube Engine] BTCH API error for ${videoId}:`, err?.message || err);
   }
 
-  // 2. Second Priority: Verified Invidious mirrors (with live HTTP 200/206 probe verification)
   try {
-    const invRes = await resolveYouTubeViaInvidious(videoId, isAudio, quality);
-    if (invRes?.streamUrl) {
-      console.log(`[YouTube Engine] Resolved via Invidious (probe passed): hasAudioCombined=${invRes.hasAudioCombined}`);
-      return invRes;
-    }
-  } catch (invErr: any) {
-    console.warn(`[YouTube Engine] Invidious error for ${videoId}:`, invErr?.message || invErr);
-  }
+    const invRes = await resolveYouTubeViaInvidious(videoId, false, quality);
+    if (invRes?.streamUrl) return invRes;
+  } catch (_) {}
 
-  // 3. Third Priority: Piped API pool (Verified streaming instances)
   try {
-    const pipedRes = await resolveYouTubeViaPiped(videoId, isAudio, quality);
-    if (pipedRes?.streamUrl) {
-      console.log(`[YouTube Engine] Resolved via Piped: hasAudioCombined=${pipedRes.hasAudioCombined}`);
-      return pipedRes;
-    }
-  } catch (err: any) {
-    console.warn(`[YouTube Engine] Piped pool error for ${videoId}:`, err?.message || err);
-  }
+    const pipedRes = await resolveYouTubeViaPiped(videoId, false, quality);
+    if (pipedRes?.streamUrl) return pipedRes;
+  } catch (_) {}
 
-  // 4. Fourth Priority: Innertube TV & Mobile fallback
   try {
-    const res = await resolveYouTubeViaInnertube(videoId, isAudio, quality);
-    if (res?.streamUrl) {
-      console.log(`[YouTube Engine] Resolved via Innertube: hasAudioCombined=${res.hasAudioCombined}`);
-      return res;
-    }
-  } catch (err: any) {
-    console.warn(`[YouTube Engine] Innertube error for ${videoId}:`, err?.message || err);
-  }
+    const res = await resolveYouTubeViaInnertube(videoId, false, quality);
+    if (res?.streamUrl) return res;
+  } catch (_) {}
 
-  // 5. Fifth Priority: Cobalt v10 engine
   try {
-    const cobaltRes = await resolveYouTubeViaCobalt(fullYtUrl, isAudio, quality);
-    if (cobaltRes?.streamUrl) {
-      console.log(`[YouTube Engine] Resolved via Cobalt: hasAudioCombined=${cobaltRes.hasAudioCombined}`);
-      return cobaltRes;
-    }
-  } catch (err: any) {
-    console.warn(`[YouTube Engine] Cobalt pool error for ${videoId}:`, err?.message || err);
-  }
+    const cobaltRes = await resolveYouTubeViaCobalt(fullYtUrl, false, quality);
+    if (cobaltRes?.streamUrl) return cobaltRes;
+  } catch (_) {}
 
   return null;
 }
@@ -698,7 +797,7 @@ async function handleYouTubePost(body: any, reqUrl: URL): Promise<Response> {
       success: false,
       error: {
         code: "YOUTUBE_STREAM_RETRY",
-        message: "YouTube media stream temporarily busy. Please retry or choose another quality.",
+        message: `YouTube ${quality} stream temporarily busy. Please retry or choose another quality.`,
         desktopFallback: false,
         platform: "youtube",
       },
@@ -711,10 +810,14 @@ async function handleYouTubePost(body: any, reqUrl: URL): Promise<Response> {
   const directStream = resolved.streamUrl;
   const audioDirectStream = resolved.audioStreamUrl;
   const hasAudioCombined = resolved.hasAudioCombined;
+  const resolvedQuality = (resolved as any).resolvedQuality || quality;
 
-  // Cloud streaming proxy endpoints
-  const downloadProxyUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}&quality=${encodeURIComponent(quality)}&format_url=${encodeURIComponent(directStream)}`;
-  const fullDownloadUrl = `${EDGE_BASE}?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}&quality=${encodeURIComponent(quality)}&format_url=${encodeURIComponent(directStream)}`;
+  if (filename.includes(quality) && resolvedQuality !== quality) {
+    filename = filename.replace(quality, resolvedQuality);
+  }
+
+  const downloadProxyUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}&quality=${encodeURIComponent(resolvedQuality)}&format_url=${encodeURIComponent(directStream)}`;
+  const fullDownloadUrl = `${EDGE_BASE}?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}&audio=${isAudio}&quality=${encodeURIComponent(resolvedQuality)}&format_url=${encodeURIComponent(directStream)}`;
 
   const audioProxyUrl = audioDirectStream ? `/api/download?url=${encodeURIComponent(url)}&filename=audio.m4a&audio=true&quality=140&format_url=${encodeURIComponent(audioDirectStream)}` : '';
   const fullAudioDownloadUrl = audioDirectStream ? `${EDGE_BASE}?url=${encodeURIComponent(url)}&filename=audio.m4a&audio=true&quality=140&format_url=${encodeURIComponent(audioDirectStream)}` : '';
@@ -732,7 +835,7 @@ async function handleYouTubePost(body: any, reqUrl: URL): Promise<Response> {
     fullAudioDownloadUrl: fullAudioDownloadUrl || undefined,
     hasAudioCombined: hasAudioCombined,
     filename: filename,
-    quality: quality,
+    quality: resolvedQuality,
     format: isAudio ? "mp3" : "mp4",
     via: "youtube-cloud-stream",
   }), {
@@ -794,19 +897,31 @@ async function handleYouTubeGet(req: Request, reqUrl: URL): Promise<Response> {
     let cookieJar = "";
 
     for (let hop = 0; hop < 6; hop++) {
+      const isGoogleVideo = currentUrl.includes("googlevideo.com");
       const hopHeaders: Record<string, string> = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "User-Agent": (isGoogleVideo && currentUrl.includes("c=ANDROID"))
+          ? "com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip"
+          : (isGoogleVideo && currentUrl.includes("c=IOS"))
+          ? "com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 17_4 like Mac OS X)"
+          : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         "Accept": "*/*",
       };
       if (req.headers.has("range")) {
         hopHeaders["Range"] = req.headers.get("range")!;
       }
-      try {
-        const u = new URL(currentUrl);
-        hopHeaders["Referer"] = `${u.protocol}//${u.host}/`;
-      } catch (_) {}
+      if (isGoogleVideo) {
+        hopHeaders["Referer"] = "https://www.youtube.com/";
+        hopHeaders["Origin"] = "https://www.youtube.com";
+      } else {
+        try {
+          const u = new URL(currentUrl);
+          hopHeaders["Referer"] = `${u.protocol}//${u.host}/`;
+        } catch (_) {}
+      }
       if (cookieJar) {
         hopHeaders["Cookie"] = cookieJar;
+      } else if (isGoogleVideo && DEFAULT_YOUTUBE_COOKIE) {
+        hopHeaders["Cookie"] = DEFAULT_YOUTUBE_COOKIE;
       }
 
       try {

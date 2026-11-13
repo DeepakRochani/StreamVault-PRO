@@ -1654,21 +1654,20 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
           ytdlpArgs.push(targetUrl);
           
         } else {
-          // Video Quality mapping - strictly prefer AVC/H.264
-          let formatStr = 'bestvideo[height<=4320][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=4320][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=2160][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=2160][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=1440][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=1440][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=1080][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=1080][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=720][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=720][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=480][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=480][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=360][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=360][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[vcodec^=h264]+bestaudio[ext=m4a]/bestvideo+bestaudio/best';
+          // Video Quality mapping - prioritize target resolution up to requested height with mp4 muxing
+          let formatStr = 'bestvideo[height<=4320][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=4320]+bestaudio/bestvideo+bestaudio/best';
           
           if (requestedQuality && requestedQuality !== 'Original' && requestedQuality !== 'best' && requestedQuality !== 'Best') {
               // If it's a specific format_id from yt-dlp that already contains audio, don't append +bestaudio
               if (requestedQuality.includes('+')) {
                   formatStr = `${requestedQuality}/bestvideo+bestaudio/best`;
               } else if (['hd', 'sd'].includes(requestedQuality) && isFacebook) {
-                  // For Facebook direct URLs, there is no format ID 'hd' or 'sd' in yt-dlp, the URL itself is the video
                   formatStr = 'best';
               } else if (!isLegacyVideo && !isLegacyAudio) {
-                  // Assume raw format ID passed by user
                   formatStr = `${requestedQuality}+bestaudio[ext=m4a]/${requestedQuality}+bestaudio/${requestedQuality}/bestvideo+bestaudio/best`;
               } else {
-                  formatStr = `${requestedQuality}+bestaudio[ext=m4a]/bestvideo[height<=4320][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=4320][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=2160][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=2160][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=1440][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=1440][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=1080][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=1080][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=720][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=720][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=480][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=480][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<=360][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=360][vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[vcodec^=h264]+bestaudio[ext=m4a]/bestvideo+bestaudio/best`;
+                  const targetH = parseInt(requestedQuality.replace(/[^0-9]/g, '') || '1080', 10);
+                  formatStr = `bestvideo[height<=${targetH}][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=${targetH}]+bestaudio[ext=m4a]/bestvideo[height<=${targetH}]+bestaudio/best[height<=${targetH}]/bestvideo+bestaudio/best`;
               }
           }
 

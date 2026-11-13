@@ -137,6 +137,18 @@ async function getInnertube() {
 }
 
 // ── Helpers ──────────────────────────────────────────────────
+function parseFormatHeight(f: any): number {
+  if (typeof f?.height === "number" && f.height > 0) return f.height;
+  const qStr = String(f?.quality_label || f?.qualityLabel || f?.quality || "").toLowerCase();
+  const mQ = qStr.match(/(\d+)p/);
+  if (mQ) return parseInt(mQ[1], 10);
+  const rStr = String(f?.resolution || "").toLowerCase();
+  const mR = rStr.match(/x(\d+)/) || rStr.match(/(\d+)x(\d+)/);
+  if (mR) return parseInt(mR[2] || mR[1], 10);
+  const rawNum = parseInt(qStr.replace(/[^0-9]/g, "") || "0", 10);
+  return rawNum > 0 ? rawNum : 0;
+}
+
 function extractVideoId(url: string): string | null {
   const patterns = [
     /(?:youtube\.com\/watch\?(?:.*&)?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
@@ -608,17 +620,18 @@ serve(async (req: Request) => {
       }
     }
 
-    // 1. Try Innertube across multi-client strategy (ANDROID -> IOS -> TV -> MWEB -> WEB)
+    // 1. Try Innertube across multi-client strategy (TV -> TV_EMBEDDED -> IOS -> ANDROID -> MWEB -> WEB)
     const yt = await getInnertube();
     let videoInfo: any = null;
 
-    for (const client of ["ANDROID", "IOS", "TV", "MWEB", "WEB"] as const) {
+    for (const client of ["TV", "TV_EMBEDDED", "IOS", "ANDROID", "MWEB", "WEB"] as const) {
       try {
-        const candidate = await yt.getBasicInfo(videoId, { client });
+        const candidate = await yt.getInfo(videoId, { client }).catch(() => yt.getBasicInfo(videoId, { client }));
         if (candidate?.basic_info?.title) {
-          videoInfo = candidate;
-          matchedClient = client;
+          if (!videoInfo) videoInfo = candidate;
           if (candidate?.streaming_data?.formats?.length || candidate?.streaming_data?.adaptive_formats?.length) {
+            videoInfo = candidate;
+            matchedClient = client;
             break;
           }
         }
@@ -662,7 +675,8 @@ serve(async (req: Request) => {
       adaptiveFormatsCount = adaptFormats.length;
 
       for (const f of allFormats) {
-        if (f.height) availableHeights.add(f.height);
+        const h = parseFormatHeight(f);
+        if (h > 0) availableHeights.add(h);
       }
 
       logSafeDiagnostic({
