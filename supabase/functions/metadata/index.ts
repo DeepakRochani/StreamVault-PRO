@@ -110,15 +110,12 @@ function logSafeDiagnostic(diag: SafeDiagnostic) {
   console.log(`[Metadata Diagnostic] ${JSON.stringify(diag)}`);
 }
 
-// ── Default YouTube Session Cookies ──────────────────────────
-const DEFAULT_YOUTUBE_COOKIE = "PREF=hl=en&tz=UTC; SOCS=CAI; VISITOR_INFO1_LIVE=zjW6Y_RzRUI; VISITOR_PRIVACY_METADATA=CgJJThIEGgAgGg%3D%3D; YSC=JNKtOAO-9B4; __Secure-ROLLOUT_TOKEN=CMS3w9CquMO7HBDkkLrOjZiVAxi3-KrE3PWXAw%3D%3D; __Secure-YNID=CvcBCAUSqQEBDB6PDDiOk2VZAnAERv2h5xSOYxQjdeMjOBfl4C0tfFXsSmXuer1r_5ZQz1HIh1keKC_JP_8KmBfxsNAjgS4G_fvsM86vbOtsT9cphmguOquTqgMlidcFcDKo4gG5onAm0GB4Zu_Myi5Tig_j9iP7eLKQG41idmjdaUcWxEJbfGuIeoMIvWjhjgQDrTgCSLLaIzkvbp3vi3rCyNZIrOE_jV3Nx8bO208lKAUyRQEcWPVquTkaGpujh1pFmImeHGY-ADypXl4Bv0TEfFM-x3iozR3YljYgJeYd_SZYKaZfkrHcSEFKS6y55RtBpKa8orIuCg; GPS=1";
-
 // ── Innertube Session ─────────────────────────────────────────
 let cachedInnertube: any = null;
 async function getInnertube() {
   if (!cachedInnertube) {
-    const rawCookie = Deno.env.get("YOUTUBE_COOKIE") || DEFAULT_YOUTUBE_COOKIE;
-    const normalized = normalizeYouTubeCookies(rawCookie);
+    const rawCookie = Deno.env.get("YOUTUBE_COOKIE");
+    const normalized = rawCookie ? normalizeYouTubeCookies(rawCookie) : { valid: false, cookieHeader: "" };
     try {
       cachedInnertube = await Innertube.create({
         cache: new UniversalCache(false),

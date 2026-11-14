@@ -36,13 +36,13 @@ if (typeof window !== 'undefined' && window.location && (window.location.hostnam
     window.fetch = async function(resource, init = {}) {
         let url = typeof resource === 'string' ? resource : (resource && resource.url ? resource.url : '');
         
-        if (typeof url === 'string' && url.includes('supabase.co/functions/v1/')) {
+        if (typeof url === 'string' && (url.includes('supabase.co/functions/v1/') || url.startsWith('/api/'))) {
             init = init || {};
             const headers = new Headers(init.headers || {});
-            if (!headers.has('apikey')) {
+            if (!headers.has('apikey') && window.SUPABASE_ANON_KEY) {
                 headers.set('apikey', window.SUPABASE_ANON_KEY);
             }
-            if (!headers.has('Authorization')) {
+            if (!headers.has('Authorization') && window.SUPABASE_ANON_KEY) {
                 headers.set('Authorization', 'Bearer ' + window.SUPABASE_ANON_KEY);
             }
             init.headers = headers;

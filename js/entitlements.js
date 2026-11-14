@@ -70,28 +70,9 @@
 
     /**
      * Evaluates whether a quality / format selection requires Desktop Pro.
+     * All qualities are fully unlocked for seamless online download without sign-in requirement.
      */
     function isDesktopProRequired(qualityId, format, user = null) {
-        if (hasDesktopProAccess(user)) return false;
-        
-        const fmtLower = (format || '').toString().toLowerCase();
-        if (fmtLower === 'mp3' || fmtLower === 'audio') {
-            return false; // MP3 is web supported
-        }
-
-        const qLower = (qualityId || '').toString().toLowerCase();
-        
-        // Check if it's 1440p, 4K, 8K, 2160p, 4320p
-        if (
-            qLower.includes('1440') || 
-            qLower.includes('2160') || 
-            qLower.includes('4k') || 
-            qLower.includes('4320') || 
-            qLower.includes('8k')
-        ) {
-            return true;
-        }
-
         return false;
     }
 

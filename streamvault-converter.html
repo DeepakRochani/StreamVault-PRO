@@ -1046,10 +1046,6 @@
         }
 
         async function startConversion() {
-            if (!window.isLoggedIn && window.loginEnabled === true) {
-                showLoginModal();
-                return;
-            }
             if (!selectedFile) return;
             if (typeof window.toggleAds === 'function') window.toggleAds(false); // Hide ads during processing
             
@@ -1301,14 +1297,9 @@
             }
         }
 
-        // Login Required Logic
+        // Login Required Logic (Disabled: guests can convert/download without signing in)
         function showLoginModal() {
-            document.getElementById('login-required-modal').classList.remove('hidden');
-            fetch((window.API_BASE_URL || '') + '/api/track', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'Download Requests Blocked', details: 'Guest attempted conversion without login' })
-            }).catch(e=>{});
+            console.log('[Auth] Guest downloading permitted without sign-in');
         }
 
         function saveStateAndRedirect(mode) {
