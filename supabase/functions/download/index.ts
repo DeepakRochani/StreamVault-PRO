@@ -48,6 +48,8 @@ export interface ResolvedStreamResult {
   mimeType: string;
   itag?: string;
   hasAudioCombined: boolean;
+  resolvedQuality?: string;
+  botguardProtected?: boolean;
 }
 
 // ============================================================
@@ -527,6 +529,7 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
 async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
   const yt = await getYouTubeInnertube();
   let video: any = null;
+  let botguardDetected = false;
 
   // Prefer IOS client first: provides direct, unthrottled AVC 1080p and AAC 140 URLs in 250ms
   try {
@@ -534,9 +537,15 @@ async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, qua
     if (iosCandidate?.streaming_data?.formats?.length || iosCandidate?.streaming_data?.adaptive_formats?.length) {
       video = iosCandidate;
       console.log(`[YouTube Engine] Successfully resolved formats via Innertube IOS client`);
+    } else if (iosCandidate?.playability_status?.status === "LOGIN_REQUIRED") {
+      botguardDetected = true;
     }
   } catch (iosErr: any) {
-    console.warn(`[YouTube Engine] IOS client warning for ${videoId}:`, iosErr?.message || iosErr);
+    const msg = String(iosErr?.message || iosErr);
+    if (msg.includes("LOGIN_REQUIRED") || msg.includes("confirm you're not a bot") || msg.includes("Sign in")) {
+      botguardDetected = true;
+    }
+    console.warn(`[YouTube Engine] IOS client warning for ${videoId}:`, msg);
   }
 
   // Fallback to ANDROID, WEB or TV if IOS failed
@@ -548,13 +557,23 @@ async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, qua
           video = candidate;
           console.log(`[YouTube Engine] Successfully resolved formats via client: ${client}`);
           break;
+        } else if (candidate?.playability_status?.status === "LOGIN_REQUIRED") {
+          botguardDetected = true;
         }
-      } catch (_) {}
+      } catch (cErr: any) {
+        const msg = String(cErr?.message || cErr);
+        if (msg.includes("LOGIN_REQUIRED") || msg.includes("confirm you're not a bot") || msg.includes("Sign in")) {
+          botguardDetected = true;
+        }
+      }
     }
   }
 
   const streamingData = video?.streaming_data;
   if (!streamingData) {
+    if (botguardDetected) {
+      throw new Error(`LOGIN_REQUIRED: Video ${videoId} is protected by YouTube Botguard verification`);
+    }
     throw new Error(`No streaming data available from Innertube for ${videoId}`);
   }
 
@@ -697,6 +716,7 @@ async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: 
   // We MUST prioritize engines capable of genuine 1080p / 720p video streams.
   // We NEVER call BTCH for >= 720p because BTCH is hard-capped at 360p / 480p!
   if (targetH >= 720) {
+    let botguardDetected = false;
     // 1. First Priority: Innertube iOS/Android/Web engine (Guaranteed genuine 1080p itag 137 AVC + itag 140 AAC)
     try {
       const res = await resolveYouTubeViaInnertube(videoId, false, quality);
@@ -705,7 +725,11 @@ async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: 
         return res;
       }
     } catch (err: any) {
-      console.warn(`[YouTube Engine] Innertube error for ${videoId}:`, err?.message || err);
+      const msg = String(err?.message || err);
+      if (msg.includes("LOGIN_REQUIRED") || msg.includes("Botguard") || msg.includes("confirm you're not a bot")) {
+        botguardDetected = true;
+      }
+      console.warn(`[YouTube Engine] Innertube error for ${videoId}:`, msg);
     }
 
     // 2. Second Priority: Cobalt v10 engine (Pre-muxed high quality combined MP4 with pristine sound)
@@ -739,6 +763,15 @@ async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: 
       }
     } catch (err: any) {
       console.warn(`[YouTube Engine] Piped pool error for ${videoId}:`, err?.message || err);
+    }
+
+    if (botguardDetected) {
+      return {
+        streamUrl: "",
+        mimeType: "",
+        hasAudioCombined: false,
+        botguardProtected: true,
+      };
     }
 
     return null;
@@ -821,14 +854,17 @@ async function handleYouTubePost(body: any, reqUrl: URL): Promise<Response> {
 
   const resolved = await resolveYouTubeStream(videoId, isAudio, quality);
 
-  // If stream resolution failed, do NOT lock user out with Desktop Pro. Provide clean retryable error.
+  // If stream resolution failed, do NOT lock user out with Desktop Pro unless Botguard protected
   if (!resolved || !resolved.streamUrl) {
+    const isBotguard = !!resolved?.botguardProtected;
     return new Response(JSON.stringify({
       success: false,
       error: {
-        code: "YOUTUBE_STREAM_RETRY",
-        message: `YouTube ${quality} stream temporarily busy. Please retry or choose another quality.`,
-        desktopFallback: false,
+        code: isBotguard ? "BOTGUARD_PROTECTED" : "YOUTUBE_STREAM_RETRY",
+        message: isBotguard
+          ? "This music video is protected by YouTube Botguard verification. Please download via StreamVault Desktop Pro."
+          : `YouTube ${quality} stream temporarily busy. Please retry or choose another quality.`,
+        desktopFallback: isBotguard,
         platform: "youtube",
       },
     }), {

@@ -484,6 +484,229 @@
         return new Blob(outParts, { type: 'video/mp4' });
     }
 
+    function extractChunkOffsets(u8, stblChildren) {
+        const view = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+        const stco = stblChildren.find(b => b.type === 'stco');
+        const co64 = stblChildren.find(b => b.type === 'co64');
+        const offsets = [];
+
+        if (stco) {
+            const entryCount = view.getUint32(stco.pos + stco.headerSize + 4, false);
+            let off = stco.pos + stco.headerSize + 8;
+            for (let i = 0; i < entryCount; i++) {
+                offsets.push(view.getUint32(off, false));
+                off += 4;
+            }
+        } else if (co64) {
+            const entryCount = view.getUint32(co64.pos + co64.headerSize + 4, false);
+            let off = co64.pos + co64.headerSize + 8;
+            for (let i = 0; i < entryCount; i++) {
+                const high = view.getUint32(off, false);
+                const low = view.getUint32(off + 4, false);
+                offsets.push((high * 4294967296) + low);
+                off += 8;
+            }
+        }
+        return offsets;
+    }
+
+    function remuxStandardMp4(videoU8, audioU8) {
+        const vBoxes = parseBoxes(videoU8, 0, videoU8.length);
+        const aBoxes = parseBoxes(audioU8, 0, audioU8.length);
+
+        const vFtyp = vBoxes.find(b => b.type === 'ftyp');
+        const vMoov = vBoxes.find(b => b.type === 'moov');
+        const vMdat = vBoxes.find(b => b.type === 'mdat');
+
+        const aMoov = aBoxes.find(b => b.type === 'moov');
+        const aMdat = aBoxes.find(b => b.type === 'mdat');
+
+        if (!vMoov || !vMdat || !aMoov || !aMdat) {
+            throw new Error("Missing required standard MP4 boxes (moov/mdat)");
+        }
+
+        const ftypData = vFtyp ? videoU8.subarray(vFtyp.pos, vFtyp.pos + vFtyp.size) : new Uint8Array([0,0,0,24,102,116,121,112,105,115,111,109,0,0,2,0,105,115,111,109,105,115,111,50]);
+
+        // Parse video trak hierarchy
+        const vMoovChildren = parseBoxes(videoU8, vMoov.pos + vMoov.headerSize, vMoov.pos + vMoov.size);
+        const vMvhd = vMoovChildren.find(b => b.type === 'mvhd');
+        const vTrak = vMoovChildren.find(b => b.type === 'trak');
+        if (!vTrak || !vMvhd) throw new Error("Missing video trak or mvhd");
+
+        const vTrakChildren = parseBoxes(videoU8, vTrak.pos + vTrak.headerSize, vTrak.pos + vTrak.size);
+        const vMdia = vTrakChildren.find(b => b.type === 'mdia');
+        const vMdiaChildren = parseBoxes(videoU8, vMdia.pos + vMdia.headerSize, vMdia.pos + vMdia.size);
+        const vMinf = vMdiaChildren.find(b => b.type === 'minf');
+        const vMinfChildren = parseBoxes(videoU8, vMinf.pos + vMinf.headerSize, vMinf.pos + vMinf.size);
+        const vStbl = vMinfChildren.find(b => b.type === 'stbl');
+        const vStblChildren = parseBoxes(videoU8, vStbl.pos + vStbl.headerSize, vStbl.pos + vStbl.size);
+
+        // Parse audio trak hierarchy
+        const aMoovChildren = parseBoxes(audioU8, aMoov.pos + aMoov.headerSize, aMoov.pos + aMoov.size);
+        const aTrak = aMoovChildren.find(b => b.type === 'trak');
+        if (!aTrak) throw new Error("Missing audio trak");
+
+        const aTrakChildren = parseBoxes(audioU8, aTrak.pos + aTrak.headerSize, aTrak.pos + aTrak.size);
+        const aMdia = aTrakChildren.find(b => b.type === 'mdia');
+        const aMdiaChildren = parseBoxes(audioU8, aMdia.pos + aMdia.headerSize, aMdia.pos + aMdia.size);
+        const aMinf = aMdiaChildren.find(b => b.type === 'minf');
+        const aMinfChildren = parseBoxes(audioU8, aMinf.pos + aMinf.headerSize, aMinf.pos + aMinf.size);
+        const aStbl = aMinfChildren.find(b => b.type === 'stbl');
+        const aStblChildren = parseBoxes(audioU8, aStbl.pos + aStbl.headerSize, aStbl.pos + aStbl.size);
+
+        // Extract original chunk offsets
+        const vOffsets = extractChunkOffsets(videoU8, vStblChildren);
+        const aOffsets = extractChunkOffsets(audioU8, aStblChildren);
+
+        if (vOffsets.length === 0 || aOffsets.length === 0) {
+            throw new Error("Missing chunk offsets in stbl tables");
+        }
+
+        const vMdatPayloadPos = vMdat.pos + vMdat.headerSize;
+        const vMdatPayloadLen = vMdat.size - vMdat.headerSize;
+
+        const aMdatPayloadPos = aMdat.pos + aMdat.headerSize;
+        const aMdatPayloadLen = aMdat.size - aMdat.headerSize;
+
+        const totalPayloadLen = vMdatPayloadLen + aMdatPayloadLen;
+        const isLargeMdat = (totalPayloadLen + 8 > 0xFFFFFFFF);
+        const mdatHeaderSize = isLargeMdat ? 16 : 8;
+
+        function assembleMoov(videoOffsets, audioOffsets) {
+            // Build video trak
+            const newVStblBoxes = [];
+            for (const b of vStblChildren) {
+                if (b.type === 'stco' || b.type === 'co64') {
+                    newVStblBoxes.push(buildCo64(videoOffsets));
+                } else {
+                    newVStblBoxes.push(videoU8.subarray(b.pos, b.pos + b.size));
+                }
+            }
+            const newVStbl = makeBox('stbl', newVStblBoxes);
+
+            const newVMinfBoxes = [];
+            for (const b of vMinfChildren) {
+                if (b.type === 'stbl') newVMinfBoxes.push(newVStbl);
+                else newVMinfBoxes.push(videoU8.subarray(b.pos, b.pos + b.size));
+            }
+            const newVMinf = makeBox('minf', newVMinfBoxes);
+
+            const newVMdiaBoxes = [];
+            for (const b of vMdiaChildren) {
+                if (b.type === 'minf') newVMdiaBoxes.push(newVMinf);
+                else newVMdiaBoxes.push(videoU8.subarray(b.pos, b.pos + b.size));
+            }
+            const newVMdia = makeBox('mdia', newVMdiaBoxes);
+
+            const newVTrakBoxes = [];
+            for (const b of vTrakChildren) {
+                if (b.type === 'tkhd') {
+                    const tkhdVer = videoU8[b.pos + 8];
+                    const newTkhd = new Uint8Array(b.size);
+                    newTkhd.set(videoU8.subarray(b.pos, b.pos + b.size));
+                    const tkhdView = new DataView(newTkhd.buffer, newTkhd.byteOffset, newTkhd.byteLength);
+                    if (tkhdVer === 1) tkhdView.setUint32(28, 1, false);
+                    else tkhdView.setUint32(20, 1, false);
+                    newTkhd[11] = 0x03; // enabled + in_movie
+                    newVTrakBoxes.push(newTkhd);
+                } else if (b.type === 'mdia') {
+                    newVTrakBoxes.push(newVMdia);
+                } else {
+                    newVTrakBoxes.push(videoU8.subarray(b.pos, b.pos + b.size));
+                }
+            }
+            const newVTrak = makeBox('trak', newVTrakBoxes);
+
+            // Build audio trak
+            const newAStblBoxes = [];
+            for (const b of aStblChildren) {
+                if (b.type === 'stco' || b.type === 'co64') {
+                    newAStblBoxes.push(buildCo64(audioOffsets));
+                } else {
+                    newAStblBoxes.push(audioU8.subarray(b.pos, b.pos + b.size));
+                }
+            }
+            const newAStbl = makeBox('stbl', newAStblBoxes);
+
+            const newAMinfBoxes = [];
+            for (const b of aMinfChildren) {
+                if (b.type === 'stbl') newAMinfBoxes.push(newAStbl);
+                else newAMinfBoxes.push(audioU8.subarray(b.pos, b.pos + b.size));
+            }
+            const newAMinf = makeBox('minf', newAMinfBoxes);
+
+            const newAMdiaBoxes = [];
+            for (const b of aMdiaChildren) {
+                if (b.type === 'minf') newAMdiaBoxes.push(newAMinf);
+                else newAMdiaBoxes.push(audioU8.subarray(b.pos, b.pos + b.size));
+            }
+            const newAMdia = makeBox('mdia', newAMdiaBoxes);
+
+            const newATrakBoxes = [];
+            for (const b of aTrakChildren) {
+                if (b.type === 'tkhd') {
+                    const tkhdVer = audioU8[b.pos + 8];
+                    const newTkhd = new Uint8Array(b.size);
+                    newTkhd.set(audioU8.subarray(b.pos, b.pos + b.size));
+                    const tkhdView = new DataView(newTkhd.buffer, newTkhd.byteOffset, newTkhd.byteLength);
+                    if (tkhdVer === 1) tkhdView.setUint32(28, 2, false);
+                    else tkhdView.setUint32(20, 2, false);
+                    newTkhd[11] = 0x03; // enabled + in_movie
+                    newATrakBoxes.push(newTkhd);
+                } else if (b.type === 'mdia') {
+                    newATrakBoxes.push(newAMdia);
+                } else {
+                    newATrakBoxes.push(audioU8.subarray(b.pos, b.pos + b.size));
+                }
+            }
+            const newATrak = makeBox('trak', newATrakBoxes);
+
+            // Build mvhd with updated next_track_ID = 3
+            const origMvhd = vMvhd;
+            const newMvhd = new Uint8Array(origMvhd.size);
+            newMvhd.set(videoU8.subarray(origMvhd.pos, origMvhd.pos + origMvhd.size));
+            const mvhdView = new DataView(newMvhd.buffer, newMvhd.byteOffset, newMvhd.byteLength);
+            mvhdView.setUint32(newMvhd.length - 16, 3, false); // next_track_ID = 3
+
+            return makeBox('moov', [newMvhd, newVTrak, newATrak]);
+        }
+
+        // Pass 1: compute exact moov length
+        const dummyVOffsets = new Array(vOffsets.length).fill(0);
+        const dummyAOffsets = new Array(aOffsets.length).fill(0);
+        const pass1Moov = assembleMoov(dummyVOffsets, dummyAOffsets);
+        const moovSize = pass1Moov.length;
+
+        const mdatPayloadStartOffset = ftypData.length + moovSize + mdatHeaderSize;
+
+        // Pass 2: calculate real offsets
+        const realVOffsets = vOffsets.map(o => mdatPayloadStartOffset + (o - vMdatPayloadPos));
+        const realAOffsets = aOffsets.map(o => mdatPayloadStartOffset + vMdatPayloadLen + (o - aMdatPayloadPos));
+
+        const finalMoov = assembleMoov(realVOffsets, realAOffsets);
+
+        // Build mdat header
+        const mdatHeader = new Uint8Array(mdatHeaderSize);
+        const mdatView = new DataView(mdatHeader.buffer, mdatHeader.byteOffset, mdatHeader.byteLength);
+        if (isLargeMdat) {
+            mdatView.setUint32(0, 1, false);
+            mdatHeader[4] = 109; mdatHeader[5] = 100; mdatHeader[6] = 97; mdatHeader[7] = 116;
+            const totalMdatBoxSize = totalPayloadLen + 16;
+            const high = Math.floor(totalMdatBoxSize / 4294967296);
+            const low = totalMdatBoxSize >>> 0;
+            mdatView.setUint32(8, high, false);
+            mdatView.setUint32(12, low, false);
+        } else {
+            mdatView.setUint32(0, totalPayloadLen + 8, false);
+            mdatHeader[4] = 109; mdatHeader[5] = 100; mdatHeader[6] = 97; mdatHeader[7] = 116;
+        }
+
+        const vPayload = videoU8.subarray(vMdatPayloadPos, vMdatPayloadPos + vMdatPayloadLen);
+        const aPayload = audioU8.subarray(aMdatPayloadPos, aMdatPayloadPos + aMdatPayloadLen);
+
+        return [ftypData, finalMoov, mdatHeader, vPayload, aPayload];
+    }
+
     global.StreamVaultRemuxer = {
         isLoaded: true,
         async init() {
@@ -500,9 +723,23 @@
                 const vU8 = new Uint8Array(vBuf);
                 const aU8 = new Uint8Array(aBuf);
 
+                // Priority 1: Check standard MP4 (moov + mdat)
+                try {
+                    const parts = remuxStandardMp4(vU8, aU8);
+                    if (parts && parts.length > 0) {
+                        const mergedBlob = new Blob(parts, { type: 'video/mp4' });
+                        const elapsed = Math.round(performance.now() - startTime);
+                        console.log(`[StreamVault Remuxer] Standard unfragmented MP4 remux succeeded in ${elapsed}ms! Size: ${mergedBlob.size} bytes`);
+                        return mergedBlob;
+                    }
+                } catch (stdErr) {
+                    console.log('[StreamVault Remuxer] Standard MP4 remux skipped, checking fragmented fMP4:', stdErr?.message || stdErr);
+                }
+
+                // Priority 2: Fragmented fMP4 remux (moof + mdat chunks)
                 const mergedBlob = remux(vU8, aU8);
                 const elapsed = Math.round(performance.now() - startTime);
-                console.log(`[StreamVault Remuxer] Fast unfragmented remux succeeded in ${elapsed}ms! Output size: ${mergedBlob.size} bytes`);
+                console.log(`[StreamVault Remuxer] Fast fMP4 remux succeeded in ${elapsed}ms! Output size: ${mergedBlob.size} bytes`);
                 return mergedBlob;
             } catch (err) {
                 console.warn('[StreamVault Remuxer Error]:', err?.message || err);
