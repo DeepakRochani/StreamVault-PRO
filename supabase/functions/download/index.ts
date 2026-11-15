@@ -178,13 +178,7 @@ function isAudioFormat(f: any): boolean {
 
 // ── Provider 1: Cobalt v10 High-Speed Pre-Muxed Engine ────────
 const COBALT_INSTANCES: string[] = [
-  "https://cobalt-api.kwiatekm.pl",
   "https://api.cobalt.tools",
-  "https://cobalt.api.scip.io",
-  "https://cobalt.kwiatekm.pl",
-  "https://cobalt.synapticfire.net",
-  "https://cobalt.canine.tools",
-  "https://cobalt.ducks.party",
 ];
 
 async function resolveYouTubeViaCobalt(url: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
@@ -204,7 +198,7 @@ async function resolveYouTubeViaCobalt(url: string, isAudio: boolean, quality: s
         downloadMode: isAudio ? "audio" : "auto",
         audioFormat: "mp3",
       }),
-      signal: AbortSignal.timeout(3500),
+      signal: AbortSignal.timeout(2500),
     });
 
     if (!resp.ok) throw new Error(`${inst} status ${resp.status}`);
@@ -290,11 +284,8 @@ async function resolveYouTubeViaBtch(videoId: string, isAudio: boolean): Promise
 
 // ── Provider 3: Piped API Engine Pool ─────────────────────────
 const PIPED_INSTANCES: string[] = [
-  "https://pipedapi.kavin.rocks",
   "https://pipedapi.adminforge.de",
   "https://api.piped.private.coffee",
-  "https://api.piped.yt",
-  "https://pipedapi.ducks.party",
 ];
 
 async function resolveYouTubeViaPiped(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
@@ -382,10 +373,6 @@ const INVIDIOUS_MIRRORS: string[] = [
   "https://inv.nadeko.net",
   "https://invidious.nerdvpn.de",
   "https://invidious.tiekoetter.com",
-  "https://invidious.privacydev.net",
-  "https://vid.priv.au",
-  "https://yt.artemislena.eu",
-  "https://invidious.flokinet.to",
 ];
 
 async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
@@ -393,7 +380,7 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
 
   const mirrorPromises = INVIDIOUS_MIRRORS.map(async (mirror) => {
     const res = await fetch(`${mirror}/api/v1/videos/${videoId}`, {
-      signal: AbortSignal.timeout(3500),
+      signal: AbortSignal.timeout(2500),
       headers: {
         "Accept": "application/json",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -526,8 +513,8 @@ async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, qua
   const yt = await getYouTubeInnertube();
   let video: any = null;
 
-  // Multi-client order prioritizing TV, Android VR and mobile clients that require no browser botguard
-  const clientsToTry = ["TV", "TV_EMBEDDED", "ANDROID_VR", "ANDROID", "IOS", "MWEB", "WEB"] as const;
+  // Fast mobile & TV clients with minimal botguard restrictions
+  const clientsToTry = ["IOS", "ANDROID", "TV"] as const;
 
   for (const client of clientsToTry) {
     try {
