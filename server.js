@@ -1678,12 +1678,18 @@ app.post('/api/download', checkFeatureAndLimits, (req, res, next) => {
             '--no-playlist',
             '--newline',
             '--no-update',
+            '--force-overwrites',
             '--format', formatStr,
             '--remux-video', 'mp4',
             '--ffmpeg-location', ffmpegPath,
             '-o', destPath,
             targetUrl
           ];
+        }
+
+        // Clean any stale temp file before starting fresh download
+        if (destPath && fs.existsSync(destPath)) {
+          try { fs.unlinkSync(destPath); } catch (_) {}
         }
         
         let ytdlpOutputLog = '';
