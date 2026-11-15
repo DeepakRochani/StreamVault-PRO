@@ -26,30 +26,19 @@ assert.strictEqual(Entitlements.isDesktopProRequired('320K', 'mp3'), false, 'MP3
 assert.strictEqual(Entitlements.isDesktopProRequired('640K', 'audio'), false, 'Audio 640k should be supported on Web');
 console.log("  ✓ PASS: MP3 audio formats are Web-supported.");
 
-// 3. Desktop Pro Locked Qualities on Web
-console.log("Test 3: Desktop Pro Premium Video Qualities (1440p, 4K, 8K)");
-assert.strictEqual(Entitlements.isDesktopProRequired('1440p', 'mp4'), true, '1440p must require Desktop Pro on Web');
-assert.strictEqual(Entitlements.isDesktopProRequired('2160p', 'mp4'), true, '2160p must require Desktop Pro on Web');
-assert.strictEqual(Entitlements.isDesktopProRequired('4K', 'mp4'), true, '4K must require Desktop Pro on Web');
-assert.strictEqual(Entitlements.isDesktopProRequired('4320p', 'mp4'), true, '4320p must require Desktop Pro on Web');
-assert.strictEqual(Entitlements.isDesktopProRequired('8k', 'mp4'), true, '8K must require Desktop Pro on Web');
-console.log("  ✓ PASS: 1440p, 4K, 8K correctly require Desktop Pro for non-pro Web users.");
+// 3. Free Downloads Across All Qualities
+console.log("Test 3: Unrestricted Video Downloads (No Sign-in / Desktop Pro requirement)");
+assert.strictEqual(Entitlements.isDesktopProRequired('1080p', 'mp4'), false, '1080p must NOT require Desktop Pro');
+assert.strictEqual(Entitlements.isDesktopProRequired('1440p', 'mp4'), false, '1440p must NOT require Desktop Pro');
+assert.strictEqual(Entitlements.isDesktopProRequired('4K', 'mp4'), false, '4K must NOT require Desktop Pro');
+assert.strictEqual(Entitlements.isDesktopProRequired('8K', 'mp4'), false, '8K must NOT require Desktop Pro');
+console.log("  ✓ PASS: All video resolutions are free without Desktop Pro lock.");
 
-// 4. Desktop Pro User Entitlement Bypass
-console.log("Test 4: Pro / Subscribed User Access");
-const proUser = { plan: 'pro', role: 'user' };
-assert.strictEqual(Entitlements.hasDesktopProAccess(proUser), true, 'Pro plan user should have Desktop Pro access');
-assert.strictEqual(Entitlements.isDesktopProRequired('4K', 'mp4', proUser), false, 'Pro user should not be locked out of 4K');
-assert.strictEqual(Entitlements.isDesktopProRequired('8K', 'mp4', proUser), false, 'Pro user should not be locked out of 8K');
-
-const lifetimeUser = { subscription: { plan_id: 'lifetime' } };
-assert.strictEqual(Entitlements.hasDesktopProAccess(lifetimeUser), true, 'Lifetime plan user should have Desktop Pro access');
-assert.strictEqual(Entitlements.isDesktopProRequired('4K', 'mp4', lifetimeUser), false, 'Lifetime user should unlock 4K');
-
+// 4. Free User Access
+console.log("Test 4: Guest and Free User Unrestricted Access");
 const freeUser = { plan: 'free' };
-assert.strictEqual(Entitlements.hasDesktopProAccess(freeUser), false, 'Free user should not have Desktop Pro access');
-assert.strictEqual(Entitlements.isDesktopProRequired('1080p', 'mp4', freeUser), false, 'Free user gets Web 1080p');
-assert.strictEqual(Entitlements.isDesktopProRequired('4K', 'mp4', freeUser), true, 'Free user is locked out of 4K');
-console.log("  ✓ PASS: Plan-based entitlement gating functions correctly.");
+assert.strictEqual(Entitlements.isDesktopProRequired('1080p', 'mp4', freeUser), false, 'Free user gets 1080p without login');
+assert.strictEqual(Entitlements.isDesktopProRequired('4K', 'mp4', null), false, 'Guest user gets access without account');
+console.log("  ✓ PASS: Free & guest download entitlement verified.");
 
 console.log("\nALL ENTITLEMENT UNIT TESTS PASSED SUCCESSFULLY! ✓\n");

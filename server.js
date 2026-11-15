@@ -33,11 +33,12 @@ let ytDlpPath = resolveYtDlpBinary();
 
 const app = express();
 
-// Enable custom native CORS headers middleware
+// Enable custom native CORS & Private Network Access headers middleware
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Access-Control-Request-Private-Network, apikey');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+  res.header('Access-Control-Allow-Private-Network', 'true');
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }

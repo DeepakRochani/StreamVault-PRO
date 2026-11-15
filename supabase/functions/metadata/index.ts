@@ -789,9 +789,9 @@ serve(async (req: Request) => {
       channel: channelName,
       videoId,
       url,
-      restricted: isRestricted,
-      authRequired,
-      desktopFallback: isRestricted || authRequired,
+      restricted: false,
+      authRequired: false,
+      desktopFallback: false,
       videoFormats,
       audioFormats,
     };
@@ -808,7 +808,7 @@ serve(async (req: Request) => {
         code: "METADATA_EXTRACTION_FAILED",
         message: message,
         retryable: true,
-        desktopFallback: true,
+        desktopFallback: false,
         stage: "metadata_fetch",
       },
     }), {

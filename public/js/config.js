@@ -24,11 +24,30 @@ if (typeof window !== 'undefined' && window.location && (window.location.hostnam
     console.log('[StreamVault Config] Local mode — API pointing to Local Server:', window.API_BASE_URL);
 } else {
     // Web / Vercel Production Mode:
-    // Uses relative '/api' same-origin endpoints proxied by Vercel server-side to Supabase Edge Functions.
-    // This avoids CORS preflights, prevents ad-blocker domain blocking, and ensures fast edge routing.
+    // Default to relative '/api' same-origin endpoints proxied by Vercel server-side to Supabase Edge Functions.
     window.API_BASE_URL = window.ENV_API_URL || '';
     window.SUPABASE_FUNCTIONS_URL = `https://${window.SUPABASE_PROJECT_REF}.supabase.co/functions/v1`;
     console.log('[StreamVault Config] Production mode — using same-origin /api with Supabase fallback');
+    
+    // Automatic Local Daemon Detection:
+    // If the user has StreamVault server running on 127.0.0.1:10000 on their computer,
+    // upgrade to direct residential pipeline for unthrottled 1080p/4K downloads.
+    if (typeof window !== 'undefined') {
+        const LOCAL_DAEMON = 'http://127.0.0.1:10000';
+        fetch(`${LOCAL_DAEMON}/api/health`, {
+            method: 'GET',
+            mode: 'cors',
+            signal: AbortSignal.timeout ? AbortSignal.timeout(1200) : undefined
+        }).then(res => {
+            if (res.ok) {
+                window.API_BASE_URL = LOCAL_DAEMON;
+                window.__LOCAL_DAEMON_CONNECTED = true;
+                console.log('[StreamVault Config] Local Desktop Engine active! Routing downloads via residential daemon at 127.0.0.1:10000.');
+            }
+        }).catch(() => {
+            // Keep cloud /api fallback
+        });
+    }
     
     // Intercept fetch in Web/Production mode:
     // If a request hits supabase.co directly, attach apikey & Authorization Bearer headers.

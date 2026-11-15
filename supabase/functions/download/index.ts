@@ -734,14 +734,19 @@ async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: 
   }
 
   // 5. Fifth Priority: BTCH residential pool (Fast pre-muxed combined MP4)
-  try {
-    const btchRes = await resolveYouTubeViaBtch(videoId, false);
-    if (btchRes?.streamUrl) {
-      console.log(`[YouTube Engine] Resolved via BTCH fallback: hasAudioCombined=${btchRes.hasAudioCombined}`);
-      return btchRes;
+  // CRITICAL: BTCH only provides 360p. NEVER use BTCH if user requested HD (>= 720p)!
+  if (targetH <= 480) {
+    try {
+      const btchRes = await resolveYouTubeViaBtch(videoId, false);
+      if (btchRes?.streamUrl) {
+        console.log(`[YouTube Engine] Resolved via BTCH fallback: hasAudioCombined=${btchRes.hasAudioCombined}`);
+        return btchRes;
+      }
+    } catch (err: any) {
+      console.warn(`[YouTube Engine] BTCH API error for ${videoId}:`, err?.message || err);
     }
-  } catch (err: any) {
-    console.warn(`[YouTube Engine] BTCH API error for ${videoId}:`, err?.message || err);
+  } else {
+    console.log(`[YouTube Engine] Skipping BTCH 360p fallback because requested quality is HD (${quality})`);
   }
 
   return null;
@@ -770,6 +775,7 @@ async function handleYouTubePost(body: any, reqUrl: URL): Promise<Response> {
   }
 
   const resolved = await resolveYouTubeStream(videoId, isAudio, quality);
+  const targetH = parseQualityHeight(quality);
 
   // If stream resolution failed, return clean retryable status without any desktop fallback prompt
   if (!resolved || !resolved.streamUrl) {
@@ -777,7 +783,9 @@ async function handleYouTubePost(body: any, reqUrl: URL): Promise<Response> {
       success: false,
       error: {
         code: "YOUTUBE_STREAM_BUSY",
-        message: `YouTube stream temporarily busy. Please retry or choose another quality.`,
+        message: targetH >= 1080
+          ? `YouTube 1080p stream temporarily busy. Please choose another quality (720p or 480p) or retry.`
+          : `YouTube stream temporarily busy. Please retry or choose another quality.`,
         desktopFallback: false,
         platform: "youtube",
       },
@@ -791,6 +799,23 @@ async function handleYouTubePost(body: any, reqUrl: URL): Promise<Response> {
   const audioDirectStream = resolved.audioStreamUrl;
   const hasAudioCombined = resolved.hasAudioCombined;
   const resolvedQuality = (resolved as any).resolvedQuality || quality;
+
+  // Strict check: NEVER accept low-res fallback (< 720p) when HD (1080p/720p) was requested
+  if (targetH >= 720 && parseQualityHeight(resolvedQuality) < 720) {
+    console.warn(`[YouTube Engine] Rejecting downgraded stream (${resolvedQuality}) for requested HD (${quality})`);
+    return new Response(JSON.stringify({
+      success: false,
+      error: {
+        code: "YOUTUBE_STREAM_BUSY",
+        message: `YouTube ${quality} stream is currently unavailable from cloud nodes. Please try 720p or 480p, or retry in a moment.`,
+        desktopFallback: false,
+        platform: "youtube",
+      },
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   if (filename.includes(quality) && resolvedQuality !== quality) {
     filename = filename.replace(quality, resolvedQuality);

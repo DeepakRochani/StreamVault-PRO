@@ -268,9 +268,9 @@
             <span class="hidden sm:inline">Admin</span>
         </a>
         <div class="relative" id="user-menu-container">
-        <button id="auth-btn" onclick="window.location.href='streamvault-login.html?mode=login'" class="bg-primary/10 hover:bg-primary/20 text-primary font-bold px-4 py-2 rounded-xl transition-all border border-primary/20 flex items-center gap-2" title="Sign In">
-            <span class="material-symbols-outlined text-[18px]">login</span>
-            <span class="hidden sm:inline text-sm">Sign In</span>
+        <button id="auth-btn" class="hidden bg-primary/10 hover:bg-primary/20 text-primary font-bold px-4 py-2 rounded-xl transition-all border border-primary/20 items-center gap-2" title="User Menu">
+            <span class="material-symbols-outlined text-[18px]">account_circle</span>
+            <span class="hidden sm:inline text-sm">Account</span>
         </button>
     <!-- Dropdown (Hidden by default) -->
     <div id="user-dropdown" class="absolute right-0 mt-2 w-56 bg-surface-container-high border border-white/10 rounded-2xl shadow-xl overflow-hidden hidden flex flex-col z-50">
@@ -509,19 +509,15 @@
             if (udAdminLink) udAdminLink.classList.add('hidden');
 
             if (authBtn) {
-                authBtn.onclick = () => window.location.href = 'streamvault-login.html?mode=login';
-                authBtn.className = "bg-primary/10 hover:bg-primary/20 text-primary font-bold px-4 py-2 rounded-xl transition-all border border-primary/20 flex items-center gap-2";
-                authBtn.innerHTML = '<span class="material-symbols-outlined text-[18px]">login</span><span class="hidden sm:inline text-sm">Sign In</span>';
+                authBtn.classList.add('hidden');
             }
             const histSection = document.getElementById('history-section');
             if(histSection) {
                 histSection.innerHTML = `
                 <div class="w-full bg-surface-container/50 border border-white/5 rounded-2xl p-5 flex flex-col items-center justify-center text-center relative overflow-hidden">
-                    <div class="absolute inset-0 bg-gradient-to-b from-transparent to-surface-container pointer-events-none"></div>
-                    <span class="material-symbols-outlined text-[48px] text-on-surface-variant mb-4 relative z-10">lock</span>
-                    <h3 class="font-title-md text-xl text-on-surface font-bold relative z-10 mb-2">History & Sync Locked</h3>
-                    <p class="text-sm text-on-surface-variant max-w-sm relative z-10 mb-4" id="guest-promo-text">100% Free Video Downloader</p>
-                    <a href="streamvault-login.html?mode=register" class="bg-primary hover:bg-primary-container text-[#5c0000] font-bold px-4 py-2 rounded-xl transition-all relative z-10">Create Free Account</a>
+                    <span class="material-symbols-outlined text-[36px] text-primary mb-2">download_done</span>
+                    <h3 class="font-title-md text-lg text-on-surface font-bold mb-1">Downloads Ready</h3>
+                    <p class="text-xs text-on-surface-variant max-w-sm">Paste any video link above to download in full quality without signing in.</p>
                 </div>`;
                 
                 const checkAndHidePromo = () => {
@@ -1741,15 +1737,7 @@ if (window.supabaseClient) {
         }
 
         function showDesktopProModal(qualityName) {
-            const modal = document.getElementById('desktop-pro-modal');
-            const desc = document.getElementById('desktop-pro-modal-desc');
-            if (desc) {
-                const q = (qualityName || '4K').toUpperCase();
-                desc.textContent = `Resolutions above 1080p (${q}) require StreamVault Desktop Pro. Online web downloads are fully supported up to 1080p Full HD.`;
-            }
-            if (modal) {
-                modal.classList.remove('hidden');
-            }
+            console.log('[Entitlements] All qualities unlocked for online download');
         }
 
         function continueWithWeb1080p() {
@@ -3195,50 +3183,6 @@ if (window.supabaseClient) {
                 <button type="button" onclick="closeDownloadModal()" class="w-full mt-1 text-on-surface-variant hover:text-white py-1.5 text-xs transition-colors cursor-pointer">
                     Close
                 </button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Desktop Pro Upgrade Modal -->
-    <div id="desktop-pro-modal" class="hidden fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-surface-container-high border border-white/10 rounded-3xl p-6 w-full max-w-md shadow-2xl relative text-center animate-fade-in-up">
-            <button onclick="document.getElementById('desktop-pro-modal').classList.add('hidden')" class="absolute top-4 right-4 text-on-surface-variant hover:text-white"><span class="material-symbols-outlined">close</span></button>
-            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center mx-auto mb-4 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
-                <span class="material-symbols-outlined text-[36px]">lock</span>
-            </div>
-            <h3 class="text-2xl font-display font-bold text-on-surface mb-2">Desktop Pro Required</h3>
-            <p id="desktop-pro-modal-desc" class="text-on-surface-variant text-sm mb-4">4K downloads require the StreamVault Desktop App.</p>
-            
-            <div class="bg-surface/70 border border-white/10 rounded-2xl p-4 mb-5 text-left text-xs space-y-2.5 text-on-surface-variant">
-                <div class="text-white font-semibold mb-2 flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-[16px] text-amber-400">stars</span> Desktop Pro includes:
-                </div>
-                <div class="flex items-center gap-2 text-on-surface"><span class="material-symbols-outlined text-[16px] text-green-400">check_circle</span> 1440p, 4K &amp; 8K resolutions</div>
-                <div class="flex items-center gap-2 text-on-surface"><span class="material-symbols-outlined text-[16px] text-green-400">check_circle</span> High-bitrate audio extraction</div>
-                <div class="flex items-center gap-2 text-on-surface"><span class="material-symbols-outlined text-[16px] text-green-400">check_circle</span> Local FFmpeg multi-stream processing</div>
-                <div class="flex items-center gap-2 text-on-surface"><span class="material-symbols-outlined text-[16px] text-green-400">check_circle</span> Unrestricted local browser session downloads</div>
-            </div>
-
-            <div class="flex flex-col gap-3">
-                <a href="streamvault-upgrade.html" class="w-full bg-gradient-to-r from-primary to-orange-500 text-on-primary py-3 rounded-xl font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20">
-                    <span class="material-symbols-outlined text-[18px]">workspace_premium</span> Get Desktop Pro
-                </a>
-                <button type="button" onclick="continueWithWeb1080p()" class="w-full bg-surface border border-white/10 text-on-surface py-2.5 rounded-xl font-medium hover:bg-white/5 transition-colors">Continue with 1080p</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Login Required Modal -->
-    <div id="login-required-modal" class="hidden fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-surface-container-high border border-white/10 rounded-2xl p-5 w-full max-w-sm shadow-2xl relative text-center">
-            <button onclick="document.getElementById('login-required-modal').classList.add('hidden')" class="absolute top-4 right-4 text-on-surface-variant hover:text-white"><span class="material-symbols-outlined">close</span></button>
-            <span class="material-symbols-outlined text-[48px] text-primary mb-4">lock</span>
-            <h3 class="text-2xl font-display font-bold text-on-surface mb-2">Login Required</h3>
-            <p class="text-on-surface-variant text-sm mb-4">Please login to continue analyzing, downloading, and converting files.</p>
-            
-            <div class="flex flex-col gap-3">
-                <button onclick="saveStateAndRedirect()" class="w-full bg-primary text-on-primary py-2 rounded-xl font-bold hover:bg-primary-container transition-colors">Sign In</button>
-                <button onclick="saveStateAndRedirect('register')" class="w-full bg-surface border border-white/10 text-on-surface py-2 rounded-xl font-bold hover:bg-white/5 transition-colors">Create Free Account</button>
             </div>
         </div>
     </div>
