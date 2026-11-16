@@ -27,6 +27,16 @@
         socScript.src = 'https://bellnewyork.org/14/36a5484a8ce32d42c19376b0311e706a';
         document.head.appendChild(socScript);
     }
+
+    // 3. Monetag Tag Zone 311191 Script
+    if (!document.querySelector('script[data-zone="311191"]')) {
+        const monScript = document.createElement('script');
+        monScript.src = 'https://quge5.com/88/tag.min.js';
+        monScript.setAttribute('data-zone', '311191');
+        monScript.async = true;
+        monScript.setAttribute('data-cfasync', 'false');
+        document.head.appendChild(monScript);
+    }
 })();
 
 class StreamVaultAd extends HTMLElement {
