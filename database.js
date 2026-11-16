@@ -286,20 +286,62 @@ function initDB() {
         try { db.exec(`ALTER TABLE plans ADD COLUMN ${col}`); } catch(e) {}
     });
 
-    // Bootstrap Ad Placements
+    // Bootstrap Ad Placements with Adsterra defaults
     const defaultPlacements = [
-        { id: 'home_header', name: 'HEADER_BANNER' },
-        { id: 'home_content', name: 'DOWNLOADER_CONTENT' },
-        { id: 'home_download_complete', name: 'DOWNLOAD_COMPLETE' },
-        { id: 'converter_content', name: 'CONVERTER_BANNER' },
-        { id: 'converter_footer', name: 'CONVERTER_FOOTER_BANNER' },
-        { id: 'profile_settings_footer', name: 'SETTINGS_FOOTER' }
+        { 
+            id: 'home_header', 
+            name: 'HEADER_BANNER', 
+            provider: 'Adsterra',
+            code: `<script type="text/javascript">atOptions = {'key' : '3659b9f3b31b047dfc20ca0f99500e68','format' : 'iframe','height' : 90,'width' : 728,'params' : {}};</script><script type="text/javascript" src="https://bellnewyork.org/22/3659b9f3b31b047dfc20ca0f99500e68"></script>` 
+        },
+        { 
+            id: 'home_content', 
+            name: 'DOWNLOADER_CONTENT', 
+            provider: 'Adsterra',
+            code: `<script type="text/javascript">atOptions = {'key' : '7d264d5af884a6ae24cfced799e093b1','format' : 'iframe','height' : 250,'width' : 300,'params' : {}};</script><script type="text/javascript" src="https://bellnewyork.org/22/7d264d5af884a6ae24cfced799e093b1"></script>` 
+        },
+        { 
+            id: 'home_download_complete', 
+            name: 'DOWNLOAD_COMPLETE', 
+            provider: 'Adsterra',
+            code: `<script async="async" data-cfasync="false" src="https://bellnewyork.org/21/234b0bb78fe3652c9b4335cdca5e011e"></script><div id="container-234b0bb78fe3652c9b4335cdca5e011e"></div>` 
+        },
+        { 
+            id: 'home_footer', 
+            name: 'FOOTER_BANNER', 
+            provider: 'Adsterra',
+            code: `<script type="text/javascript">atOptions = {'key' : '3659b9f3b31b047dfc20ca0f99500e68','format' : 'iframe','height' : 90,'width' : 728,'params' : {}};</script><script type="text/javascript" src="https://bellnewyork.org/22/3659b9f3b31b047dfc20ca0f99500e68"></script>` 
+        },
+        { 
+            id: 'rewarded_video', 
+            name: 'REWARDED_VIDEO', 
+            provider: 'Adsterra',
+            code: `<script type="text/javascript">atOptions = {'key' : '7d264d5af884a6ae24cfced799e093b1','format' : 'iframe','height' : 250,'width' : 300,'params' : {}};</script><script type="text/javascript" src="https://bellnewyork.org/22/7d264d5af884a6ae24cfced799e093b1"></script>` 
+        },
+        { 
+            id: 'converter_content', 
+            name: 'CONVERTER_BANNER', 
+            provider: 'Adsterra',
+            code: `<script type="text/javascript">atOptions = {'key' : '7d264d5af884a6ae24cfced799e093b1','format' : 'iframe','height' : 250,'width' : 300,'params' : {}};</script><script type="text/javascript" src="https://bellnewyork.org/22/7d264d5af884a6ae24cfced799e093b1"></script>` 
+        },
+        { 
+            id: 'converter_footer', 
+            name: 'CONVERTER_FOOTER_BANNER', 
+            provider: 'Adsterra',
+            code: `<script type="text/javascript">atOptions = {'key' : '3659b9f3b31b047dfc20ca0f99500e68','format' : 'iframe','height' : 90,'width' : 728,'params' : {}};</script><script type="text/javascript" src="https://bellnewyork.org/22/3659b9f3b31b047dfc20ca0f99500e68"></script>` 
+        },
+        { 
+            id: 'profile_settings_footer', 
+            name: 'SETTINGS_FOOTER', 
+            provider: 'Adsterra',
+            code: `<script type="text/javascript">atOptions = {'key' : '187d356973a5615573097567743c4165','format' : 'iframe','height' : 60,'width' : 468,'params' : {}};</script><script type="text/javascript" src="https://bellnewyork.org/22/187d356973a5615573097567743c4165"></script>` 
+        }
     ];
     
     try {
-        const adInsert = db.prepare('INSERT OR IGNORE INTO ad_placements (id, name, code) VALUES (?, ?, ?)');
+        const adInsert = db.prepare('INSERT INTO ad_placements (id, name, code, provider) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET code = excluded.code, provider = excluded.provider WHERE code LIKE "%No Code Set%" OR code IS NULL OR code = ""');
         defaultPlacements.forEach(p => {
-            adInsert.run(p.id, p.name, '<!-- Ads Management: No Code Set -->');
+            adInsert.run(p.id, p.name, p.code, p.provider);
         });
     } catch(e) { console.error('Error bootstrapping ad placements:', e.message); }
 
