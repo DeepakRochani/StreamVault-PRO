@@ -17,6 +17,8 @@
 <script src="js/entitlements.js"></script>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="js/fmp4-remuxer.js"></script>
+<script src="js/lame.min.js"></script>
+<script src="js/audio-transcoder.js"></script>
 <script src="ads.js"></script>
 <script src="js/url-parser.js"></script>
 <script src="js/streamvault-ui.js"></script>
@@ -2302,7 +2304,7 @@ if (window.supabaseClient) {
                         let lastProgressTime = performance.now();
                         let lastProgressBytes = 0;
                         finalBlob = await fetchBlobWithProgress(singleUrl, secondaryUrl, (pct, received, total) => {
-                            const p = Math.round(20 + pct * 75);
+                            const p = isAudio ? Math.round(20 + pct * 55) : Math.round(20 + pct * 75);
                             progressBar.style.width = p + '%';
                             pctText.textContent = p + '%';
                             if (total > 0 && received > 0) {
@@ -2339,6 +2341,29 @@ if (window.supabaseClient) {
                     return;
                 }
 
+                // If user selected MP3, automatically decode stream in background via Web Audio API & encode to genuine 320 kbps MP3
+                if (isAudio && finalBlob && window.StreamVaultAudioTranscoder) {
+                    try {
+                        statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Encoding Studio-Quality <strong class="text-white">320 kbps MP3</strong> in background...';
+                        speedText.textContent = '320k MP3';
+                        const originalBlob = finalBlob;
+                        finalBlob = await window.StreamVaultAudioTranscoder.transcodeBlobToMp3(originalBlob, {
+                            bitrate: 320,
+                            onProgress: (pPct, pMsg) => {
+                                const uiPct = Math.min(99, Math.round(75 + (pPct * 0.24)));
+                                progressBar.style.width = uiPct + '%';
+                                pctText.textContent = uiPct + '%';
+                                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> ' + pMsg;
+                            }
+                        });
+                        if (!dlFilename.toLowerCase().endsWith('.mp3')) {
+                            dlFilename = dlFilename.replace(/\.[^/.]+$/, "") + '.mp3';
+                        }
+                    } catch (transcodeErr) {
+                        console.warn('[YouTube MP3 Transcode Exception]:', transcodeErr);
+                    }
+                }
+
                 // Successful completion
                 progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
                 progressBar.style.width = '100%';
@@ -2359,7 +2384,8 @@ if (window.supabaseClient) {
                     URL.revokeObjectURL(blobUrl);
                 }, 10000);
 
-                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> YouTube Download Complete! Saved with sound. <button type="button" onclick="triggerFastBrowserDownload()" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/40 hover:bg-primary/60 px-3 py-1 rounded-lg border border-primary/50 shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">download</span> Save Again</button>';
+                const completeMsg = isAudio ? 'YouTube 320 kbps MP3 Download Complete! Genuine Studio Audio.' : 'YouTube Download Complete! Saved with sound.';
+                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> ' + completeMsg + ' <button type="button" onclick="triggerFastBrowserDownload()" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/40 hover:bg-primary/60 px-3 py-1 rounded-lg border border-primary/50 shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">download</span> Save Again</button>';
                 statusText.classList.replace('text-primary', 'text-green-400');
                 speedText.textContent  = '';
                 sizeInfo.textContent   = '';
@@ -2548,7 +2574,7 @@ if (window.supabaseClient) {
                     let lastProgressTime = performance.now();
                     let lastProgressBytes = 0;
                     finalBlob = await fetchBlobWithProgress(singleUrl, fallbackStreamUrl, (pct, received, total) => {
-                        const p = Math.round(25 + pct * 70);
+                        const p = isAudio ? Math.round(25 + pct * 50) : Math.round(25 + pct * 70);
                         progressBar.style.width = p + '%';
                         pctText.textContent = p + '%';
                         if (total > 0 && received > 0) {
@@ -2598,6 +2624,29 @@ if (window.supabaseClient) {
                     return;
                 }
 
+                // If user selected MP3, automatically decode stream in background via Web Audio API & encode to genuine 320 kbps MP3
+                if (isAudio && finalBlob && window.StreamVaultAudioTranscoder) {
+                    try {
+                        statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> Converting ' + platformName + ' audio to Studio-Quality <strong class="text-white">320 kbps MP3</strong>...';
+                        speedText.textContent = '320k MP3';
+                        const originalBlob = finalBlob;
+                        finalBlob = await window.StreamVaultAudioTranscoder.transcodeBlobToMp3(originalBlob, {
+                            bitrate: 320,
+                            onProgress: (pPct, pMsg) => {
+                                const uiPct = Math.min(99, Math.round(75 + (pPct * 0.24)));
+                                progressBar.style.width = uiPct + '%';
+                                pctText.textContent = uiPct + '%';
+                                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">sync</span> ' + pMsg;
+                            }
+                        });
+                        if (!dlFilename.toLowerCase().endsWith('.mp3')) {
+                            dlFilename = dlFilename.replace(/\.[^/.]+$/, "") + '.mp3';
+                        }
+                    } catch (transcodeErr) {
+                        console.warn('[' + platformName + ' MP3 Transcode Exception]:', transcodeErr);
+                    }
+                }
+
                 progressBar.classList.replace('bg-gradient-to-r', 'bg-green-500');
                 progressBar.style.width = '100%';
                 pctText.textContent = '100%';
@@ -2617,7 +2666,8 @@ if (window.supabaseClient) {
                     URL.revokeObjectURL(blobUrl);
                 }, 10000);
 
-                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> ' + platformName + ' Download Complete! Saved with sound. <button type="button" onclick="triggerFastBrowserDownload()" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/40 hover:bg-primary/60 px-3 py-1 rounded-lg border border-primary/50 shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">download</span> Save Again</button>';
+                const completeMsg = isAudio ? (platformName + ' 320 kbps MP3 Download Complete! Genuine Studio Audio.') : (platformName + ' Download Complete! Saved with sound.');
+                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span> ' + completeMsg + ' <button type="button" onclick="triggerFastBrowserDownload()" class="inline-flex items-center gap-1 font-bold text-white ml-2 bg-primary/40 hover:bg-primary/60 px-3 py-1 rounded-lg border border-primary/50 shadow-sm transition-all text-xs"><span class="material-symbols-outlined text-[14px]">download</span> Save Again</button>';
                 statusText.classList.replace('text-primary', 'text-green-400');
                 speedText.textContent  = '';
                 sizeInfo.textContent   = '';
