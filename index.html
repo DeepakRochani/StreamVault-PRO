@@ -2176,7 +2176,7 @@ if (window.supabaseClient) {
                                     } : {})
                                 },
                                 body: JSON.stringify(reqBody),
-                                signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined
+                                signal: AbortSignal.timeout ? AbortSignal.timeout(60000) : undefined
                             });
                             if (res.ok) {
                                 dlRes = res;
@@ -2408,7 +2408,11 @@ if (window.supabaseClient) {
                 speedText.textContent = '';
                 sizeInfo.textContent = '';
                 pctText.textContent = '';
-                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">error</span> ' + (err.message || 'YouTube media stream temporarily busy') + '<br><button type="button" onclick="startInlineDownload(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white mt-3 bg-primary hover:brightness-110 px-4 py-1.5 rounded-xl text-xs shadow-md transition-all"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry Download</button> <button type="button" onclick="resetToUrlInput()" class="inline-flex items-center gap-1 font-medium text-on-surface hover:text-white mt-3 ml-2 bg-surface-container border border-white/10 px-4 py-1.5 rounded-xl text-xs transition-all">Try Another Video</button>';
+                let displayErrMsg = (typeof err === 'object' && err?.message) ? err.message : String(err || 'YouTube media stream temporarily busy');
+                if (displayErrMsg.toLowerCase().includes('timeout') || err?.name === 'TimeoutError') {
+                    displayErrMsg = 'Cloud streaming node took longer than expected to prepare this stream. Please click Retry Download below or try another quality.';
+                }
+                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">error</span> ' + displayErrMsg + '<br><button type="button" onclick="startInlineDownload(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white mt-3 bg-primary hover:brightness-110 px-4 py-1.5 rounded-xl text-xs shadow-md transition-all"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry Download</button> <button type="button" onclick="resetToUrlInput()" class="inline-flex items-center gap-1 font-medium text-on-surface hover:text-white mt-3 ml-2 bg-surface-container border border-white/10 px-4 py-1.5 rounded-xl text-xs transition-all">Try Another Video</button>';
                 statusText.classList.replace('text-primary', 'text-red-400');
                 downloadAnotherBtn.classList.remove('hidden');
             }
