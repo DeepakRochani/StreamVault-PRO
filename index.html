@@ -251,7 +251,7 @@
       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
       <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
     </span>
-    <span>4K Cloud Engine Online</span>
+    <span id="engine-status-badge">4K Cloud Engine Online</span>
 </div>
 <div class="flex items-center gap-3">
     <!-- Notification Bell -->
@@ -1024,6 +1024,12 @@ if (window.supabaseClient) {
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
+        // Auto-detect local engine badge
+        if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+            const badge = document.getElementById('engine-status-badge');
+            if (badge) badge.textContent = 'Residential 1080p Engine Active';
+        }
+
         // Navigation routing
         document.querySelectorAll('.nav-home').forEach(el => {
             el.addEventListener('click', () => { window.location.href = 'index.html'; });
@@ -2412,7 +2418,29 @@ if (window.supabaseClient) {
                 if (displayErrMsg.toLowerCase().includes('timeout') || err?.name === 'TimeoutError') {
                     displayErrMsg = 'Cloud streaming node took longer than expected to prepare this stream. Please click Retry Download below or try another quality.';
                 }
-                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">error</span> ' + displayErrMsg + '<br><button type="button" onclick="startInlineDownload(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white mt-3 bg-primary hover:brightness-110 px-4 py-1.5 rounded-xl text-xs shadow-md transition-all"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry Download</button> <button type="button" onclick="resetToUrlInput()" class="inline-flex items-center gap-1 font-medium text-on-surface hover:text-white mt-3 ml-2 bg-surface-container border border-white/10 px-4 py-1.5 rounded-xl text-xs transition-all">Try Another Video</button>';
+                const isDesktopFallback = (err && (err.desktopFallback || err.code === 'YOUTUBE_1080P_DESKTOP_RECOMMENDED'));
+                let actionButtons = '';
+                if (isDesktopFallback) {
+                    actionButtons = `
+                        <div class="flex flex-wrap items-center gap-2 mt-3">
+                            <a href="http://localhost:10000" target="_blank" class="inline-flex items-center gap-1.5 font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 px-4 py-2 rounded-xl text-xs shadow-lg transition-all">
+                                <span class="material-symbols-outlined text-[15px]">bolt</span> Launch Local 1080p Engine (localhost:10000)
+                            </a>
+                            <button type="button" onclick="startInlineDownload(window.__lastVideoData, 'video', '720p')" class="inline-flex items-center gap-1 font-bold text-white bg-primary hover:brightness-110 px-4 py-2 rounded-xl text-xs shadow-md transition-all">
+                                <span class="material-symbols-outlined text-[15px]">high_quality</span> Try 720p HD
+                            </button>
+                            <button type="button" onclick="startInlineDownload(window.__lastVideoData, 'audio', '320K')" class="inline-flex items-center gap-1 font-bold text-white bg-amber-600 hover:brightness-110 px-4 py-2 rounded-xl text-xs shadow-md transition-all">
+                                <span class="material-symbols-outlined text-[15px]">music_note</span> Download 320k MP3
+                            </button>
+                            <button type="button" onclick="resetToUrlInput()" class="inline-flex items-center gap-1 font-medium text-on-surface hover:text-white bg-surface-container border border-white/10 px-3 py-2 rounded-xl text-xs transition-all">
+                                Try Another Video
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    actionButtons = `<button type="button" onclick="startInlineDownload(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white mt-3 bg-primary hover:brightness-110 px-4 py-1.5 rounded-xl text-xs shadow-md transition-all"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry Download</button> <button type="button" onclick="resetToUrlInput()" class="inline-flex items-center gap-1 font-medium text-on-surface hover:text-white mt-3 ml-2 bg-surface-container border border-white/10 px-4 py-1.5 rounded-xl text-xs transition-all">Try Another Video</button>`;
+                }
+                statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">error</span> ' + displayErrMsg + '<br>' + actionButtons;
                 statusText.classList.replace('text-primary', 'text-red-400');
                 downloadAnotherBtn.classList.remove('hidden');
             }
@@ -2870,23 +2898,30 @@ if (window.supabaseClient) {
             window.__lastFormat = format;
             window.__lastQuality = selectedQuality;
 
-            // 1. Detect if Local Residential Engine is active (running on 127.0.0.1:10000)
+            // 1. Detect if Local Residential Engine is active (running on localhost:10000)
             let isLocal = window.__LOCAL_DAEMON_CONNECTED;
             if (!isLocal && typeof window !== 'undefined') {
-                try {
-                    const check = await fetch('http://127.0.0.1:10000/api/health', {
-                        method: 'GET',
-                        mode: 'cors',
-                        signal: AbortSignal.timeout ? AbortSignal.timeout(800) : undefined
-                    });
-                    if (check.ok) {
-                        isLocal = true;
-                        window.API_BASE_URL = 'http://127.0.0.1:10000';
-                        window.__LOCAL_DAEMON_CONNECTED = true;
-                        console.log('[Router] Local Residential Engine connected!');
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    isLocal = true;
+                    window.API_BASE_URL = window.location.origin;
+                    window.__LOCAL_DAEMON_CONNECTED = true;
+                    console.log('[Router] Local Residential Engine active on same origin!');
+                } else {
+                    try {
+                        const check = await fetch('http://127.0.0.1:10000/api/health', {
+                            method: 'GET',
+                            mode: 'cors',
+                            signal: AbortSignal.timeout ? AbortSignal.timeout(800) : undefined
+                        });
+                        if (check.ok) {
+                            isLocal = true;
+                            window.API_BASE_URL = 'http://127.0.0.1:10000';
+                            window.__LOCAL_DAEMON_CONNECTED = true;
+                            console.log('[Router] Local Residential Engine connected!');
+                        }
+                    } catch (_) {
+                        isLocal = false;
                     }
-                } catch (_) {
-                    isLocal = false;
                 }
             }
 
