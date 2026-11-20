@@ -139,6 +139,7 @@ async function getYouTubeInnertube() {
   return cachedYouTubeSession;
 }
 
+// ── Helpers ──────────────────────────────────────────────────
 function parseQualityHeight(q: string): number {
   const s = (q || "").toLowerCase();
   if (s.includes("8k") || s.includes("4320")) return 4320;
@@ -178,6 +179,19 @@ function isAudioFormat(f: any): boolean {
   return mime.startsWith("audio") || mime.includes("audio/");
 }
 
+function is1080pFormat(f: any): boolean {
+  if (!isVideoFormat(f)) return false;
+  const h = parseFormatHeight(f);
+  if (h >= 1080) return true;
+  if (f.itag === 299 || f.itag === 137 || f.itag === 399 || f.itag === 248 || f.itag === 303) return true;
+  const qStr = String(f?.quality_label || f?.qualityLabel || "").toLowerCase();
+  return qStr.startsWith("1080");
+}
+
+function isStreamableFormat(f: any): boolean {
+  return Boolean(f?.url || f?.signature_cipher || f?.cipher || typeof f?.decipher === "function");
+}
+
 
 // ── Provider 0: Raw ANDROID InnerTube API (highest priority, bypasses datacenter blocks) ──
 const FALLBACK_YOUTUBE_COOKIE = "DEVICE_INFO=ChxOemN3T1RFME5qRTJOemcyTmpBNU1UUXlOZz09EJjH8dcGGJjH8dcG; GPS=1; PREF=hl=en&tz=UTC; SOCS=CAI; VISITOR_INFO1_LIVE=zjW6Y_RzRUI; VISITOR_PRIVACY_METADATA=CgJJThIEGgAgGg%3D%3D; YSC=JNKtOAO-9B4; __Secure-ROLLOUT_TOKEN=CMS3w9CquMO7HBDkkLrOjZiVAxjkr7C1mo-YAw%3D%3D; __Secure-YNID=CvcBCAUSqQEBDB6PDIo-96LbPh1NeXzrKQsKuZLIhNGWmRZlHoQCNhcQh14d61QUq9L7UgMOnT5TgQ-GSKmdwTFaxt3v3jEwEM78dSdfJTj91fzJxY1IuEItRsRq11dcsFLoYa1WsjT_G_58tQWAPCUGn0uTl_KfPPyOI7mBjirFj8C0Bnof8E87M-TW8CKWPqgAdIeEOJ6qaB60U3BGYKOT3tzwgDEK3tQmVDLcdTLlKAUyRQEcWPVq-WhgbWjCk-QvCa9ppd9UUoNmdmbiSA1GvFPpWScDKvG8GupLc7WKdTFMHhuDpO4WKkLh4o9343DYDhOrHulbBw; __Secure-YT_TVFAS=t=495010&s=2; __Secure-YT_DERP=CPqlq-_cBg%3D%3D";
@@ -210,7 +224,6 @@ async function resolveYouTubeViaRawAndroid(videoId: string, isAudio: boolean, qu
         gl: "US",
       },
     },
-    params: "CgIQBg==",
     playbackContext: {
       contentPlaybackContext: { html5Preference: "HTML5_PREF_WANTS" }
     },
@@ -250,35 +263,37 @@ async function resolveYouTubeViaRawAndroid(videoId: string, isAudio: boolean, qu
   }
 
   // Adaptive video formats with plain (non-ciphered) URLs
-  const vAdaptive = adaptive.filter((f: any) => f.mimeType?.startsWith("video") && f.url);
-  vAdaptive.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
+  const vAdaptive = adaptive.filter((f: any) => (f.mimeType || f.mime_type || "").startsWith("video") && f.url);
+  vAdaptive.sort((a: any, b: any) => (b.height || parseFormatHeight(b) || 0) - (a.height || parseFormatHeight(a) || 0));
 
   let chosenVideo: any = null;
   if (targetH >= 1080) {
-    chosenVideo = vAdaptive.find((f: any) => (f.height || 0) >= 1080);
+    const mp4_1080 = vAdaptive.filter((f: any) => (f.height >= 1080 || parseFormatHeight(f) >= 1080 || f.itag === 137 || f.itag === 299) && (f.mimeType || f.mime_type || "").includes("mp4"));
+    chosenVideo = mp4_1080[0] || vAdaptive.find((f: any) => (f.height >= 1080 || parseFormatHeight(f) >= 1080 || f.itag === 137 || f.itag === 299));
     if (!chosenVideo) {
-      throw new Error(`Android InnerTube has no 1080p format (found max: ${vAdaptive[0]?.height || 0}p)`);
+      throw new Error(`Android InnerTube has no 1080p format (found max: ${vAdaptive[0]?.height || parseFormatHeight(vAdaptive[0]) || 0}p)`);
     }
   } else if (targetH >= 720) {
-    chosenVideo = vAdaptive.find((f: any) => (f.height || 0) === targetH) || vAdaptive.find((f: any) => (f.height || 0) >= 720);
+    const mp4_720 = vAdaptive.filter((f: any) => (f.height >= 720 || parseFormatHeight(f) >= 720) && (f.mimeType || f.mime_type || "").includes("mp4"));
+    chosenVideo = mp4_720[0] || vAdaptive.find((f: any) => (f.height || parseFormatHeight(f)) === targetH) || vAdaptive.find((f: any) => (f.height || parseFormatHeight(f)) >= 720);
     if (!chosenVideo) {
-      throw new Error(`Android InnerTube has no HD format >= 720p (found max: ${vAdaptive[0]?.height || 0}p)`);
+      throw new Error(`Android InnerTube has no HD format >= 720p (found max: ${vAdaptive[0]?.height || parseFormatHeight(vAdaptive[0]) || 0}p)`);
     }
   } else {
-    chosenVideo = vAdaptive.find((f: any) => (f.height || 0) === targetH) || vAdaptive.find((f: any) => (f.height || 0) <= targetH) || vAdaptive[0];
+    chosenVideo = vAdaptive.find((f: any) => (f.height || parseFormatHeight(f)) === targetH) || vAdaptive.find((f: any) => (f.height || parseFormatHeight(f)) <= targetH) || vAdaptive[0];
   }
 
   // Progressive fallback (combined audio+video)
   if (!chosenVideo && targetH <= 720) {
-    const progFmts = formats.filter((f: any) => f.url && f.mimeType?.startsWith("video"));
-    progFmts.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
-    const prog = progFmts.find((f: any) => (f.height || 0) === targetH) || progFmts[0];
+    const progFmts = formats.filter((f: any) => f.url && (f.mimeType || f.mime_type || "").startsWith("video"));
+    progFmts.sort((a: any, b: any) => (b.height || parseFormatHeight(b) || 0) - (a.height || parseFormatHeight(a) || 0));
+    const prog = progFmts.find((f: any) => (f.height || parseFormatHeight(f)) === targetH) || progFmts[0];
     if (prog?.url) {
       const h = prog.height || parseFormatHeight(prog);
       return {
         streamUrl: prog.url,
         directCdnUrl: prog.url,
-        mimeType: prog.mimeType?.split(";")[0] || "video/mp4",
+        mimeType: (prog.mimeType || prog.mime_type || "").split(";")[0] || "video/mp4",
         hasAudioCombined: true,
         resolvedQuality: h > 0 ? `${h}p` : quality,
       };
@@ -287,9 +302,9 @@ async function resolveYouTubeViaRawAndroid(videoId: string, isAudio: boolean, qu
 
   if (!chosenVideo?.url) throw new Error("No plain video URL in Android InnerTube (may require cipher)");
 
-  const aAdaptive = adaptive.filter((f: any) => f.mimeType?.startsWith("audio") && f.url);
+  const aAdaptive = adaptive.filter((f: any) => (f.mimeType || f.mime_type || "").startsWith("audio") && f.url);
   aAdaptive.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
-  const chosenAudio = aAdaptive.find((f: any) => f.itag === 140) || aAdaptive.find((f: any) => f.mimeType?.includes("mp4")) || aAdaptive[0];
+  const chosenAudio = aAdaptive.find((f: any) => f.itag === 140) || aAdaptive.find((f: any) => (f.mimeType || f.mime_type || "").includes("mp4") || (f.mimeType || f.mime_type || "").includes("m4a")) || aAdaptive[0];
 
   const resolvedH = chosenVideo.height || parseFormatHeight(chosenVideo);
   console.log(`[YouTube Engine] Raw Android: ${resolvedH}p video (itag ${chosenVideo.itag}), audio itag ${chosenAudio?.itag}`);
@@ -681,47 +696,79 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
   return null;
 }
 
-// Auxiliary YouTube stream resolver using Innertube with iOS direct client priority
+// Auxiliary YouTube stream resolver using Innertube with multi-client rotation
+// (TV_EMBEDDED / ANDROID_VR / TV / WEB_EMBEDDED for 1080p Full HD; IOS for <= 720p)
 async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
   const yt = await getYouTubeInnertube();
   let video: any = null;
-  let botguardDetected = false;
+  let matchedClient = "";
+  const targetH = parseQualityHeight(quality);
 
-  // Prefer IOS client first: provides direct, unthrottled AVC 1080p and AAC 140 URLs in 250ms
-  try {
-    const iosCandidate = await yt.getBasicInfo(videoId, { client: "IOS" });
-    if (iosCandidate?.streaming_data?.formats?.length || iosCandidate?.streaming_data?.adaptive_formats?.length) {
-      video = iosCandidate;
-      console.log(`[YouTube Engine] Successfully resolved formats via Innertube IOS client`);
-    } else if (iosCandidate?.playability_status?.status === "LOGIN_REQUIRED") {
-      botguardDetected = true;
+  // Client candidate order:
+  // For 1080p (and higher): Prioritize TV_EMBEDDED, ANDROID_VR, TV, WEB_EMBEDDED, WEB.
+  // (Note: iOS client caps formats at 720p on YouTube's backend, so it must not be chosen for 1080p).
+  // For <= 720p: IOS client is fastest and delivers direct unthrottled AVC + AAC formats.
+  const clientsToTry = targetH >= 1080
+    ? (["TV_EMBEDDED", "ANDROID_VR", "TV", "TV_SIMPLY", "WEB_EMBEDDED", "WEB", "IOS"] as const)
+    : (["IOS", "TV_EMBEDDED", "ANDROID_VR", "TV", "WEB_EMBEDDED", "WEB"] as const);
+
+  for (const client of clientsToTry) {
+    try {
+      const candidate = await yt.getInfo(videoId, { client }).catch(() => yt.getBasicInfo(videoId, { client })).catch(() => null);
+      if (!candidate?.streaming_data) continue;
+
+      const formats = candidate.streaming_data.formats || [];
+      const adaptive = candidate.streaming_data.adaptive_formats || [];
+      const allFormats = [...formats, ...adaptive];
+      if (allFormats.length === 0) continue;
+
+      if (isAudio) {
+        const hasAudio = allFormats.some((f: any) => isAudioFormat(f) && isStreamableFormat(f));
+        if (hasAudio) {
+          video = candidate;
+          matchedClient = client;
+          break;
+        }
+      } else if (targetH >= 1080) {
+        // Crucial: Only accept this client if it actually contains a streamable 1080p format!
+        const has1080 = allFormats.some((f: any) => is1080pFormat(f) && isStreamableFormat(f));
+        if (has1080) {
+          video = candidate;
+          matchedClient = client;
+          console.log(`[YouTube Engine] Found genuine 1080p streamable format via client: ${client}`);
+          break;
+        } else {
+          console.log(`[YouTube Engine] Client ${client} has no 1080p format, trying next client...`);
+        }
+      } else if (targetH >= 720) {
+        const has720 = allFormats.some((f: any) => isVideoFormat(f) && parseFormatHeight(f) >= 720 && isStreamableFormat(f));
+        if (has720) {
+          video = candidate;
+          matchedClient = client;
+          console.log(`[YouTube Engine] Found 720p format via client: ${client}`);
+          break;
+        }
+      } else {
+        video = candidate;
+        matchedClient = client;
+        break;
+      }
+    } catch (cErr: any) {
+      console.warn(`[YouTube Engine] Client ${client} error for ${videoId}:`, cErr?.message || cErr);
     }
-  } catch (iosErr: any) {
-    const msg = String(iosErr?.message || iosErr);
-    if (msg.includes("LOGIN_REQUIRED") || msg.includes("confirm you're not a bot") || msg.includes("Sign in")) {
-      botguardDetected = true;
-    }
-    console.warn(`[YouTube Engine] IOS client warning for ${videoId}:`, msg);
   }
 
-  // Fallback to ANDROID, WEB or TV if IOS failed
+  // Fallback: If no client passed strict requirement, try any client that returned streaming_data
   if (!video) {
-    for (const client of ["ANDROID", "WEB", "TV"] as const) {
+    for (const client of ["TV_EMBEDDED", "ANDROID_VR", "TV", "WEB", "IOS"] as const) {
       try {
-        const candidate = await yt.getBasicInfo(videoId, { client });
+        const candidate = await yt.getBasicInfo(videoId, { client }).catch(() => null);
         if (candidate?.streaming_data?.formats?.length || candidate?.streaming_data?.adaptive_formats?.length) {
           video = candidate;
-          console.log(`[YouTube Engine] Successfully resolved formats via client: ${client}`);
+          matchedClient = client;
           break;
-        } else if (candidate?.playability_status?.status === "LOGIN_REQUIRED") {
-          botguardDetected = true;
         }
-      } catch (cErr: any) {
-        const msg = String(cErr?.message || cErr);
-        if (msg.includes("LOGIN_REQUIRED") || msg.includes("confirm you're not a bot") || msg.includes("Sign in")) {
-          botguardDetected = true;
-        }
-      }
+      } catch (_) {}
     }
   }
 
@@ -732,59 +779,111 @@ async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, qua
 
   const formats = streamingData.formats || [];
   const adaptive = streamingData.adaptive_formats || [];
-  let chosenFmt = null;
+  let chosenFmt: any = null;
   let chosenAudioFmt: any = null;
   let hasAudioCombined = false;
 
   if (isAudio) {
-    const audioFormats = adaptive.filter((f: any) => f.has_audio && (f.url || typeof f.decipher === "function"));
-    audioFormats.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
-    chosenFmt = audioFormats.find((f: any) => f.itag === 140) || audioFormats[0] || formats.find((f: any) => f.has_audio);
+    const audioFormats = adaptive.filter((f: any) => isAudioFormat(f) && isStreamableFormat(f));
+    audioFormats.sort((a: any, b: any) => {
+      const a140 = a.itag === 140 ? 1 : 0;
+      const b140 = b.itag === 140 ? 1 : 0;
+      if (a140 !== b140) return b140 - a140;
+      const aMp4 = (a.mime_type || "").includes("mp4") || (a.mime_type || "").includes("m4a") ? 1 : 0;
+      const bMp4 = (b.mime_type || "").includes("mp4") || (b.mime_type || "").includes("m4a") ? 1 : 0;
+      if (aMp4 !== bMp4) return bMp4 - aMp4;
+      return (b.bitrate || 0) - (a.bitrate || 0);
+    });
+    chosenFmt = audioFormats[0] || formats.find((f: any) => isAudioFormat(f));
     hasAudioCombined = true;
   } else {
-    const targetH = parseQualityHeight(quality);
-
-    // Progressive format check for <= 720p (combined video + audio)
-    const prog = formats.filter((f: any) => isVideoFormat(f) && isAudioFormat(f) && (f.url || typeof f.decipher === "function"));
-    if (prog.length > 0 && targetH <= 720) {
-      prog.sort((a: any, b: any) => parseFormatHeight(b) - parseFormatHeight(a));
-      const exactProg = prog.find((f: any) => parseFormatHeight(f) === targetH);
-      if (exactProg) {
-        chosenFmt = exactProg;
-        hasAudioCombined = true;
-        console.log(`[YouTube Engine] Progressive Video+Audio Format: ${chosenFmt.quality_label || parseFormatHeight(chosenFmt) + 'p'} (itag: ${chosenFmt.itag})`);
+    // 1. For <= 720p: Check for progressive combined formats
+    if (targetH <= 720) {
+      const prog = formats.filter((f: any) => isVideoFormat(f) && isAudioFormat(f) && isStreamableFormat(f));
+      if (prog.length > 0) {
+        prog.sort((a: any, b: any) => parseFormatHeight(b) - parseFormatHeight(a));
+        const exactProg = prog.find((f: any) => parseFormatHeight(f) === targetH);
+        if (exactProg) {
+          chosenFmt = exactProg;
+          hasAudioCombined = true;
+          console.log(`[YouTube Engine] Progressive Video+Audio Format: ${chosenFmt.quality_label || parseFormatHeight(chosenFmt) + 'p'} (itag: ${chosenFmt.itag})`);
+        }
       }
     }
 
     if (!chosenFmt) {
       // Modern adaptive video format (1080p, 720p, etc.)
-      const vAdaptive = adaptive.filter((f: any) => isVideoFormat(f) && (f.url || typeof f.decipher === "function"));
-      vAdaptive.sort((a: any, b: any) => parseFormatHeight(b) - parseFormatHeight(a));
-      let chosen = vAdaptive.find((f: any) => parseFormatHeight(f) === targetH);
-      if (!chosen && targetH >= 1080) {
-        chosen = vAdaptive.find((f: any) => parseFormatHeight(f) >= 1080);
-      } else if (!chosen && targetH >= 720) {
-        chosen = vAdaptive.find((f: any) => parseFormatHeight(f) >= 720);
-      } else if (!chosen) {
-        chosen = vAdaptive.find((f: any) => parseFormatHeight(f) <= targetH) || vAdaptive[0];
+      const vAdaptive = adaptive.filter((f: any) => isVideoFormat(f) && isStreamableFormat(f));
+      if (vAdaptive.length === 0) throw new Error("No adaptive video formats found in Innertube stream");
+
+      let candidates: any[] = [];
+      if (targetH >= 1080) {
+        candidates = vAdaptive.filter(is1080pFormat);
+        if (candidates.length === 0) {
+          throw new Error(`Innertube client ${matchedClient} has no 1080p format for ${videoId}`);
+        }
+      } else if (targetH >= 720) {
+        candidates = vAdaptive.filter((f: any) => parseFormatHeight(f) >= 720);
+        if (candidates.length === 0) {
+          throw new Error(`Innertube client ${matchedClient} has no 720p format for ${videoId}`);
+        }
+      } else {
+        candidates = vAdaptive.filter((f: any) => parseFormatHeight(f) === targetH) || vAdaptive.filter((f: any) => parseFormatHeight(f) <= targetH);
+        if (candidates.length === 0) candidates = vAdaptive;
       }
 
-      // CRITICAL: If targetH >= 1080, NEVER accept < 1080p from Innertube
-      if (targetH >= 1080 && (!chosen || parseFormatHeight(chosen) < 1080)) {
-        throw new Error(`Innertube has no 1080p format (found max: ${parseFormatHeight(vAdaptive[0])}p)`);
+      // Strictly prioritize MP4 container (AVC1 itag 299 or 137) for in-browser fmp4-remuxer compatibility
+      const mp4Candidates = candidates.filter((f: any) => (f.mime_type || f.mimeType || "").includes("mp4"));
+      if (mp4Candidates.length > 0) {
+        candidates = mp4Candidates;
       }
-      // CRITICAL: If targetH >= 720, NEVER accept < 720p from Innertube
-      if (targetH >= 720 && (!chosen || parseFormatHeight(chosen) < 720)) {
-        throw new Error(`Innertube has no HD format >= 720p (found max: ${parseFormatHeight(vAdaptive[0])}p)`);
-      }
-      chosenFmt = chosen;
 
-      // High-quality audio format (prefer itag 140 or itag 139)
-      const aAdaptive = adaptive.filter((f: any) => isAudioFormat(f) && (f.url || typeof f.decipher === "function"));
-      aAdaptive.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
-      chosenAudioFmt = aAdaptive.find((f: any) => f.itag === 140) || aAdaptive.find((f: any) => f.mime_type?.includes("mp4") || f.mime_type?.includes("m4a")) || aAdaptive[0];
+      // Sort candidates: Strictly prioritize MP4 container (AVC1) for fmp4-remuxer compatibility
+      candidates.sort((a: any, b: any) => {
+        const aH = parseFormatHeight(a);
+        const bH = parseFormatHeight(b);
+        if (targetH >= 1080) {
+          const a1080 = aH >= 1080 ? 1 : 0;
+          const b1080 = bH >= 1080 ? 1 : 0;
+          if (a1080 !== b1080) return b1080 - a1080;
+        }
+        // Prefer MP4 container
+        const aMp4 = (a.mime_type || "").includes("mp4") ? 1 : 0;
+        const bMp4 = (b.mime_type || "").includes("mp4") ? 1 : 0;
+        if (aMp4 !== bMp4) return bMp4 - aMp4;
+        // Prefer AVC1 (H.264 itag 299 or 137)
+        const aAvc = (a.mime_type || "").includes("avc") || a.itag === 299 || a.itag === 137 ? 1 : 0;
+        const bAvc = (b.mime_type || "").includes("avc") || b.itag === 299 || b.itag === 137 ? 1 : 0;
+        if (aAvc !== bAvc) return bAvc - aAvc;
+        // Prefer direct plain URL
+        const aDirect = Boolean(a.url) ? 1 : 0;
+        const bDirect = Boolean(b.url) ? 1 : 0;
+        if (aDirect !== bDirect) return bDirect - aDirect;
+        // Prefer higher height
+        if (bH !== aH) return bH - aH;
+        // Prefer higher bitrate
+        return (b.bitrate || 0) - (a.bitrate || 0);
+      });
+
+      chosenFmt = candidates[0];
+
+      // Audio stream pairing
+      const aAdaptive = adaptive.filter((f: any) => isAudioFormat(f) && isStreamableFormat(f));
+      aAdaptive.sort((a: any, b: any) => {
+        const a140 = a.itag === 140 ? 1 : 0;
+        const b140 = b.itag === 140 ? 1 : 0;
+        if (a140 !== b140) return b140 - a140;
+        const aMp4 = (a.mime_type || "").includes("mp4") || (a.mime_type || "").includes("m4a") ? 1 : 0;
+        const bMp4 = (b.mime_type || "").includes("mp4") || (b.mime_type || "").includes("m4a") ? 1 : 0;
+        if (aMp4 !== bMp4) return bMp4 - aMp4;
+        const aDirect = Boolean(a.url) ? 1 : 0;
+        const bDirect = Boolean(b.url) ? 1 : 0;
+        if (aDirect !== bDirect) return bDirect - aDirect;
+        return (b.bitrate || 0) - (a.bitrate || 0);
+      });
+      chosenAudioFmt = aAdaptive[0];
       hasAudioCombined = false;
-      console.log(`[YouTube Engine] Adaptive Video (${chosenFmt?.quality_label || parseFormatHeight(chosenFmt) + 'p'}, itag ${chosenFmt?.itag}) + Audio (itag ${chosenAudioFmt?.itag})`);
+      console.log(`[YouTube Engine] Selected Video (${chosenFmt?.quality_label || parseFormatHeight(chosenFmt) + 'p'}, itag ${chosenFmt?.itag}) + Audio (itag ${chosenAudioFmt?.itag}) via ${matchedClient}`);
     }
   }
 
@@ -831,7 +930,16 @@ async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: 
 
   if (isAudio) {
     // Priority for Audio:
-    // 0. Raw Android Audio (Pristine AAC direct stream)
+    // 1. Innertube audio (itag 140 pristine AAC in m4a)
+    try {
+      const res = await resolveYouTubeViaInnertube(videoId, true, quality);
+      if (res?.streamUrl) {
+        console.log(`[YouTube Engine] Resolved Audio via Innertube (itag 140)`);
+        return res;
+      }
+    } catch (_) {}
+
+    // 2. Raw Android Audio
     try {
       const androidRes = await resolveYouTubeViaRawAndroid(videoId, true, quality);
       if (androidRes?.streamUrl) {
@@ -840,7 +948,7 @@ async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: 
       }
     } catch (_) {}
 
-    // 1. BTCH (Ultra-fast dedicated audio stream / MP3)
+    // 3. BTCH (Dedicated audio stream / MP3)
     try {
       const btchRes = await resolveYouTubeViaBtch(videoId, true);
       if (btchRes?.streamUrl) {
@@ -849,25 +957,19 @@ async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: 
       }
     } catch (_) {}
 
-    // 2. Piped audio pool
+    // 4. Piped audio pool
     try {
       const pipedRes = await resolveYouTubeViaPiped(videoId, true, quality);
       if (pipedRes?.streamUrl) return pipedRes;
     } catch (_) {}
 
-    // 3. Invidious audio pool
+    // 5. Invidious audio pool
     try {
       const invRes = await resolveYouTubeViaInvidious(videoId, true, quality);
       if (invRes?.streamUrl) return invRes;
     } catch (_) {}
 
-    // 4. Innertube audio
-    try {
-      const res = await resolveYouTubeViaInnertube(videoId, true, quality);
-      if (res?.streamUrl) return res;
-    } catch (_) {}
-
-    // 5. Cobalt audio
+    // 6. Cobalt audio
     try {
       const cobaltRes = await resolveYouTubeViaCobalt(fullYtUrl, true, quality);
       if (cobaltRes?.streamUrl) return cobaltRes;
@@ -884,18 +986,7 @@ async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: 
   // We MUST prioritize engines capable of genuine 1080p / 720p video streams.
   // We NEVER return BTCH 360p for HD requests!
   if (targetH >= 720) {
-    // 1. First Priority: Raw ANDROID InnerTube API (Direct 1080p itag 137 AVC + 140 AAC without botguard)
-    try {
-      const androidRes = await resolveYouTubeViaRawAndroid(videoId, false, quality);
-      if (androidRes?.streamUrl) {
-        console.log(`[YouTube Engine] Resolved ${quality} via Raw Android: hasAudioCombined=${androidRes.hasAudioCombined}, quality=${androidRes.resolvedQuality}`);
-        return androidRes;
-      }
-    } catch (err: any) {
-      console.warn(`[YouTube Engine] Raw Android error for ${videoId}:`, String(err?.message || err));
-    }
-
-    // 2. Second Priority: Innertube iOS/Android/Web engine (Guaranteed genuine 1080p itag 137 AVC + itag 140 AAC)
+    // 1. First Priority: Innertube TV_EMBEDDED / ANDROID_VR / TV / IOS engine (Guaranteed genuine 1080p itag 299/137 AVC + itag 140 AAC)
     try {
       const res = await resolveYouTubeViaInnertube(videoId, false, quality);
       if (res?.streamUrl) {
@@ -904,6 +995,17 @@ async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: 
       }
     } catch (err: any) {
       console.warn(`[YouTube Engine] Innertube error for ${videoId}:`, String(err?.message || err));
+    }
+
+    // 2. Second Priority: Raw ANDROID InnerTube API (Direct fallback)
+    try {
+      const androidRes = await resolveYouTubeViaRawAndroid(videoId, false, quality);
+      if (androidRes?.streamUrl) {
+        console.log(`[YouTube Engine] Resolved ${quality} via Raw Android: hasAudioCombined=${androidRes.hasAudioCombined}, quality=${androidRes.resolvedQuality}`);
+        return androidRes;
+      }
+    } catch (err: any) {
+      console.warn(`[YouTube Engine] Raw Android error for ${videoId}:`, String(err?.message || err));
     }
 
     // 3. Third Priority: Cobalt v10 engine (Pre-muxed high quality combined MP4 with pristine sound)
@@ -1183,6 +1285,8 @@ async function handleYouTubeGet(req: Request, reqUrl: URL): Promise<Response> {
           ? "com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip"
           : (isGoogleVideo && currentUrl.includes("c=IOS"))
           ? "com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 17_4 like Mac OS X)"
+          : (isGoogleVideo && currentUrl.includes("c=TVHTML5"))
+          ? "Mozilla/5.0 (SMART-TV; Linux; Tizen 5.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
           : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         "Accept": "*/*",
       };
