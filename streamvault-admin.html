@@ -1346,17 +1346,33 @@
 
             <!-- Ad Placements Table -->
             <div class="bg-surface-container-high border border-white/10 rounded-2xl p-4 overflow-hidden">
-                <h3 class="text-xl font-title-md text-on-surface mb-4 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-primary">view_carousel</span> Active Placements
-                </h3>
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                    <div>
+                        <h3 class="text-xl font-title-md text-on-surface flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">view_carousel</span> Active Placements
+                        </h3>
+                        <p class="text-xs text-on-surface-variant mt-0.5">Control live scripts and banners across Monetag, Adsterra, and Google AdSense.</p>
+                    </div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <div class="flex items-center bg-surface border border-white/10 rounded-lg p-0.5 text-xs">
+                            <button onclick="filterAds('all')" id="btn-filter-all" class="px-2.5 py-1 rounded font-medium bg-primary text-on-primary">All</button>
+                            <button onclick="filterAds('Monetag')" id="btn-filter-monetag" class="px-2.5 py-1 rounded font-medium text-on-surface-variant hover:text-on-surface">Monetag</button>
+                            <button onclick="filterAds('Adsterra')" id="btn-filter-adsterra" class="px-2.5 py-1 rounded font-medium text-on-surface-variant hover:text-on-surface">Adsterra</button>
+                            <button onclick="filterAds('Google AdSense')" id="btn-filter-adsense" class="px-2.5 py-1 rounded font-medium text-on-surface-variant hover:text-on-surface">AdSense</button>
+                        </div>
+                        <button onclick="openAdEditModal(null)" class="bg-white/10 hover:bg-white/15 text-on-surface text-xs font-bold py-1.5 px-3 rounded-lg border border-white/15 flex items-center gap-1.5 transition-colors">
+                            <span class="material-symbols-outlined text-[16px]">add</span> Add Placement
+                        </button>
+                    </div>
+                </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>
-                            <tr class="text-on-surface-variant border-b border-white/10">
-                                <th class="py-1 px-2 text-xs font-medium text-sm">Placement Name</th>
-                                <th class="py-1 px-2 text-xs font-medium text-sm">Provider</th>
-                                <th class="py-1 px-2 text-xs font-medium text-sm">Status</th>
-                                <th class="py-1 px-2 text-xs font-medium text-sm">Actions</th>
+                            <tr class="text-on-surface-variant border-b border-white/10 text-xs">
+                                <th class="py-2.5 px-3 font-semibold">Placement & Location</th>
+                                <th class="py-2.5 px-3 font-semibold">Network Provider</th>
+                                <th class="py-2.5 px-3 font-semibold text-center">Status</th>
+                                <th class="py-2.5 px-3 font-semibold text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="ads-table-body" class="divide-y divide-white/5">
@@ -1364,7 +1380,6 @@
                         </tbody>
                     </table>
                 </div>
-            </div>
             </div>
 
             <!-- Rewarded Ads Configuration -->
@@ -1404,38 +1419,63 @@
 
         <!-- Ad Edit Modal -->
         <div id="ad-edit-modal" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
-            <div class="bg-surface-container-high border border-white/10 rounded-2xl p-4 w-full max-w-3xl flex flex-col gap-4 shadow-2xl relative">
-                <button onclick="closeAdEditModal()" class="absolute top-4 right-4 text-on-surface-variant hover:text-white">
+            <div class="bg-surface-container-high border border-white/10 rounded-2xl p-6 w-full max-w-3xl flex flex-col gap-4 shadow-2xl relative">
+                <button onclick="closeAdEditModal()" class="absolute top-4 right-4 text-on-surface-variant hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors">
                     <span class="material-symbols-outlined">close</span>
                 </button>
-                <h3 class="text-2xl font-title-lg text-on-surface flex items-center gap-2">
-                    <span class="material-symbols-outlined text-primary">code</span> Edit Ad Code
-                </h3>
-                <p id="ad-edit-placement-name" class="text-on-surface-variant font-mono text-sm">PLACEMENT_ID</p>
+                <div>
+                    <h3 id="ad-edit-modal-title" class="text-2xl font-title-lg text-on-surface flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary">code</span> Edit Ad Placement
+                    </h3>
+                    <p id="ad-edit-placement-name" class="text-on-surface-variant font-mono text-xs mt-1">PLACEMENT_ID</p>
+                </div>
+
+                <div id="ad-new-fields" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="flex flex-col gap-1">
+                        <label class="text-xs text-on-surface-variant font-medium">Placement ID (unique identifier)</label>
+                        <input type="text" id="ad-edit-id" class="bg-surface border border-white/10 rounded-lg px-3 py-2 text-on-surface text-sm outline-none focus:border-primary font-mono" placeholder="e.g. monetag_banner_custom">
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <label class="text-xs text-on-surface-variant font-medium">Placement Name</label>
+                        <input type="text" id="ad-edit-name" class="bg-surface border border-white/10 rounded-lg px-3 py-2 text-on-surface text-sm outline-none focus:border-primary" placeholder="e.g. Custom Sidebar Banner">
+                    </div>
+                </div>
                 
-                <div class="flex flex-col gap-1">
-                    <label class="text-sm text-on-surface-variant">Ad Provider</label>
-                    <input type="text" id="ad-edit-provider" class="bg-surface border border-white/10 rounded-lg px-4 py-2 text-on-surface outline-none focus:border-primary" placeholder="e.g. AdSense, Custom">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="flex flex-col gap-1">
+                        <label class="text-xs text-on-surface-variant font-medium">Ad Network / Provider</label>
+                        <input type="text" id="ad-edit-provider" class="bg-surface border border-white/10 rounded-lg px-3 py-2 text-on-surface text-sm outline-none focus:border-primary" placeholder="e.g. Monetag, Adsterra, Google AdSense">
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <label class="text-xs text-on-surface-variant font-medium">Placement Location / Target</label>
+                        <input type="text" id="ad-edit-location" class="bg-surface border border-white/10 rounded-lg px-3 py-2 text-on-surface text-sm outline-none focus:border-primary font-mono" placeholder="e.g. header_global, popunder, home_header">
+                    </div>
                 </div>
 
                 <div class="flex flex-col gap-1 flex-grow">
-                    <label class="text-sm text-on-surface-variant">Ad HTML / JS Script</label>
-                    <textarea id="ad-edit-code" class="bg-surface border border-white/10 rounded-lg p-4 text-on-surface font-mono text-sm h-64 outline-none focus:border-primary resize-y" placeholder="Paste Ad Code Here"></textarea>
+                    <label class="text-xs text-on-surface-variant font-medium">HTML / JavaScript Snippet</label>
+                    <textarea id="ad-edit-code" class="bg-surface border border-white/10 rounded-lg p-3 text-on-surface font-mono text-xs h-52 outline-none focus:border-primary resize-y leading-relaxed" placeholder="Paste script or iframe tag here..."></textarea>
                 </div>
 
                 <!-- Preview Area -->
                 <div class="flex flex-col gap-1">
-                    <label class="text-sm text-on-surface-variant">Live Preview (Safe Mode)</label>
-                    <div id="ad-edit-preview-container" class="w-full min-h-[100px] border border-dashed border-white/20 rounded-lg bg-black/50 p-2 flex justify-center items-center overflow-hidden">
+                    <label class="text-xs text-on-surface-variant font-medium">Live Safe Preview</label>
+                    <div id="ad-edit-preview-container" class="w-full min-h-[90px] max-h-48 border border-dashed border-white/20 rounded-lg bg-black/50 p-2 flex justify-center items-center overflow-auto text-xs text-on-surface-variant">
                         <!-- Preview injected here -->
+                        <span class="italic text-white/40">Click 'Preview' below to test rendered markup</span>
                     </div>
                 </div>
 
-                <div class="flex justify-end gap-3 mt-2">
-                    <button onclick="previewAdCode()" class="px-4 py-2 rounded-lg border border-white/20 text-on-surface hover:bg-white/5 transition-colors font-bold">Preview</button>
-                    <button onclick="saveAdCode()" class="px-4 py-2 rounded-lg bg-primary text-on-primary hover:bg-primary-container transition-colors font-bold flex items-center gap-2">
-                        <span class="material-symbols-outlined text-[18px]">save</span> Save Changes
+                <div class="flex justify-between items-center gap-3 mt-1">
+                    <button id="ad-delete-btn" type="button" onclick="deleteActiveAdPlacement()" class="hidden px-3 py-2 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors text-xs font-bold items-center gap-1">
+                        <span class="material-symbols-outlined text-[16px]">delete</span> Delete
                     </button>
+                    <div class="flex items-center gap-2 ml-auto">
+                        <button onclick="previewAdCode()" class="px-4 py-2 rounded-lg border border-white/20 text-on-surface hover:bg-white/5 transition-colors font-semibold text-xs">Preview</button>
+                        <button onclick="saveAdCode()" class="px-5 py-2 rounded-lg bg-primary text-on-primary hover:bg-primary-container transition-colors font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-primary/20">
+                            <span class="material-symbols-outlined text-[16px]">save</span> Save Changes
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2719,47 +2759,145 @@
 
         // Ads Management Logic
         let currentAds = [];
+        let activeAdFilter = 'all';
+
+        function filterAds(provider) {
+            activeAdFilter = provider;
+            ['all', 'monetag', 'adsterra', 'adsense'].forEach(k => {
+                const btn = document.getElementById('btn-filter-' + k);
+                if (!btn) return;
+                const match = (k === 'all' && provider === 'all') ||
+                              (k === 'monetag' && provider.toLowerCase().includes('monetag')) ||
+                              (k === 'adsterra' && provider.toLowerCase().includes('adsterra')) ||
+                              (k === 'adsense' && provider.toLowerCase().includes('adsense'));
+                if (match) {
+                    btn.className = 'px-2.5 py-1 rounded font-medium bg-primary text-on-primary';
+                } else {
+                    btn.className = 'px-2.5 py-1 rounded font-medium text-on-surface-variant hover:text-on-surface';
+                }
+            });
+            renderAdsTable();
+        }
+
+        function renderAdsTable() {
+            const tbody = document.getElementById('ads-table-body');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            const list = currentAds.filter(p => {
+                if (activeAdFilter === 'all') return true;
+                return (p.provider || '').toLowerCase().includes(activeAdFilter.toLowerCase()) ||
+                       (p.id || '').toLowerCase().includes(activeAdFilter.toLowerCase());
+            });
+
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-on-surface-variant text-xs italic">No placements match the selected network.</td></tr>`;
+                return;
+            }
+
+            list.forEach(p => {
+                const isEnabled = p.is_enabled === 1 || p.is_enabled === true || p.is_enabled === '1' || p.is_enabled === 'true';
+                const prov = p.provider || 'Custom';
+                let provBadge = 'bg-white/10 text-on-surface-variant border border-white/10';
+                if (prov.toLowerCase().includes('monetag')) {
+                    provBadge = 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+                } else if (prov.toLowerCase().includes('adsterra')) {
+                    provBadge = 'bg-amber-500/15 text-amber-400 border border-amber-500/30';
+                } else if (prov.toLowerCase().includes('adsense')) {
+                    provBadge = 'bg-blue-500/15 text-blue-400 border border-blue-500/30';
+                }
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-white/5 transition-colors border-b border-white/5">
+                        <td class="py-3 px-3 text-xs">
+                            <div class="font-bold text-on-surface text-sm flex items-center gap-2">
+                                ${p.name || p.id}
+                                ${isEnabled ? '<span class="w-2 h-2 rounded-full bg-emerald-400 inline-block shadow-[0_0_8px_rgba(52,211,153,0.8)]" title="Active"></span>' : '<span class="w-2 h-2 rounded-full bg-white/20 inline-block" title="Disabled"></span>'}
+                            </div>
+                            <div class="text-[11px] text-on-surface-variant font-mono mt-0.5 flex items-center gap-2">
+                                <span class="bg-black/40 px-1.5 py-0.5 rounded border border-white/10">${p.id}</span>
+                                <span>•</span>
+                                <span class="text-white/60">Location: ${p.location || 'default'}</span>
+                            </div>
+                        </td>
+                        <td class="py-3 px-3 text-xs">
+                            <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${provBadge}">${prov}</span>
+                        </td>
+                        <td class="py-3 px-3 text-xs text-center">
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" class="sr-only peer" ${isEnabled ? 'checked' : ''} onchange="toggleAdStatus('${p.id}', this.checked)">
+                                <div class="w-10 h-5 bg-surface-container border border-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                        </td>
+                        <td class="py-3 px-3 text-xs text-right">
+                            <button onclick="openAdEditModal('${p.id}')" class="text-primary hover:text-primary-container font-bold text-xs inline-flex items-center gap-1 px-2.5 py-1 rounded hover:bg-white/5 border border-primary/20 transition-colors">
+                                <span class="material-symbols-outlined text-[14px]">edit</span> Edit Code
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
 
         async function loadAds() {
             try {
-                const res = await fetch((window.API_BASE_URL || '') + '/api/admin/ads');
-                const data = await res.json();
-                if(data.success) {
-                    currentAds = data.placements;
-                    const tbody = document.getElementById('ads-table-body');
-                    tbody.innerHTML = '';
-                    data.placements.forEach(p => {
-                        tbody.innerHTML += `
-                            <tr class="hover:bg-white/5 transition-colors">
-                                <td class="py-1 px-2 text-xs text-on-surface font-medium">${p.name} <br><span class="text-xs text-on-surface-variant font-mono">${p.id}</span></td>
-                                <td class="py-1 px-2 text-xs text-on-surface-variant">${p.provider}</td>
-                                <td class="py-1 px-2 text-xs">
-                                    <label class="relative inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" class="sr-only peer" ${p.is_enabled ? 'checked' : ''} onchange="toggleAdStatus('${p.id}', this.checked)">
-                                        <div class="w-11 h-6 bg-surface-container border border-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                                    </label>
-                                </td>
-                                <td class="py-1 px-2 text-xs">
-                                    <button onclick="openAdEditModal('${p.id}')" class="text-primary hover:text-primary-container text-sm font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">edit</span> Edit Code</button>
-                                </td>
-                            </tr>
-                        `;
-                    });
+                let res = await fetch((window.API_BASE_URL || '') + '/api/admin/ads', {
+                    headers: getAdminHeaders()
+                }).catch(() => null);
+
+                if (!res || !res.ok) {
+                    const fallbackUrl = (window.SUPABASE_FUNCTIONS_URL || 'https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1') + '/admin/ads';
+                    res = await fetch(fallbackUrl, { headers: getAdminHeaders() }).catch(() => null);
                 }
-            } catch(e) {}
+
+                if (res && res.ok) {
+                    const data = await res.json();
+                    if (data.success && Array.isArray(data.placements)) {
+                        currentAds = data.placements;
+                        renderAdsTable();
+                    }
+                }
+            } catch(e) {
+                console.warn('loadAds error:', e);
+            }
         }
 
         let activeEditAdId = null;
 
         function openAdEditModal(id) {
-            const ad = currentAds.find(a => a.id === id);
-            if(!ad) return;
-            activeEditAdId = id;
-            document.getElementById('ad-edit-placement-name').textContent = ad.name + ' (' + ad.id + ')';
-            document.getElementById('ad-edit-provider').value = ad.provider || 'Custom';
-            document.getElementById('ad-edit-code').value = ad.code || '';
-            document.getElementById('ad-edit-preview-container').innerHTML = '';
             const adModal = document.getElementById('ad-edit-modal');
+            const newFields = document.getElementById('ad-new-fields');
+            const delBtn = document.getElementById('ad-delete-btn');
+            const titleEl = document.getElementById('ad-edit-modal-title');
+            const subTitleEl = document.getElementById('ad-edit-placement-name');
+
+            activeEditAdId = id;
+            document.getElementById('ad-edit-preview-container').innerHTML = '<span class="italic text-white/40">Click \'Preview\' below to test rendered markup</span>';
+
+            if (!id) {
+                // New Placement
+                titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add New Placement';
+                subTitleEl.textContent = 'Create a custom ad placement for Monetag, Adsterra, AdSense, or Custom scripts.';
+                newFields.classList.remove('hidden');
+                delBtn.classList.add('hidden');
+                document.getElementById('ad-edit-id').value = '';
+                document.getElementById('ad-edit-name').value = '';
+                document.getElementById('ad-edit-provider').value = 'Custom';
+                document.getElementById('ad-edit-location').value = 'home_content';
+                document.getElementById('ad-edit-code').value = '';
+            } else {
+                // Existing Placement
+                const ad = currentAds.find(a => a.id === id);
+                if (!ad) return;
+                titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">code</span> Edit Ad Placement';
+                subTitleEl.textContent = `${ad.name || ad.id} • [${ad.id}]`;
+                newFields.classList.add('hidden');
+                delBtn.classList.remove('hidden');
+                document.getElementById('ad-edit-provider').value = ad.provider || 'Custom';
+                document.getElementById('ad-edit-location').value = ad.location || '';
+                document.getElementById('ad-edit-code').value = ad.code || '';
+            }
+
             adModal.classList.remove('hidden');
             adModal.classList.add('flex');
         }
@@ -2773,36 +2911,115 @@
         function previewAdCode() {
             const code = document.getElementById('ad-edit-code').value;
             const container = document.getElementById('ad-edit-preview-container');
-            container.innerHTML = code;
+            container.innerHTML = code || '<span class="italic text-white/40">Empty Code</span>';
         }
 
         async function saveAdCode() {
-            if(!activeEditAdId) return;
+            let targetId = activeEditAdId;
+            let targetName = '';
+            let isNew = !targetId;
+
+            if (isNew) {
+                targetId = document.getElementById('ad-edit-id').value.trim();
+                targetName = document.getElementById('ad-edit-name').value.trim();
+                if (!targetId) return alert('Placement ID is required.');
+            }
+
             const code = document.getElementById('ad-edit-code').value;
-            const provider = document.getElementById('ad-edit-provider').value;
-            const ad = currentAds.find(a => a.id === activeEditAdId);
+            const provider = document.getElementById('ad-edit-provider').value.trim() || 'Custom';
+            const location = document.getElementById('ad-edit-location').value.trim() || 'home_content';
+            const existing = currentAds.find(a => a.id === targetId);
+
+            const payload = {
+                id: targetId,
+                name: targetName || (existing ? existing.name : targetId),
+                location: location,
+                provider: provider,
+                code: code,
+                is_enabled: existing ? existing.is_enabled : 1
+            };
+
             try {
-                await fetch((window.API_BASE_URL || '') + '/api/admin/ads/' + activeEditAdId, {
+                let res = await fetch((window.API_BASE_URL || '') + '/api/admin/ads/' + targetId, {
                     method: 'PUT',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ code, provider, is_enabled: ad.is_enabled })
-                });
+                    headers: getAdminHeaders(),
+                    body: JSON.stringify(payload)
+                }).catch(() => null);
+
+                if (!res || !res.ok) {
+                    const fallbackUrl = (window.SUPABASE_FUNCTIONS_URL || 'https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1') + '/admin/ads/' + targetId;
+                    res = await fetch(fallbackUrl, {
+                        method: 'PUT',
+                        headers: getAdminHeaders(),
+                        body: JSON.stringify(payload)
+                    }).catch(() => null);
+                }
+
                 closeAdEditModal();
-                loadAds();
-            } catch(e) { alert("Save failed"); }
+                await loadAds();
+                alert('Ad placement updated successfully!');
+            } catch(e) {
+                alert('Save failed: ' + e.message);
+            }
+        }
+
+        async function deleteActiveAdPlacement() {
+            if (!activeEditAdId) return;
+            if (!confirm(`Are you sure you want to delete ad placement "${activeEditAdId}"?`)) return;
+
+            try {
+                let res = await fetch((window.API_BASE_URL || '') + '/api/admin/ads/' + activeEditAdId, {
+                    method: 'DELETE',
+                    headers: getAdminHeaders()
+                }).catch(() => null);
+
+                if (!res || !res.ok) {
+                    const fallbackUrl = (window.SUPABASE_FUNCTIONS_URL || 'https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1') + '/admin/ads/' + activeEditAdId;
+                    res = await fetch(fallbackUrl, {
+                        method: 'DELETE',
+                        headers: getAdminHeaders()
+                    }).catch(() => null);
+                }
+
+                closeAdEditModal();
+                await loadAds();
+            } catch(e) {
+                alert('Delete failed: ' + e.message);
+            }
         }
 
         async function toggleAdStatus(id, enabled) {
             const ad = currentAds.find(a => a.id === id);
-            if(!ad) return;
+            if (!ad) return;
+            const newStatus = enabled ? 1 : 0;
+            ad.is_enabled = newStatus;
+
+            const payload = {
+                code: ad.code,
+                provider: ad.provider,
+                location: ad.location,
+                is_enabled: newStatus
+            };
+
             try {
-                await fetch((window.API_BASE_URL || '') + '/api/admin/ads/' + id, {
+                let res = await fetch((window.API_BASE_URL || '') + '/api/admin/ads/' + id, {
                     method: 'PUT',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ code: ad.code, provider: ad.provider, is_enabled: enabled })
-                });
-                ad.is_enabled = enabled;
-            } catch(e) {}
+                    headers: getAdminHeaders(),
+                    body: JSON.stringify(payload)
+                }).catch(() => null);
+
+                if (!res || !res.ok) {
+                    const fallbackUrl = (window.SUPABASE_FUNCTIONS_URL || 'https://sjnamkshicpxtyikzsnp.supabase.co/functions/v1') + '/admin/ads/' + id;
+                    await fetch(fallbackUrl, {
+                        method: 'PUT',
+                        headers: getAdminHeaders(),
+                        body: JSON.stringify(payload)
+                    }).catch(() => null);
+                }
+                renderAdsTable();
+            } catch(e) {
+                console.warn('toggleAdStatus error:', e);
+            }
         }
 
         window.addEventListener('load', () => {

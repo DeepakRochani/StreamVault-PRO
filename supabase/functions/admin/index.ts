@@ -40,9 +40,114 @@ let plans = [
 ];
 
 let adPlacements = [
-  { id: "banner_bottom", name: "Bottom Banner", location: "bottom_banner", code: "<!-- Google AdSense Banner ca-pub-7928165411445722 -->", is_enabled: 1, provider: "Google AdSense" },
-  { id: "interstitial", name: "Download Popup", location: "download_interstitial", code: "<!-- Interstitial AdSense ca-pub-7928165411445722 -->", is_enabled: 1, provider: "Google AdSense" },
-  { id: "converter_banner", name: "Converter Top Banner", location: "converter_banner", code: "<!-- Converter Banner ca-pub-7928165411445722 -->", is_enabled: 1, provider: "Google AdSense" },
+  {
+    id: "monetag_zone_311191",
+    name: "Monetag Auto Tag (Zone 311191)",
+    location: "header_global",
+    provider: "Monetag",
+    code: '<script src="https://quge5.com/88/tag.min.js" data-zone="311191" async data-cfasync="false"></script>',
+    is_enabled: 1,
+    description: "Monetag high-yield auto tag for Zone 311191 (popunders, push, interstitial)."
+  },
+  {
+    id: "adsterra_popunder",
+    name: "Adsterra Popunder Script",
+    location: "popunder",
+    provider: "Adsterra",
+    code: '<script data-cfasync="false" src="https://accountut.com/1/2b933657f8c6419d6092a68ba0a3d43b"></script>',
+    is_enabled: 1,
+    description: "Adsterra high CPM popunder triggered on first visitor interaction."
+  },
+  {
+    id: "adsterra_socialbar",
+    name: "Adsterra Social Bar",
+    location: "floating_bar",
+    provider: "Adsterra",
+    code: '<script data-cfasync="false" src="https://bellnewyork.org/14/36a5484a8ce32d42c19376b0311e706a"></script>',
+    is_enabled: 1,
+    description: "Adsterra interactive floating Social Bar and notification ads."
+  },
+  {
+    id: "home_header",
+    name: "Home Header Banner (728x90 / 320x50)",
+    location: "home_header",
+    provider: "Adsterra",
+    code: `<script type="text/javascript">
+atOptions = {
+  'key' : '3659b9f3b31b047dfc20ca0f99500e68',
+  'format' : 'iframe',
+  'height' : 90,
+  'width' : 728,
+  'params' : {}
+};
+</script>
+<script type="text/javascript" src="https://bellnewyork.org/22/3659b9f3b31b047dfc20ca0f99500e68"></script>`,
+    is_enabled: 1,
+    description: "Top leaderboard banner displayed above download container."
+  },
+  {
+    id: "home_content",
+    name: "Home Content Rectangle (300x250)",
+    location: "home_content",
+    provider: "Adsterra",
+    code: `<script type="text/javascript">
+atOptions = {
+  'key' : '7d264d5af884a6ae24cfced799e093b1',
+  'format' : 'iframe',
+  'height' : 250,
+  'width' : 300,
+  'params' : {}
+};
+</script>
+<script type="text/javascript" src="https://bellnewyork.org/22/7d264d5af884a6ae24cfced799e093b1"></script>`,
+    is_enabled: 1,
+    description: "Medium rectangle banner displayed alongside format choices."
+  },
+  {
+    id: "home_download_complete",
+    name: "Download Complete Banner (Native)",
+    location: "home_download_complete",
+    provider: "Adsterra Native",
+    code: `<script async="async" data-cfasync="false" src="https://bellnewyork.org/21/234b0bb78fe3652c9b4335cdca5e011e"></script><div id="container-234b0bb78fe3652c9b4335cdca5e011e"></div>`,
+    is_enabled: 1,
+    description: "High-engagement native banner presented immediately upon download completion."
+  },
+  {
+    id: "home_footer",
+    name: "Home Footer Banner (728x90)",
+    location: "home_footer",
+    provider: "Adsterra",
+    code: `<script type="text/javascript">
+atOptions = {
+  'key' : '3659b9f3b31b047dfc20ca0f99500e68',
+  'format' : 'iframe',
+  'height' : 90,
+  'width' : 728,
+  'params' : {}
+};
+</script>
+<script type="text/javascript" src="https://bellnewyork.org/22/3659b9f3b31b047dfc20ca0f99500e68"></script>`,
+    is_enabled: 1,
+    description: "Bottom leaderboard banner placed above the site footer."
+  },
+  {
+    id: "converter_banner",
+    name: "Converter Top Banner (728x90)",
+    location: "converter_banner",
+    provider: "Google AdSense",
+    code: '<!-- Converter Banner ca-pub-7928165411445722 -->',
+    is_enabled: 1,
+    description: "Banner displayed on the format converter page."
+  },
+  {
+    id: "google_adsense_global",
+    name: "Google AdSense Auto Ads",
+    location: "header_global",
+    provider: "Google AdSense",
+    code: '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7928165411445722" crossorigin="anonymous"></script>',
+    is_enabled: 1,
+    description: "Google AdSense Auto Ads tag (Client ID ca-pub-7928165411445722)."
+  }
 ];
 
 let systemConfig = {
@@ -608,22 +713,47 @@ serve(async (req: Request) => {
     }
 
     // ── 12. Ads Management ───────────────────────────────────────
-    if (pathname === "/ads" || pathname.startsWith("/ads/")) {
+    if (pathname === "/ads" || pathname.startsWith("/ads/") || pathname === "/public-settings") {
       if (req.method === "POST" || req.method === "PUT") {
         const body = await req.json().catch(() => ({}));
         const adId = pathname.replace("/ads/", "").trim();
+        
+        if (body.ads_enabled !== undefined) {
+          systemConfig.ads_enabled = String(body.ads_enabled);
+        }
+
         const existing = adPlacements.find(a => a.id === adId);
         if (existing) {
           Object.assign(existing, body);
         } else if (body.id) {
           adPlacements.push(body);
         }
-        return new Response(JSON.stringify({ success: true, placements: adPlacements }), {
+        return new Response(JSON.stringify({ 
+          success: true, 
+          ads_enabled: systemConfig.ads_enabled !== "false", 
+          placements: adPlacements 
+        }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+
+      if (req.method === "DELETE") {
+        const adId = pathname.replace("/ads/", "").trim();
+        if (adId) {
+          adPlacements = adPlacements.filter(a => a.id !== adId);
+        }
+        return new Response(JSON.stringify({ 
+          success: true, 
+          ads_enabled: systemConfig.ads_enabled !== "false", 
+          placements: adPlacements 
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       return new Response(JSON.stringify({
         success: true,
+        ads_enabled: systemConfig.ads_enabled !== "false",
         placements: adPlacements,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
