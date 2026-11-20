@@ -179,6 +179,133 @@ function isAudioFormat(f: any): boolean {
 }
 
 
+// ── Provider 0: Raw ANDROID InnerTube API (highest priority, bypasses datacenter blocks) ──
+const FALLBACK_YOUTUBE_COOKIE = "DEVICE_INFO=ChxOemN3T1RFME5qRTJOemcyTmpBNU1UUXlOZz09EJjH8dcGGJjH8dcG; GPS=1; PREF=hl=en&tz=UTC; SOCS=CAI; VISITOR_INFO1_LIVE=zjW6Y_RzRUI; VISITOR_PRIVACY_METADATA=CgJJThIEGgAgGg%3D%3D; YSC=JNKtOAO-9B4; __Secure-ROLLOUT_TOKEN=CMS3w9CquMO7HBDkkLrOjZiVAxjkr7C1mo-YAw%3D%3D; __Secure-YNID=CvcBCAUSqQEBDB6PDIo-96LbPh1NeXzrKQsKuZLIhNGWmRZlHoQCNhcQh14d61QUq9L7UgMOnT5TgQ-GSKmdwTFaxt3v3jEwEM78dSdfJTj91fzJxY1IuEItRsRq11dcsFLoYa1WsjT_G_58tQWAPCUGn0uTl_KfPPyOI7mBjirFj8C0Bnof8E87M-TW8CKWPqgAdIeEOJ6qaB60U3BGYKOT3tzwgDEK3tQmVDLcdTLlKAUyRQEcWPVq-WhgbWjCk-QvCa9ppd9UUoNmdmbiSA1GvFPpWScDKvG8GupLc7WKdTFMHhuDpO4WKkLh4o9343DYDhOrHulbBw; __Secure-YT_TVFAS=t=495010&s=2; __Secure-YT_DERP=CPqlq-_cBg%3D%3D";
+
+async function resolveYouTubeViaRawAndroid(videoId: string, isAudio: boolean, quality: string): Promise<ResolvedStreamResult | null> {
+  const targetH = parseQualityHeight(quality);
+  const rawCookie = Deno.env.get("YOUTUBE_COOKIE") || FALLBACK_YOUTUBE_COOKIE;
+  const { cookieHeader } = normalizeYouTubeCookies(rawCookie);
+
+  const reqHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+    "User-Agent": "com.google.android.youtube/19.09.37(Linux; U; Android 11) gzip",
+    "X-Youtube-Client-Name": "3",
+    "X-Youtube-Client-Version": "19.09.37",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Origin": "https://www.youtube.com",
+    "Referer": "https://www.youtube.com/",
+  };
+  if (cookieHeader) reqHeaders["Cookie"] = cookieHeader;
+
+  const payload = {
+    videoId,
+    context: {
+      client: {
+        clientName: "ANDROID",
+        clientVersion: "19.09.37",
+        androidSdkVersion: 30,
+        userAgent: "com.google.android.youtube/19.09.37(Linux; U; Android 11) gzip",
+        hl: "en",
+        gl: "US",
+      },
+    },
+    params: "CgIQBg==",
+    playbackContext: {
+      contentPlaybackContext: { html5Preference: "HTML5_PREF_WANTS" }
+    },
+  };
+
+  const resp = await fetch(
+    "https://www.youtube.com/youtubei/v1/player?key=AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w&prettyPrint=false",
+    { method: "POST", headers: reqHeaders, body: JSON.stringify(payload), signal: AbortSignal.timeout(10000) }
+  );
+
+  if (!resp.ok) throw new Error(`Android InnerTube HTTP ${resp.status}`);
+  const data = await resp.json();
+
+  const playability = data?.playabilityStatus?.status;
+  if (playability && playability !== "OK") {
+    throw new Error(`Android blocked: ${playability} - ${data?.playabilityStatus?.reason || ""}`);
+  }
+
+  const streamingData = data?.streamingData;
+  if (!streamingData) throw new Error("No streamingData in Android InnerTube response");
+
+  const formats: any[] = streamingData.formats || [];
+  const adaptive: any[] = streamingData.adaptiveFormats || [];
+
+  if (isAudio) {
+    const audioFmts = adaptive.filter((f: any) => f.mimeType?.startsWith("audio") && f.url);
+    audioFmts.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
+    const chosen = audioFmts.find((f: any) => f.itag === 140) || audioFmts.find((f: any) => f.url);
+    if (!chosen?.url) throw new Error("No plain audio URL in Android response");
+    return {
+      streamUrl: chosen.url,
+      directCdnUrl: chosen.url,
+      mimeType: chosen.mimeType?.split(";")[0] || "audio/mp4",
+      hasAudioCombined: true,
+      resolvedQuality: "MP3",
+    };
+  }
+
+  // Adaptive video formats with plain (non-ciphered) URLs
+  const vAdaptive = adaptive.filter((f: any) => f.mimeType?.startsWith("video") && f.url);
+  vAdaptive.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
+
+  let chosenVideo: any = null;
+  if (targetH >= 1080) {
+    chosenVideo = vAdaptive.find((f: any) => (f.height || 0) >= 1080);
+    if (!chosenVideo) {
+      throw new Error(`Android InnerTube has no 1080p format (found max: ${vAdaptive[0]?.height || 0}p)`);
+    }
+  } else if (targetH >= 720) {
+    chosenVideo = vAdaptive.find((f: any) => (f.height || 0) === targetH) || vAdaptive.find((f: any) => (f.height || 0) >= 720);
+    if (!chosenVideo) {
+      throw new Error(`Android InnerTube has no HD format >= 720p (found max: ${vAdaptive[0]?.height || 0}p)`);
+    }
+  } else {
+    chosenVideo = vAdaptive.find((f: any) => (f.height || 0) === targetH) || vAdaptive.find((f: any) => (f.height || 0) <= targetH) || vAdaptive[0];
+  }
+
+  // Progressive fallback (combined audio+video)
+  if (!chosenVideo && targetH <= 720) {
+    const progFmts = formats.filter((f: any) => f.url && f.mimeType?.startsWith("video"));
+    progFmts.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
+    const prog = progFmts.find((f: any) => (f.height || 0) === targetH) || progFmts[0];
+    if (prog?.url) {
+      const h = prog.height || parseFormatHeight(prog);
+      return {
+        streamUrl: prog.url,
+        directCdnUrl: prog.url,
+        mimeType: prog.mimeType?.split(";")[0] || "video/mp4",
+        hasAudioCombined: true,
+        resolvedQuality: h > 0 ? `${h}p` : quality,
+      };
+    }
+  }
+
+  if (!chosenVideo?.url) throw new Error("No plain video URL in Android InnerTube (may require cipher)");
+
+  const aAdaptive = adaptive.filter((f: any) => f.mimeType?.startsWith("audio") && f.url);
+  aAdaptive.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
+  const chosenAudio = aAdaptive.find((f: any) => f.itag === 140) || aAdaptive.find((f: any) => f.mimeType?.includes("mp4")) || aAdaptive[0];
+
+  const resolvedH = chosenVideo.height || parseFormatHeight(chosenVideo);
+  console.log(`[YouTube Engine] Raw Android: ${resolvedH}p video (itag ${chosenVideo.itag}), audio itag ${chosenAudio?.itag}`);
+
+  return {
+    streamUrl: chosenVideo.url,
+    audioStreamUrl: chosenAudio?.url,
+    directCdnUrl: chosenVideo.url,
+    audioDirectCdnUrl: chosenAudio?.url,
+    mimeType: chosenVideo.mimeType?.split(";")[0] || "video/mp4",
+    itag: String(chosenVideo.itag),
+    hasAudioCombined: !chosenAudio,
+    resolvedQuality: resolvedH >= 1080 ? "1080p" : resolvedH >= 720 ? "720p" : resolvedH >= 480 ? "480p" : `${resolvedH}p`,
+  };
+}
+
 // ── Provider 1: Cobalt v10 High-Speed Pre-Muxed Engine ────────
 const COBALT_INSTANCES: string[] = [
   "https://cobalt-api.kwiatekm.pl",
@@ -365,12 +492,18 @@ async function resolveYouTubeViaPiped(videoId: string, isAudio: boolean, quality
       vStreams.sort((a: any, b: any) => parseFormatHeight(b) - parseFormatHeight(a));
 
       let chosenVideo = vStreams.find((s: any) => parseFormatHeight(s) === targetH);
-      if (!chosenVideo && targetH >= 720) {
+      if (!chosenVideo && targetH >= 1080) {
+        chosenVideo = vStreams.find((s: any) => parseFormatHeight(s) >= 1080);
+      } else if (!chosenVideo && targetH >= 720) {
         chosenVideo = vStreams.find((s: any) => parseFormatHeight(s) >= 720);
       } else if (!chosenVideo) {
         chosenVideo = vStreams.find((s: any) => parseFormatHeight(s) <= targetH) || vStreams[0];
       }
 
+      // CRITICAL: If targetH >= 1080, NEVER accept < 1080p from Piped
+      if (targetH >= 1080 && (!chosenVideo || parseFormatHeight(chosenVideo) < 1080)) {
+        throw new Error(`Piped has no 1080p format (found max: ${parseFormatHeight(vStreams[0])}p)`);
+      }
       // CRITICAL: If targetH >= 720, NEVER accept < 720p from Piped
       if (targetH >= 720 && (!chosenVideo || parseFormatHeight(chosenVideo) < 720)) {
         throw new Error(`Piped has no HD format >= 720p (found max: ${parseFormatHeight(vStreams[0])}p)`);
@@ -493,12 +626,18 @@ async function resolveYouTubeViaInvidious(videoId: string, isAudio: boolean, qua
         candidates.sort((a: any, b: any) => parseFormatHeight(b) - parseFormatHeight(a));
         const exactMatch = candidates.find((f: any) => parseFormatHeight(f) === targetH);
         let chosenVideo = exactMatch;
-        if (!chosenVideo && targetH >= 720) {
+        if (!chosenVideo && targetH >= 1080) {
+          chosenVideo = candidates.find((f: any) => parseFormatHeight(f) >= 1080);
+        } else if (!chosenVideo && targetH >= 720) {
           chosenVideo = candidates.find((f: any) => parseFormatHeight(f) >= 720);
         } else if (!chosenVideo) {
           chosenVideo = candidates.find((f: any) => parseFormatHeight(f) <= targetH) || candidates[0];
         }
 
+        // CRITICAL: If targetH >= 1080, NEVER accept < 1080p from Invidious
+        if (targetH >= 1080 && (!chosenVideo || parseFormatHeight(chosenVideo) < 1080)) {
+          throw new Error(`Invidious has no 1080p format`);
+        }
         // CRITICAL: If targetH >= 720, NEVER accept < 720p from Invidious
         if (targetH >= 720 && (!chosenVideo || parseFormatHeight(chosenVideo) < 720)) {
           throw new Error(`Invidious has no HD format >= 720p`);
@@ -622,12 +761,18 @@ async function resolveYouTubeViaInnertube(videoId: string, isAudio: boolean, qua
       const vAdaptive = adaptive.filter((f: any) => isVideoFormat(f) && (f.url || typeof f.decipher === "function"));
       vAdaptive.sort((a: any, b: any) => parseFormatHeight(b) - parseFormatHeight(a));
       let chosen = vAdaptive.find((f: any) => parseFormatHeight(f) === targetH);
-      if (!chosen && targetH >= 720) {
+      if (!chosen && targetH >= 1080) {
+        chosen = vAdaptive.find((f: any) => parseFormatHeight(f) >= 1080);
+      } else if (!chosen && targetH >= 720) {
         chosen = vAdaptive.find((f: any) => parseFormatHeight(f) >= 720);
       } else if (!chosen) {
         chosen = vAdaptive.find((f: any) => parseFormatHeight(f) <= targetH) || vAdaptive[0];
       }
 
+      // CRITICAL: If targetH >= 1080, NEVER accept < 1080p from Innertube
+      if (targetH >= 1080 && (!chosen || parseFormatHeight(chosen) < 1080)) {
+        throw new Error(`Innertube has no 1080p format (found max: ${parseFormatHeight(vAdaptive[0])}p)`);
+      }
       // CRITICAL: If targetH >= 720, NEVER accept < 720p from Innertube
       if (targetH >= 720 && (!chosen || parseFormatHeight(chosen) < 720)) {
         throw new Error(`Innertube has no HD format >= 720p (found max: ${parseFormatHeight(vAdaptive[0])}p)`);
@@ -686,6 +831,15 @@ async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: 
 
   if (isAudio) {
     // Priority for Audio:
+    // 0. Raw Android Audio (Pristine AAC direct stream)
+    try {
+      const androidRes = await resolveYouTubeViaRawAndroid(videoId, true, quality);
+      if (androidRes?.streamUrl) {
+        console.log(`[YouTube Engine] Resolved Audio via Raw Android`);
+        return androidRes;
+      }
+    } catch (_) {}
+
     // 1. BTCH (Ultra-fast dedicated audio stream / MP3)
     try {
       const btchRes = await resolveYouTubeViaBtch(videoId, true);
@@ -727,8 +881,21 @@ async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: 
   // ==========================================
 
   // High-Definition / Full HD Video (>= 720p, such as 1080p):
+  // We MUST prioritize engines capable of genuine 1080p / 720p video streams.
+  // We NEVER return BTCH 360p for HD requests!
   if (targetH >= 720) {
-    // 1. First Priority: Innertube iOS/Android/Web engine (Guaranteed genuine 1080p itag 137 AVC + itag 140 AAC)
+    // 1. First Priority: Raw ANDROID InnerTube API (Direct 1080p itag 137 AVC + 140 AAC without botguard)
+    try {
+      const androidRes = await resolveYouTubeViaRawAndroid(videoId, false, quality);
+      if (androidRes?.streamUrl) {
+        console.log(`[YouTube Engine] Resolved ${quality} via Raw Android: hasAudioCombined=${androidRes.hasAudioCombined}, quality=${androidRes.resolvedQuality}`);
+        return androidRes;
+      }
+    } catch (err: any) {
+      console.warn(`[YouTube Engine] Raw Android error for ${videoId}:`, String(err?.message || err));
+    }
+
+    // 2. Second Priority: Innertube iOS/Android/Web engine (Guaranteed genuine 1080p itag 137 AVC + itag 140 AAC)
     try {
       const res = await resolveYouTubeViaInnertube(videoId, false, quality);
       if (res?.streamUrl) {
@@ -739,18 +906,7 @@ async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: 
       console.warn(`[YouTube Engine] Innertube error for ${videoId}:`, String(err?.message || err));
     }
 
-    // 2. High-Speed Residential Proxy Engine (BTCH) - Provides instant 720p HD MP4 with combined audio
-    try {
-      const btchRes = await resolveYouTubeViaBtch(videoId, false);
-      if (btchRes?.streamUrl) {
-        console.log(`[YouTube Engine] Resolved HD via BTCH: quality=${btchRes.resolvedQuality}, hasAudioCombined=${btchRes.hasAudioCombined}`);
-        return btchRes;
-      }
-    } catch (err: any) {
-      console.warn(`[YouTube Engine] BTCH pool error for ${videoId}:`, err?.message || err);
-    }
-
-    // 3. Cobalt v10 engine
+    // 3. Third Priority: Cobalt v10 engine (Pre-muxed high quality combined MP4 with pristine sound)
     try {
       const cobaltRes = await resolveYouTubeViaCobalt(fullYtUrl, false, quality);
       if (cobaltRes?.streamUrl) {
@@ -761,7 +917,7 @@ async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: 
       console.warn(`[YouTube Engine] Cobalt pool error for ${videoId}:`, err?.message || err);
     }
 
-    // 4. Verified Invidious mirrors (Verified >= 720p adaptive video + itag 140 audio)
+    // 4. Fourth Priority: Verified Invidious mirrors (Verified >= 720p adaptive video + itag 140 audio)
     try {
       const invRes = await resolveYouTubeViaInvidious(videoId, false, quality);
       if (invRes?.streamUrl) {
@@ -772,7 +928,7 @@ async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: 
       console.warn(`[YouTube Engine] Invidious error for ${videoId}:`, invErr?.message || invErr);
     }
 
-    // 5. Piped API pool (Verified >= 720p streaming instances)
+    // 5. Fifth Priority: Piped API pool (Verified >= 720p streaming instances)
     try {
       const pipedRes = await resolveYouTubeViaPiped(videoId, false, quality);
       if (pipedRes?.streamUrl) {
@@ -781,6 +937,23 @@ async function resolveYouTubeStream(videoId: string, isAudio: boolean, quality: 
       }
     } catch (err: any) {
       console.warn(`[YouTube Engine] Piped pool error for ${videoId}:`, err?.message || err);
+    }
+
+    // 6. If target is specifically 720p, BTCH can be accepted ONLY IF it genuinely returns >= 720p
+    if (targetH === 720) {
+      try {
+        const btchRes = await resolveYouTubeViaBtch(videoId, false);
+        if (btchRes?.streamUrl && parseQualityHeight(btchRes.resolvedQuality || "") >= 720) {
+          console.log(`[YouTube Engine] Resolved verified 720p via BTCH: quality=${btchRes.resolvedQuality}`);
+          return btchRes;
+        } else {
+          console.log(`[YouTube Engine] Rejected BTCH stream because resolution (${btchRes?.resolvedQuality}) is below 720p`);
+        }
+      } catch (err: any) {
+        console.warn(`[YouTube Engine] BTCH 720p check error for ${videoId}:`, err?.message || err);
+      }
+    } else {
+      console.log(`[YouTube Engine] Skipping BTCH fallback: requested quality is ${quality} Full HD`);
     }
 
     return null;
@@ -883,6 +1056,41 @@ async function handleYouTubePost(body: any, reqUrl: URL): Promise<Response> {
   const audioDirectStream = resolved.audioStreamUrl;
   const hasAudioCombined = resolved.hasAudioCombined;
   const resolvedQuality = (resolved as any).resolvedQuality || quality;
+
+  // Strict quality guard: NEVER return a downgraded stream to the user!
+  // If user requested 1080p, NEVER return < 1080p (such as 720p or 360p)
+  if (targetH >= 1080 && parseQualityHeight(resolvedQuality) < 1080) {
+    console.warn(`[YouTube Engine] Rejecting downgraded stream (${resolvedQuality}) for requested 1080p`);
+    return new Response(JSON.stringify({
+      success: false,
+      error: {
+        code: "YOUTUBE_STREAM_BUSY",
+        message: "YouTube 1080p stream is currently unavailable from cloud nodes. Please choose 720p or 480p, or retry in a moment.",
+        desktopFallback: false,
+        platform: "youtube",
+      },
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // If user requested HD (>= 720p), NEVER return < 720p (such as 360p or 480p)
+  if (targetH >= 720 && parseQualityHeight(resolvedQuality) < 720) {
+    console.warn(`[YouTube Engine] Rejecting downgraded stream (${resolvedQuality}) for requested HD (${quality})`);
+    return new Response(JSON.stringify({
+      success: false,
+      error: {
+        code: "YOUTUBE_STREAM_BUSY",
+        message: `YouTube ${quality} stream is currently unavailable from cloud nodes. Please choose 720p or 480p, or retry in a moment.`,
+        desktopFallback: false,
+        platform: "youtube",
+      },
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   if (filename.includes(quality) && resolvedQuality !== quality) {
     filename = filename.replace(quality, resolvedQuality);
