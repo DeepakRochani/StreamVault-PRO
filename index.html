@@ -1850,22 +1850,25 @@ if (window.supabaseClient) {
                 return h;
             }
 
-            function isDirectGoogleVideo(u) {
+            function isDirectRestrictedStream(u) {
                 if (!u) return false;
                 try {
                     const parsed = new URL(u, window.location.origin);
-                    return parsed.hostname.endsWith('googlevideo.com') || parsed.hostname === 'googlevideo.com';
+                    return parsed.hostname.endsWith('googlevideo.com') || 
+                           parsed.hostname === 'googlevideo.com' ||
+                           parsed.hostname.includes('ytdownloader.tech') ||
+                           parsed.hostname.includes('tioo.eu.org');
                 } catch (_) {
                     return false;
                 }
             }
 
-            // Exclude direct googlevideo.com URLs in browser fetch (cross-origin CORS block)
-            // Proxies like api.vidsnap.app or /api/download have open CORS and must NOT be excluded!
-            if (isDirectGoogleVideo(primaryUrl)) {
-                primaryUrl = !isDirectGoogleVideo(fallbackUrl) ? fallbackUrl : null;
+            // Exclude direct restricted URLs in browser fetch (cross-origin CORS block)
+            // Proxies like Supabase edge download have open CORS and must be used!
+            if (isDirectRestrictedStream(primaryUrl)) {
+                primaryUrl = !isDirectRestrictedStream(fallbackUrl) ? fallbackUrl : null;
             }
-            if (isDirectGoogleVideo(fallbackUrl)) {
+            if (isDirectRestrictedStream(fallbackUrl)) {
                 fallbackUrl = null;
             }
             if (!primaryUrl) {
@@ -2282,16 +2285,8 @@ if (window.supabaseClient) {
                     progressBar.style.width = '20%';
                     pctText.textContent = '20%';
 
-                    const isDirectYt = (u) => {
-                        if (!u) return false;
-                        try {
-                            const p = new URL(u, window.location.origin);
-                            return p.hostname.endsWith('googlevideo.com') || p.hostname === 'googlevideo.com';
-                        } catch(_) { return false; }
-                    };
-
-                    const singleUrl = (dlData.streamUrl && !isDirectYt(dlData.streamUrl)) ? dlData.streamUrl : (dlData.fullDownloadUrl || dlData.downloadUrl);
-                    const secondaryUrl = (singleUrl !== dlData.fullDownloadUrl && dlData.fullDownloadUrl) ? dlData.fullDownloadUrl : (dlData.streamUrl !== singleUrl ? dlData.streamUrl : null);
+                    const singleUrl = (dlData.fullDownloadUrl || dlData.downloadUrl) || dlData.streamUrl;
+                    const secondaryUrl = (dlData.streamUrl && typeof isDirectRestrictedStream === 'function' && !isDirectRestrictedStream(dlData.streamUrl)) ? dlData.streamUrl : null;
                     try {
                         let lastProgressTime = performance.now();
                         let lastProgressBytes = 0;
@@ -2403,6 +2398,8 @@ if (window.supabaseClient) {
                 let displayErrMsg = (typeof err === 'object' && err?.message) ? err.message : String(err || 'YouTube media stream temporarily busy');
                 if (displayErrMsg.toLowerCase().includes('timeout') || err?.name === 'TimeoutError') {
                     displayErrMsg = 'Cloud streaming node took longer than expected to prepare this stream. Please click Retry Download below or try another quality.';
+                } else if (displayErrMsg.toLowerCase().includes('botguard') || displayErrMsg.toLowerCase().includes('login_required')) {
+                    displayErrMsg = 'YouTube stream temporarily busy. Please choose another quality (720p or 480p) or retry below.';
                 }
                 statusText.innerHTML = '<span class="material-symbols-outlined text-[14px]">error</span> ' + displayErrMsg + '<br><button type="button" onclick="downloadYouTubeMedia(window.__lastVideoData, window.__lastFormat, window.__lastQuality)" class="inline-flex items-center gap-1 font-bold text-white mt-3 bg-primary hover:brightness-110 px-4 py-1.5 rounded-xl text-xs shadow-md transition-all"><span class="material-symbols-outlined text-[14px]">refresh</span> Retry Download</button> <button type="button" onclick="resetToUrlInput()" class="inline-flex items-center gap-1 font-medium text-on-surface hover:text-white mt-3 ml-2 bg-surface-container border border-white/10 px-4 py-1.5 rounded-xl text-xs transition-all">Try Another Video</button>';
                 statusText.classList.replace('text-primary', 'text-red-400');
